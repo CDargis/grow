@@ -3,6 +3,7 @@ using Amazon.CDK.AWS.CertificateManager;
 using Amazon.CDK.AWS.CloudFront;
 using Amazon.CDK.AWS.CloudFront.Origins;
 using Amazon.CDK.AWS.DynamoDB;
+using DynamoAttribute = Amazon.CDK.AWS.DynamoDB.Attribute;
 using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
 using Amazon.CDK.AWS.Apigatewayv2.Alpha;
@@ -27,46 +28,46 @@ public class GrowStack : Stack
         Table plantsTable = new Table(this, "PlantsTable", new TableProps
         {
             TableName     = "grow-plants",
-            PartitionKey  = new Attribute { Name = "plantId", Type = AttributeType.STRING },
+            PartitionKey  = new DynamoAttribute { Name = "plantId", Type = AttributeType.STRING },
             BillingMode   = BillingMode.PAY_PER_REQUEST,
             RemovalPolicy = RemovalPolicy.RETAIN
         });
         plantsTable.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
         {
             IndexName      = "user-index",
-            PartitionKey   = new Attribute { Name = "userId",  Type = AttributeType.STRING },
-            SortKey        = new Attribute { Name = "plantId", Type = AttributeType.STRING },
+            PartitionKey   = new DynamoAttribute { Name = "userId",  Type = AttributeType.STRING },
+            SortKey        = new DynamoAttribute { Name = "plantId", Type = AttributeType.STRING },
             ProjectionType = ProjectionType.ALL
         });
 
         Table environmentsTable = new Table(this, "EnvironmentsTable", new TableProps
         {
             TableName     = "grow-environments",
-            PartitionKey  = new Attribute { Name = "environmentId", Type = AttributeType.STRING },
+            PartitionKey  = new DynamoAttribute { Name = "environmentId", Type = AttributeType.STRING },
             BillingMode   = BillingMode.PAY_PER_REQUEST,
             RemovalPolicy = RemovalPolicy.RETAIN
         });
         environmentsTable.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
         {
             IndexName      = "user-index",
-            PartitionKey   = new Attribute { Name = "userId",        Type = AttributeType.STRING },
-            SortKey        = new Attribute { Name = "environmentId", Type = AttributeType.STRING },
+            PartitionKey   = new DynamoAttribute { Name = "userId",        Type = AttributeType.STRING },
+            SortKey        = new DynamoAttribute { Name = "environmentId", Type = AttributeType.STRING },
             ProjectionType = ProjectionType.ALL
         });
 
         Table logsTable = new Table(this, "LogsTable", new TableProps
         {
             TableName     = "grow-logs",
-            PartitionKey  = new Attribute { Name = "plantId", Type = AttributeType.STRING },
-            SortKey       = new Attribute { Name = "logId",   Type = AttributeType.STRING },
+            PartitionKey  = new DynamoAttribute { Name = "plantId", Type = AttributeType.STRING },
+            SortKey       = new DynamoAttribute { Name = "logId",   Type = AttributeType.STRING },
             BillingMode   = BillingMode.PAY_PER_REQUEST,
             RemovalPolicy = RemovalPolicy.RETAIN
         });
         logsTable.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
         {
             IndexName      = "user-date-index",
-            PartitionKey   = new Attribute { Name = "userId", Type = AttributeType.STRING },
-            SortKey        = new Attribute { Name = "date",   Type = AttributeType.STRING },
+            PartitionKey   = new DynamoAttribute { Name = "userId", Type = AttributeType.STRING },
+            SortKey        = new DynamoAttribute { Name = "date",   Type = AttributeType.STRING },
             ProjectionType = ProjectionType.ALL
         });
 
