@@ -6,6 +6,11 @@ using Amazon.CDK.AWS.DynamoDB;
 using DynamoAttribute = Amazon.CDK.AWS.DynamoDB.Attribute;
 using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
+using LambdaFunction      = Amazon.CDK.AWS.Lambda.Function;
+using LambdaFunctionProps = Amazon.CDK.AWS.Lambda.FunctionProps;
+using LambdaCode          = Amazon.CDK.AWS.Lambda.Code;
+using LambdaRuntime       = Amazon.CDK.AWS.Lambda.Runtime;
+using LambdaArchitecture  = Amazon.CDK.AWS.Lambda.Architecture;
 using Amazon.CDK.AWS.Apigatewayv2.Alpha;
 using Amazon.CDK.AWS.Apigatewayv2.Integrations.Alpha;
 using Amazon.CDK.AWS.Route53;
@@ -99,15 +104,15 @@ public class GrowStack : Stack
 
         // ── Lambda ────────────────────────────────────────────────────────
 
-        Function apiFunction = new Function(this, "ApiFunction", new FunctionProps
+        LambdaFunction apiFunction = new LambdaFunction(this, "ApiFunction", new LambdaFunctionProps
         {
             FunctionName  = "grow-api",
-            Runtime       = Runtime.PROVIDED_AL2023,
-            Architecture  = Architecture.ARM_64,
+            Runtime       = LambdaRuntime.PROVIDED_AL2023,
+            Architecture  = LambdaArchitecture.ARM_64,
             Handler       = "bootstrap",
             Timeout       = Duration.Seconds(30),
             MemorySize    = 256,
-            Code = Code.FromAsset("../backend", new AssetOptions
+            Code = LambdaCode.FromAsset("../backend", new Amazon.CDK.AWS.S3.Assets.AssetOptions
             {
                 Bundling = new BundlingOptions
                 {
