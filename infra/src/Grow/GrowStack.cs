@@ -120,7 +120,7 @@ public class GrowStack : Stack
                     Command = new[]
                     {
                         "sh", "-c",
-                        "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -tags lambda.norpc -o /asset-output/bootstrap ./cmd/api"
+                        "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOCACHE=/tmp/go-build go build -tags lambda.norpc -o /asset-output/bootstrap ./cmd/api"
                     }
                 }
             }),
