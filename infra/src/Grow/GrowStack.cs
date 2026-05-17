@@ -264,12 +264,12 @@ public class GrowStack : Stack
 
         // ── Outputs ───────────────────────────────────────────────────────
 
-        new CfnOutput(this, "SiteUrl",           new CfnOutputProps { Value = $"https://{domainName}" });
-        new CfnOutput(this, "DistributionId",    new CfnOutputProps { Value = distribution.DistributionId });
-        new CfnOutput(this, "ApiEndpoint",       new CfnOutputProps { Value = httpApi.ApiEndpoint });
-        new CfnOutput(this, "PlantsTable",       new CfnOutputProps { Value = plantsTable.TableName });
-        new CfnOutput(this, "EnvironmentsTable", new CfnOutputProps { Value = environmentsTable.TableName });
-        new CfnOutput(this, "LogsTable",         new CfnOutputProps { Value = logsTable.TableName });
-        new CfnOutput(this, "MediaBucket",       new CfnOutputProps { Value = mediaBucket.BucketName });
+        new CfnOutput(this, "SiteUrl",                new CfnOutputProps { Value = $"https://{domainName}" });
+        new CfnOutput(this, "DistributionId",         new CfnOutputProps { Value = distribution.DistributionId });
+        new CfnOutput(this, "ApiEndpoint",            new CfnOutputProps { Value = httpApi.ApiEndpoint });
+        new CfnOutput(this, "PlantsTableName",        new CfnOutputProps { Value = plantsTable.TableName });
+        new CfnOutput(this, "EnvironmentsTableName",  new CfnOutputProps { Value = environmentsTable.TableName });
+        new CfnOutput(this, "LogsTableName",          new CfnOutputProps { Value = logsTable.TableName });
+        new CfnOutput(this, "MediaBucketName",        new CfnOutputProps { Value = mediaBucket.BucketName });
     }
 }
