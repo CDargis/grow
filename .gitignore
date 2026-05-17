@@ -12,7 +12,9 @@ go.work.sum
 
 # ── React / Node ──────────────────────────────────────────────────────────────
 node_modules/
-dist/
+backend/dist/
+frontend/dist/*
+!frontend/dist/index.html
 build/
 .next/
 out/
