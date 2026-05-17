@@ -48,7 +48,7 @@ func main() {
 	mux := http.NewServeMux()
 	a.registerRoutes(mux)
 
-	lambda.Start(httpadapter.New(mux).ProxyWithContext)
+	lambda.Start(httpadapter.NewV2(mux).ProxyWithContext)
 }
 
 func (a *app) registerRoutes(mux *http.ServeMux) {
