@@ -56,6 +56,7 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/plants",                   a.createPlant)
 	mux.HandleFunc("GET /api/plants/{plantId}",          a.getPlant)
 	mux.HandleFunc("DELETE /api/plants/{plantId}",       a.deletePlant)
+	mux.HandleFunc("PUT /api/plants/{plantId}/environment", a.assignEnvironment)
 
 	mux.HandleFunc("GET /api/plants/{plantId}/logs",     a.listLogs)
 	mux.HandleFunc("POST /api/plants/{plantId}/logs",    a.createLog)
@@ -108,6 +109,34 @@ func (a *app) createPlant(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusCreated)
 	jsonOK(w, plant)
+}
+
+func (a *app) assignEnvironment(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		EnvironmentID *string `json:"environmentId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	plantID := r.PathValue("plantId")
+	fromEnvID, err := a.plants.AssignEnvironment(r.Context(), plantID, req.EnvironmentID)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	data := model.EnvironmentChangeData{FromEnvironmentID: fromEnvID}
+	if req.EnvironmentID != nil && *req.EnvironmentID != "" {
+		data.ToEnvironmentID = *req.EnvironmentID
+	}
+	dataBytes, _ := json.Marshal(data)
+	if _, err := a.logs.Create(r.Context(), plantID, a.userID, model.CreateLogRequest{
+		LogType: model.LogEnvironmentChange,
+		Data:    json.RawMessage(dataBytes),
+	}); err != nil {
+		log.Printf("warn: environment_change log: %v", err)
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *app) deletePlant(w http.ResponseWriter, r *http.Request) {

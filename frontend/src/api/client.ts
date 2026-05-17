@@ -25,7 +25,9 @@ export const api = {
     list:   ()                          => request<Plant[]>('/plants'),
     get:    (id: string)                => request<Plant>(`/plants/${id}`),
     create: (body: CreatePlantRequest)  => request<Plant>('/plants', { method: 'POST', body: JSON.stringify(body) }),
-    delete: (id: string)                => request<void>(`/plants/${id}`, { method: 'DELETE' }),
+    delete:            (id: string)                    => request<void>(`/plants/${id}`, { method: 'DELETE' }),
+    assignEnvironment: (id: string, environmentId: string | null) =>
+      request<void>(`/plants/${id}/environment`, { method: 'PUT', body: JSON.stringify({ environmentId }) }),
   },
 
   environments: {

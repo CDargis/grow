@@ -89,6 +89,44 @@ func (s *PlantStore) Create(ctx context.Context, userID string, req model.Create
 	return &plant, nil
 }
 
+// AssignEnvironment updates a plant's environmentId and returns the previous value.
+// Pass nil toEnvID to remove the assignment.
+func (s *PlantStore) AssignEnvironment(ctx context.Context, plantID string, toEnvID *string) (fromEnvID string, err error) {
+	plant, err := s.Get(ctx, plantID)
+	if err != nil {
+		return "", err
+	}
+	if plant == nil {
+		return "", fmt.Errorf("plant not found: %s", plantID)
+	}
+	fromEnvID = plant.EnvironmentID
+
+	if toEnvID != nil && *toEnvID != "" {
+		_, err = s.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+			TableName: aws.String(s.tableName),
+			Key: map[string]types.AttributeValue{
+				"plantId": &types.AttributeValueMemberS{Value: plantID},
+			},
+			UpdateExpression: aws.String("SET environmentId = :eid"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":eid": &types.AttributeValueMemberS{Value: *toEnvID},
+			},
+		})
+	} else {
+		_, err = s.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+			TableName: aws.String(s.tableName),
+			Key: map[string]types.AttributeValue{
+				"plantId": &types.AttributeValueMemberS{Value: plantID},
+			},
+			UpdateExpression: aws.String("REMOVE environmentId"),
+		})
+	}
+	if err != nil {
+		return "", fmt.Errorf("assign environment: %w", err)
+	}
+	return fromEnvID, nil
+}
+
 func (s *PlantStore) Delete(ctx context.Context, plantID string) error {
 	if _, err := s.ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.tableName),

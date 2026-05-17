@@ -5,15 +5,16 @@ import "encoding/json"
 type LogType string
 
 const (
-	LogWatering    LogType = "watering"
-	LogFeeding     LogType = "feeding"
-	LogTraining    LogType = "training"
-	LogTrimming    LogType = "trimming"
-	LogTransplant  LogType = "transplant"
-	LogHeight      LogType = "height"
-	LogNote        LogType = "note"
-	LogPhoto       LogType = "photo"
-	LogPhaseChange LogType = "phase_change"
+	LogWatering           LogType = "watering"
+	LogFeeding            LogType = "feeding"
+	LogTraining           LogType = "training"
+	LogTrimming           LogType = "trimming"
+	LogTransplant         LogType = "transplant"
+	LogHeight             LogType = "height"
+	LogNote               LogType = "note"
+	LogPhoto              LogType = "photo"
+	LogPhaseChange        LogType = "phase_change"
+	LogEnvironmentChange  LogType = "environment_change"
 )
 
 type Log struct {
@@ -84,4 +85,9 @@ type PhotoData struct {
 type PhaseChangeData struct {
 	FromPhase PlantPhase `json:"fromPhase"`
 	ToPhase   PlantPhase `json:"toPhase"`
+}
+
+type EnvironmentChangeData struct {
+	FromEnvironmentID string `json:"fromEnvironmentId,omitempty"`
+	ToEnvironmentID   string `json:"toEnvironmentId,omitempty"`
 }
