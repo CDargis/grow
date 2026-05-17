@@ -1,9 +1,13 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { api } from '@/api/client'
+import { AddPlantSheet } from '@/components/AddPlantSheet'
 
 export function PlantsPage() {
+  const [addOpen, setAddOpen] = useState(false)
+
   const { data: plants, isLoading } = useQuery({
     queryKey: ['plants'],
     queryFn: api.plants.list,
@@ -13,7 +17,10 @@ export function PlantsPage() {
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-lg font-semibold">Plants</h1>
-        <button className="flex items-center gap-1 text-sm text-fern active:opacity-70">
+        <button
+          onClick={() => setAddOpen(true)}
+          className="flex items-center gap-1 text-sm text-fern active:opacity-70"
+        >
           <Plus size={18} />
           Add
         </button>
@@ -41,6 +48,8 @@ export function PlantsPage() {
           </Link>
         ))}
       </div>
+
+      <AddPlantSheet open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   )
 }

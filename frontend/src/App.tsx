@@ -8,7 +8,7 @@ import { PlantDetailPage } from '@/pages/PlantDetail'
 
 export default function App() {
   return (
-    <div className="flex flex-col h-screen bg-base">
+    <div className="flex flex-col h-[100dvh] bg-base">
       <DateStrip />
 
       <main className="flex-1 overflow-y-auto">

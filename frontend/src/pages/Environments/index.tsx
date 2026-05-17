@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { api } from '@/api/client'
+import { AddEnvironmentSheet } from '@/components/AddEnvironmentSheet'
 
 const ENV_ICONS: Record<string, string> = {
   tent:       '⛺',
@@ -13,6 +15,8 @@ const ENV_ICONS: Record<string, string> = {
 }
 
 export function EnvironmentsPage() {
+  const [addOpen, setAddOpen] = useState(false)
+
   const { data: envs, isLoading } = useQuery({
     queryKey: ['environments'],
     queryFn: api.environments.list,
@@ -22,7 +26,10 @@ export function EnvironmentsPage() {
     <div className="p-4">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-lg font-semibold">Environments</h1>
-        <button className="flex items-center gap-1 text-sm text-fern active:opacity-70">
+        <button
+          onClick={() => setAddOpen(true)}
+          className="flex items-center gap-1 text-sm text-fern active:opacity-70"
+        >
           <Plus size={18} />
           Add
         </button>
@@ -51,6 +58,8 @@ export function EnvironmentsPage() {
           </div>
         ))}
       </div>
+
+      <AddEnvironmentSheet open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   )
 }
