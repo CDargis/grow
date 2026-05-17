@@ -5,8 +5,8 @@ using Amazon.CDK.AWS.CloudFront.Origins;
 using Amazon.CDK.AWS.DynamoDB;
 using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
-using Amazon.CDK.AWS.APIGatewayv2.Alpha;
-using Amazon.CDK.AWS.APIGatewayv2.Integrations.Alpha;
+using Amazon.CDK.AWS.Apigatewayv2.Alpha;
+using Amazon.CDK.AWS.Apigatewayv2.Integrations.Alpha;
 using Amazon.CDK.AWS.Route53;
 using Amazon.CDK.AWS.Route53.Targets;
 using Amazon.CDK.AWS.S3;
@@ -150,7 +150,7 @@ public class GrowStack : Stack
         httpApi.AddRoutes(new AddRoutesOptions
         {
             Path        = "/{proxy+}",
-            Methods     = new[] { Amazon.CDK.AWS.APIGatewayv2.Alpha.HttpMethod.ANY },
+            Methods     = new[] { Amazon.CDK.AWS.Apigatewayv2.Alpha.HttpMethod.ANY },
             Integration = new HttpLambdaIntegration("ApiIntegration", apiFunction)
         });
 
