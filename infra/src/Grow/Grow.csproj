@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Amazon.CDK.Lib" Version="2.*" />
+    <PackageReference Include="Constructs" Version="10.*" />
+    <PackageReference Include="Amazon.CDK.AWS.Apigatewayv2.Alpha" Version="2.*-alpha.*" />
+    <PackageReference Include="Amazon.CDK.AWS.Apigatewayv2.Integrations.Alpha" Version="2.*-alpha.*" />
+  </ItemGroup>
+</Project>
