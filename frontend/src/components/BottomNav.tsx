@@ -1,10 +1,9 @@
 import { NavLink } from 'react-router-dom'
-import { Sprout, Leaf, Wind } from 'lucide-react'
+import { Leaf, Wind } from 'lucide-react'
 
 const tabs = [
-  { to: '/garden',       label: 'Garden',       Icon: Sprout },
-  { to: '/plants',       label: 'Plants',        Icon: Leaf   },
-  { to: '/environments', label: 'Environments',  Icon: Wind   },
+  { to: '/plants',       label: 'Plants',       Icon: Leaf },
+  { to: '/environments', label: 'Environments', Icon: Wind },
 ]
 
 export function BottomNav() {
@@ -14,11 +13,11 @@ export function BottomNav() {
         <NavLink
           key={to}
           to={to}
-          className={({ isActive }) => `
-            flex flex-col items-center justify-center flex-1 py-3 gap-1
-            text-xs transition-colors
-            ${isActive ? 'text-fern' : 'text-muted hover:text-dim'}
-          `}
+          className={({ isActive }) =>
+            `flex flex-col items-center justify-center flex-1 py-3 gap-1 text-xs transition-colors ${
+              isActive ? 'text-fern' : 'text-muted'
+            }`
+          }
         >
           <Icon size={20} strokeWidth={1.5} />
           <span>{label}</span>

@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
+import { DatePicker } from '@/components/DatePicker'
 import type { Log, LogType, EnvironmentChangeData, Environment } from '@/types'
 
 const LOG_ICONS: Record<LogType, React.ReactNode> = {
@@ -24,32 +25,28 @@ function envName(id: string | undefined, envMap: Map<string, string>): string {
   return envMap.get(id) ?? id
 }
 
-function LogEntry({ log, envMap }: { log: Log; envMap: Map<string, string> }) {
-  const label = log.logType.replace(/_/g, ' ')
-
-  let summary: string | null = null
-  if (log.logType === 'environment_change') {
-    const d = log.data as unknown as EnvironmentChangeData
-    const from = envName(d.fromEnvironmentId, envMap)
-    const to   = envName(d.toEnvironmentId, envMap)
-    if (d.toEnvironmentId) {
-      summary = from !== 'None' ? `${from} → ${to}` : `Assigned to ${to}`
-    } else {
-      summary = `Removed from ${from}`
+function logSummary(log: Log, envMap: Map<string, string>): string | null {
+  switch (log.logType) {
+    case 'environment_change': {
+      const d = log.data as unknown as EnvironmentChangeData
+      const from = envName(d.fromEnvironmentId, envMap)
+      const to   = envName(d.toEnvironmentId, envMap)
+      if (d.toEnvironmentId) return from !== 'None' ? `${from} → ${to}` : `Assigned to ${to}`
+      return `Removed from ${from}`
     }
-  } else if (log.logType === 'phase_change') {
-    const d = log.data as any
-    summary = `${d.fromPhase} → ${d.toPhase}`
-  } else if (log.logType === 'note') {
-    summary = (log.data as any).text
-  } else if (log.logType === 'height') {
-    const d = log.data as any
-    summary = `${d.height} ${d.unit}`
-  } else if (log.logType === 'watering') {
-    const d = log.data as any
-    summary = `${d.amount} ${d.unit}`
+    case 'phase_change': {
+      const d = log.data as any
+      return `${d.fromPhase} → ${d.toPhase}`
+    }
+    case 'note':     return (log.data as any).text
+    case 'height':   { const d = log.data as any; return `${d.height} ${d.unit}` }
+    case 'watering': { const d = log.data as any; return `${d.amount} ${d.unit}` }
+    default:         return null
   }
+}
 
+function LogEntry({ log, envMap }: { log: Log; envMap: Map<string, string> }) {
+  const summary = logSummary(log, envMap)
   return (
     <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
       <div className="w-7 h-7 rounded-full bg-raised border border-border flex items-center justify-center text-dim flex-shrink-0 mt-0.5">
@@ -57,7 +54,9 @@ function LogEntry({ log, envMap }: { log: Log; envMap: Map<string, string> }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium capitalize text-primary">{label}</span>
+          <span className="text-sm font-medium capitalize text-primary">
+            {log.logType.replace(/_/g, ' ')}
+          </span>
           <span className="text-xs text-muted flex-shrink-0">
             {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
@@ -99,7 +98,7 @@ function ChangeEnvironmentSheet({
         <button
           onClick={() => mutation.mutate(null)}
           disabled={mutation.isPending || !currentEnvId}
-          className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+          className={`w-full flex items-center gap-3 p-3 rounded-xl border ${
             !currentEnvId
               ? 'border-fern bg-forest/20 text-primary'
               : 'border-border bg-raised text-dim active:opacity-70'
@@ -109,21 +108,21 @@ function ChangeEnvironmentSheet({
           <span className="text-sm">No environment</span>
         </button>
 
-        {envs?.map(env => (
+        {envs?.map((env: Environment) => (
           <button
             key={env.environmentId}
             onClick={() => mutation.mutate(env.environmentId)}
             disabled={mutation.isPending || env.environmentId === currentEnvId}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+            className={`w-full flex items-center gap-3 p-3 rounded-xl border ${
               env.environmentId === currentEnvId
                 ? 'border-fern bg-forest/20 text-primary'
                 : 'border-border bg-raised text-primary active:opacity-70'
             }`}
           >
             <span className="text-base">⛺</span>
-            <span className="text-sm">{env.name}</span>
+            <span className="text-sm flex-1 text-left">{env.name}</span>
             {env.environmentId === currentEnvId && (
-              <span className="ml-auto text-xs text-fern">current</span>
+              <span className="text-xs text-fern">current</span>
             )}
           </button>
         ))}
@@ -140,6 +139,7 @@ export function PlantDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [envSheetOpen, setEnvSheetOpen] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   const { data: plant, isLoading: plantLoading } = useQuery({
     queryKey: ['plant', id],
@@ -162,10 +162,14 @@ export function PlantDetailPage() {
     envs?.map((e: Environment) => [e.environmentId, e.name]) ?? []
   )
 
+  const activeDates = new Set(logs?.map((l: Log) => l.date) ?? [])
+  const displayLogs = selectedDate
+    ? (logs?.filter((l: Log) => l.date === selectedDate) ?? [])
+    : (logs ?? [])
+
   if (plantLoading) {
     return <div className="flex items-center justify-center h-full text-muted">Loading…</div>
   }
-
   if (!plant) {
     return <div className="flex items-center justify-center h-full text-muted">Plant not found.</div>
   }
@@ -198,16 +202,35 @@ export function PlantDetailPage() {
         <ChevronRight size={16} className="text-muted" />
       </button>
 
+      {/* Date picker */}
+      <DatePicker
+        activeDates={activeDates}
+        selected={selectedDate}
+        onSelect={setSelectedDate}
+      />
+
       {/* Log timeline */}
       <div className="p-4">
-        <p className="text-xs text-muted mb-2 uppercase tracking-wide font-medium">Activity</p>
+        {selectedDate && (
+          <p className="text-xs text-muted mb-2 uppercase tracking-wide font-medium">
+            {new Date(selectedDate + 'T00:00:00').toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+          </p>
+        )}
+        {!selectedDate && (
+          <p className="text-xs text-muted mb-2 uppercase tracking-wide font-medium">All Activity</p>
+        )}
+
         {logsLoading ? (
           <div className="text-muted text-sm">Loading…</div>
-        ) : logs?.length === 0 ? (
-          <div className="text-muted text-sm py-8 text-center">No logs yet.</div>
+        ) : displayLogs.length === 0 ? (
+          <div className="text-muted text-sm py-8 text-center">
+            {selectedDate ? 'No activity on this day.' : 'No logs yet.'}
+          </div>
         ) : (
           <div>
-            {logs?.map(log => <LogEntry key={log.logId} log={log} envMap={envMap} />)}
+            {displayLogs.map((log: Log) => (
+              <LogEntry key={log.logId} log={log} envMap={envMap} />
+            ))}
           </div>
         )}
       </div>
