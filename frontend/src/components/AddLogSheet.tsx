@@ -268,12 +268,12 @@ function NoteForm({ plantId, date, onSuccess }: { plantId: string; date: string;
 
 // ── Phase change form ─────────────────────────────────────────────────────────
 
-function PhaseChangeForm({ plant, onSuccess }: { plant: Plant; onSuccess: () => void }) {
+function PhaseChangeForm({ plant, date, onSuccess }: { plant: Plant; date: string; onSuccess: () => void }) {
   const qc = useQueryClient()
   const [toPhase, setToPhase] = useState<PlantPhase | null>(null)
 
   const mutation = useMutation({
-    mutationFn: () => api.plants.updatePhase(plant.plantId, toPhase!),
+    mutationFn: () => api.plants.updatePhase(plant.plantId, toPhase!, date),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['plant', plant.plantId] })
       qc.invalidateQueries({ queryKey: ['logs', 'plant', plant.plantId] })
@@ -463,7 +463,7 @@ export function AddLogSheet({ open, onClose, plant, defaultDate }: Props) {
   function handleClose() { reset(); onClose() }
 
   const title = selected ? LABELS[selected] : 'Log Activity'
-  const showDatePicker = selected !== 'phase_change'
+  const showDatePicker = true
 
   return (
     <BottomSheet
@@ -494,7 +494,7 @@ export function AddLogSheet({ open, onClose, plant, defaultDate }: Props) {
       ) : selected === 'note' ? (
         <NoteForm plantId={plant.plantId} date={date} onSuccess={handleClose} />
       ) : selected === 'phase_change' ? (
-        <PhaseChangeForm plant={plant} onSuccess={handleClose} />
+        <PhaseChangeForm plant={plant} date={date} onSuccess={handleClose} />
       ) : selected === 'photo' ? (
         <PhotoForm plantId={plant.plantId} date={date} onSuccess={handleClose} />
       ) : null}

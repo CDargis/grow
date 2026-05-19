@@ -133,13 +133,18 @@ func (a *app) updateAvatar(w http.ResponseWriter, r *http.Request) {
 func (a *app) updatePhase(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Phase model.PlantPhase `json:"phase"`
+		Date  string           `json:"date"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, err, http.StatusBadRequest)
 		return
 	}
+	date := req.Date
+	if date == "" {
+		date = time.Now().UTC().Format("2006-01-02")
+	}
 	plantID := r.PathValue("plantId")
-	fromPhase, err := a.plants.UpdatePhase(r.Context(), plantID, req.Phase)
+	fromPhase, err := a.plants.UpdatePhase(r.Context(), plantID, req.Phase, date)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -148,6 +153,7 @@ func (a *app) updatePhase(w http.ResponseWriter, r *http.Request) {
 	dataBytes, _ := json.Marshal(data)
 	if _, err := a.logs.Create(r.Context(), plantID, a.userID, model.CreateLogRequest{
 		LogType: model.LogPhaseChange,
+		Date:    date,
 		Data:    json.RawMessage(dataBytes),
 	}); err != nil {
 		log.Printf("warn: phase_change log: %v", err)

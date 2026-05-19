@@ -106,7 +106,7 @@ func (s *PlantStore) UpdateAvatar(ctx context.Context, plantID, avatarKey string
 	return nil
 }
 
-func (s *PlantStore) UpdatePhase(ctx context.Context, plantID string, phase model.PlantPhase) (model.PlantPhase, error) {
+func (s *PlantStore) UpdatePhase(ctx context.Context, plantID string, phase model.PlantPhase, phaseStartDate string) (model.PlantPhase, error) {
 	plant, err := s.Get(ctx, plantID)
 	if err != nil {
 		return "", err
@@ -124,7 +124,7 @@ func (s *PlantStore) UpdatePhase(ctx context.Context, plantID string, phase mode
 		ExpressionAttributeNames: map[string]string{"#ph": "phase"},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":phase": &types.AttributeValueMemberS{Value: string(phase)},
-			":psd":   &types.AttributeValueMemberS{Value: time.Now().UTC().Format("2006-01-02")},
+			":psd":   &types.AttributeValueMemberS{Value: phaseStartDate},
 		},
 	})
 	if err != nil {
