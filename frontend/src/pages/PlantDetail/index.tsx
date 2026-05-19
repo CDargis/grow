@@ -49,8 +49,10 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
     }
     case 'note':     return (log.data as any).text
     case 'height':   { const d = log.data as any; return `${d.height} ${d.unit}` }
-    case 'watering': { const d = log.data as any; return d.amount != null ? `${d.amount} ${d.unit}` : d.unit }
-    case 'photo':    return (log.data as any).caption ?? null
+    case 'watering':   { const d = log.data as any; return d.amount != null ? `${d.amount} ${d.unit}` : d.unit }
+    case 'height':     { const d = log.data as any; return `${d.height} ${d.unit}` }
+    case 'transplant': { const d = log.data as any; return d.medium ? `${d.potSize} · ${d.medium}` : d.potSize }
+    case 'photo':      return (log.data as any).caption ?? null
     default:         return null
   }
 }

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { Plus, Pencil, Leaf, ChevronDown } from 'lucide-react'
 import { api } from '@/api/client'
 import { AddEnvironmentSheet } from '@/components/AddEnvironmentSheet'
+import { MediaImage } from '@/components/MediaImage'
 import type { Environment, Plant, PlantPhase } from '@/types'
 
 const PHASE_COLORS: Record<PlantPhase, string> = {
@@ -37,7 +38,7 @@ function EnvironmentCard({
   })
 
   const assigned = plants.filter(
-    p => p.environmentId === env.environmentId && p.phase !== 'archived'
+    p => p.environmentId === env.environmentId && p.phase !== 'archived' && p.phase !== 'dead'
   )
 
   return (
@@ -98,8 +99,10 @@ function EnvironmentCard({
                 to={`/plants/${plant.plantId}`}
                 className="flex items-center gap-3 px-4 py-3 border-b border-border last:border-0 active:bg-raised transition-colors"
               >
-                <div className="w-8 h-8 rounded-full bg-raised border border-border flex items-center justify-center text-base flex-shrink-0">
-                  🌱
+                <div className="w-8 h-8 rounded-full bg-raised border border-border flex items-center justify-center text-base flex-shrink-0 overflow-hidden">
+                  {plant.avatarKey
+                    ? <MediaImage photoKey={plant.avatarKey} alt={plant.name} className="w-full h-full object-cover" fallback={<span>🌱</span>} />
+                    : '🌱'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-primary truncate">{plant.name}</p>

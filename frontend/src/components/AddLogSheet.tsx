@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, GitBranch, ArrowRightLeft, ImagePlus, X } from 'lucide-react'
 import { BottomSheet } from './BottomSheet'
 import { api } from '@/api/client'
-import type { Plant, PlantPhase, LogType, WateringData, FeedingData, NoteData, PhotoData } from '@/types'
+import type { Plant, PlantPhase, LogType, WateringData, FeedingData, NoteData, PhotoData, TransplantData, HeightData } from '@/types'
 
 // ── Types config ─────────────────────────────────────────────────────────────
 
@@ -35,9 +35,9 @@ const LOG_TYPES: TypeConfig[] = [
   { type: 'phase_change', label: 'Phase',  icon: <ArrowRightLeft size={22} />, ready: true },
   { type: 'training',   label: 'Training', icon: <GitBranch size={22} />, ready: false },
   { type: 'trimming',   label: 'Trim',     icon: <Scissors  size={22} />, ready: false },
-  { type: 'height',     label: 'Height',   icon: <Ruler     size={22} />, ready: false },
+  { type: 'height',     label: 'Height',   icon: <Ruler     size={22} />, ready: true  },
   { type: 'photo',      label: 'Photo',    icon: <Camera    size={22} />, ready: true  },
-  { type: 'transplant', label: 'Transplant', icon: <span className="text-xl">🪴</span>, ready: false },
+  { type: 'transplant', label: 'Transplant', icon: <span className="text-xl">🪴</span>, ready: true },
 ]
 
 const LABELS: Record<LogType, string> = Object.fromEntries(
@@ -280,6 +280,117 @@ function NoteForm({ plantId, datetime, onSuccess }: { plantId: string; datetime:
   )
 }
 
+// ── Height form ───────────────────────────────────────────────────────────────
+
+function HeightForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
+  const qc = useQueryClient()
+  const [height, setHeight] = useState('')
+  const [unit, setUnit]     = useState<HeightData['unit']>('cm')
+
+  const mutation = useMutation({
+    mutationFn: () => api.logs.create(plantId, {
+      logType: 'height',
+      date:     datetimeToDate(datetime),
+      loggedAt: datetimeToISO(datetime),
+      data: { height: Number(height), unit } as HeightData,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
+      onSuccess()
+    },
+  })
+
+  return (
+    <div className="space-y-3 mt-2">
+      <div>
+        <label className={labelCls}>Height</label>
+        <div className="flex gap-2">
+          <input
+            type="number"
+            step="0.1"
+            className={inputCls}
+            placeholder="0"
+            value={height}
+            onChange={e => setHeight(e.target.value)}
+          />
+          <select
+            className="bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary focus:outline-none focus:border-fern"
+            value={unit}
+            onChange={e => setUnit(e.target.value as HeightData['unit'])}
+          >
+            <option value="cm" className="bg-raised">cm</option>
+            <option value="in" className="bg-raised">in</option>
+          </select>
+        </div>
+      </div>
+
+      {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}
+
+      <button
+        onClick={() => { if (height) mutation.mutate() }}
+        disabled={!height || mutation.isPending}
+        className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
+      >
+        {mutation.isPending ? 'Saving…' : 'Log Height'}
+      </button>
+    </div>
+  )
+}
+
+// ── Transplant form ───────────────────────────────────────────────────────────
+
+function TransplantForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
+  const qc = useQueryClient()
+  const [potSize, setPotSize] = useState('')
+  const [medium, setMedium]   = useState('')
+
+  const mutation = useMutation({
+    mutationFn: () => api.logs.create(plantId, {
+      logType: 'transplant',
+      date:     datetimeToDate(datetime),
+      loggedAt: datetimeToISO(datetime),
+      data: { potSize, ...(medium ? { medium } : {}) } as TransplantData,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
+      onSuccess()
+    },
+  })
+
+  return (
+    <div className="space-y-3 mt-2">
+      <div>
+        <label className={labelCls}>Pot size</label>
+        <input
+          className={inputCls}
+          placeholder="e.g. 3 gal, 5L, 1 gal"
+          value={potSize}
+          onChange={e => setPotSize(e.target.value)}
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Medium (optional)</label>
+        <input
+          className={inputCls}
+          placeholder="e.g. coco, FFOF, ProMix"
+          value={medium}
+          onChange={e => setMedium(e.target.value)}
+        />
+      </div>
+
+      {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}
+
+      <button
+        onClick={() => { if (potSize.trim()) mutation.mutate() }}
+        disabled={!potSize.trim() || mutation.isPending}
+        className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
+      >
+        {mutation.isPending ? 'Saving…' : 'Log Transplant'}
+      </button>
+    </div>
+  )
+}
+
 // ── Phase change form ─────────────────────────────────────────────────────────
 
 function PhaseChangeForm({ plant, datetime, onSuccess }: { plant: Plant; datetime: string; onSuccess: () => void }) {
@@ -505,6 +616,10 @@ export function AddLogSheet({ open, onClose, plant, defaultDate }: Props) {
         <FeedingForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
       ) : selected === 'note' ? (
         <NoteForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
+      ) : selected === 'height' ? (
+        <HeightForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
+      ) : selected === 'transplant' ? (
+        <TransplantForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
       ) : selected === 'phase_change' ? (
         <PhaseChangeForm plant={plant} datetime={datetime} onSuccess={handleClose} />
       ) : selected === 'photo' ? (
