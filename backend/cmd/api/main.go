@@ -67,6 +67,7 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/environments",              a.listEnvironments)
 	mux.HandleFunc("POST /api/environments",             a.createEnvironment)
 	mux.HandleFunc("GET /api/environments/{envId}",      a.getEnvironment)
+	mux.HandleFunc("PATCH /api/environments/{envId}",    a.updateEnvironment)
 	mux.HandleFunc("DELETE /api/environments/{envId}",   a.deleteEnvironment)
 
 	mux.HandleFunc("POST /api/media/upload",             a.presignUpload)
@@ -230,6 +231,20 @@ func (a *app) createEnvironment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, env)
+}
+
+func (a *app) updateEnvironment(w http.ResponseWriter, r *http.Request) {
+	var req model.CreateEnvironmentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	env, err := a.envs.Update(r.Context(), r.PathValue("envId"), req)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
 	jsonOK(w, env)
 }
 

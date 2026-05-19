@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { api } from '@/api/client'
 import { AddEnvironmentSheet } from '@/components/AddEnvironmentSheet'
+import type { Environment } from '@/types'
 
 const ENV_ICONS: Record<string, string> = {
   tent:       '⛺',
@@ -15,6 +16,7 @@ const ENV_ICONS: Record<string, string> = {
 }
 
 export function EnvironmentsPage() {
+  const [editing, setEditing] = useState<Environment | null>(null)
   const [addOpen, setAddOpen] = useState(false)
 
   const { data: envs, isLoading } = useQuery({
@@ -40,10 +42,11 @@ export function EnvironmentsPage() {
       )}
 
       <div className="space-y-2">
-        {envs?.map(env => (
-          <div
+        {envs?.map((env: Environment) => (
+          <button
             key={env.environmentId}
-            className="flex items-center gap-3 p-4 bg-surface rounded-xl border border-border"
+            onClick={() => setEditing(env)}
+            className="w-full flex items-center gap-3 p-4 bg-surface rounded-xl border border-border active:scale-[0.98] transition-transform text-left"
           >
             <div className="w-10 h-10 rounded-full bg-raised border border-border flex items-center justify-center flex-shrink-0 text-xl">
               {ENV_ICONS[env.type] ?? '📦'}
@@ -55,11 +58,19 @@ export function EnvironmentsPage() {
             {env.lightSchedule && (
               <span className="text-xs text-dim font-mono">{env.lightSchedule}</span>
             )}
-          </div>
+          </button>
         ))}
       </div>
 
-      <AddEnvironmentSheet open={addOpen} onClose={() => setAddOpen(false)} />
+      <AddEnvironmentSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+      />
+      <AddEnvironmentSheet
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        environment={editing ?? undefined}
+      />
     </div>
   )
 }

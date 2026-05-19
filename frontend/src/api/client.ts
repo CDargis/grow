@@ -34,6 +34,7 @@ export const api = {
     list:   ()                                  => request<Environment[]>('/environments'),
     get:    (id: string)                        => request<Environment>(`/environments/${id}`),
     create: (body: CreateEnvironmentRequest)    => request<Environment>('/environments', { method: 'POST', body: JSON.stringify(body) }),
+    update: (id: string, body: CreateEnvironmentRequest) => request<Environment>(`/environments/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (id: string)                        => request<void>(`/environments/${id}`, { method: 'DELETE' }),
   },
 

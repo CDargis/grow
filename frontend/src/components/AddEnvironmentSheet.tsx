@@ -1,30 +1,48 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { BottomSheet } from './BottomSheet'
 import { api } from '@/api/client'
-import type { EnvironmentType, CreateEnvironmentRequest } from '@/types'
+import type { Environment, EnvironmentType, CreateEnvironmentRequest } from '@/types'
 
 const TYPES: EnvironmentType[] = ['tent', 'outdoor', 'garage', 'basement', 'room', 'greenhouse', 'other']
 
 const inputCls = 'w-full bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-fern'
 const labelCls = 'block text-xs text-dim mb-1'
 
+const empty: CreateEnvironmentRequest = { name: '', type: 'tent' }
+
 interface Props {
   open: boolean
   onClose: () => void
+  environment?: Environment  // present = edit mode
 }
 
-export function AddEnvironmentSheet({ open, onClose }: Props) {
+export function AddEnvironmentSheet({ open, onClose, environment }: Props) {
   const qc = useQueryClient()
-  const [form, setForm] = useState<CreateEnvironmentRequest>({
-    name: '', type: 'tent',
-  })
+  const isEdit = !!environment
+  const [form, setForm] = useState<CreateEnvironmentRequest>(empty)
+
+  useEffect(() => {
+    if (open) {
+      setForm(environment
+        ? {
+            name:           environment.name,
+            type:           environment.type,
+            lightSchedule:  environment.lightSchedule,
+            targetTempF:    environment.targetTempF || undefined,
+            targetHumidity: environment.targetHumidity || undefined,
+          }
+        : empty)
+    }
+  }, [open, environment])
 
   const mutation = useMutation({
-    mutationFn: api.environments.create,
+    mutationFn: (body: CreateEnvironmentRequest) =>
+      isEdit
+        ? api.environments.update(environment!.environmentId, body)
+        : api.environments.create(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['environments'] })
-      setForm({ name: '', type: 'tent' })
       onClose()
     },
   })
@@ -36,7 +54,7 @@ export function AddEnvironmentSheet({ open, onClose }: Props) {
   }
 
   return (
-    <BottomSheet title="New Environment" open={open} onClose={onClose}>
+    <BottomSheet title={isEdit ? 'Edit Environment' : 'New Environment'} open={open} onClose={onClose}>
       <form onSubmit={submit} className="space-y-3 mt-2">
         <div>
           <label className={labelCls}>Name *</label>
@@ -104,7 +122,7 @@ export function AddEnvironmentSheet({ open, onClose }: Props) {
           disabled={mutation.isPending}
           className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50 mt-2"
         >
-          {mutation.isPending ? 'Adding…' : 'Add Environment'}
+          {mutation.isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Environment'}
         </button>
       </form>
     </BottomSheet>
