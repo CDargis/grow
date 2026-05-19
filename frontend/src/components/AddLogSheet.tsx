@@ -43,8 +43,18 @@ const LABELS: Record<LogType, string> = Object.fromEntries(
   LOG_TYPES.map(t => [t.type, t.label])
 ) as Record<LogType, string>
 
-function todayDate() {
-  return new Date().toLocaleDateString('en-CA') // YYYY-MM-DD
+function nowDatetime(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function datetimeToDate(dt: string): string {
+  return dt.slice(0, 10)
+}
+
+function datetimeToISO(dt: string): string {
+  return new Date(dt).toISOString()
 }
 
 // ── Shared field styles ───────────────────────────────────────────────────────
@@ -54,7 +64,7 @@ const labelCls = 'block text-xs text-dim mb-1'
 
 // ── Watering form ─────────────────────────────────────────────────────────────
 
-function WateringForm({ plantId, date, onSuccess }: { plantId: string; date: string; onSuccess: () => void }) {
+function WateringForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
   const qc = useQueryClient()
   const [amount, setAmount]  = useState('')
   const [unit, setUnit]      = useState<WateringData['unit']>('ml')
@@ -64,7 +74,8 @@ function WateringForm({ plantId, date, onSuccess }: { plantId: string; date: str
   const mutation = useMutation({
     mutationFn: () => api.logs.create(plantId, {
       logType: 'watering',
-      date,
+      date: datetimeToDate(datetime),
+      loggedAt: datetimeToISO(datetime),
       data: {
         ...(amount ? { amount: Number(amount) } : {}),
         unit,
@@ -130,7 +141,7 @@ function WateringForm({ plantId, date, onSuccess }: { plantId: string; date: str
 
 type NutrientRow = { name: string; amount: string; unit: string }
 
-function FeedingForm({ plantId, date, onSuccess }: { plantId: string; date: string; onSuccess: () => void }) {
+function FeedingForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
   const qc = useQueryClient()
   const [nutrients, setNutrients] = useState<NutrientRow[]>([{ name: '', amount: '', unit: 'ml' }])
   const [ph, setPh]         = useState('')
@@ -143,7 +154,8 @@ function FeedingForm({ plantId, date, onSuccess }: { plantId: string; date: stri
   const mutation = useMutation({
     mutationFn: () => api.logs.create(plantId, {
       logType: 'feeding',
-      date,
+      date: datetimeToDate(datetime),
+      loggedAt: datetimeToISO(datetime),
       data: {
         nutrients: nutrients
           .filter(n => n.name && n.amount)
@@ -228,14 +240,15 @@ function FeedingForm({ plantId, date, onSuccess }: { plantId: string; date: stri
 
 // ── Note form ─────────────────────────────────────────────────────────────────
 
-function NoteForm({ plantId, date, onSuccess }: { plantId: string; date: string; onSuccess: () => void }) {
+function NoteForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
   const qc = useQueryClient()
   const [text, setText] = useState('')
 
   const mutation = useMutation({
     mutationFn: () => api.logs.create(plantId, {
       logType: 'note',
-      date,
+      date: datetimeToDate(datetime),
+      loggedAt: datetimeToISO(datetime),
       data: { text } as NoteData,
     }),
     onSuccess: () => {
@@ -268,12 +281,16 @@ function NoteForm({ plantId, date, onSuccess }: { plantId: string; date: string;
 
 // ── Phase change form ─────────────────────────────────────────────────────────
 
-function PhaseChangeForm({ plant, date, onSuccess }: { plant: Plant; date: string; onSuccess: () => void }) {
+function PhaseChangeForm({ plant, datetime, onSuccess }: { plant: Plant; datetime: string; onSuccess: () => void }) {
   const qc = useQueryClient()
   const [toPhase, setToPhase] = useState<PlantPhase | null>(null)
 
   const mutation = useMutation({
-    mutationFn: () => api.plants.updatePhase(plant.plantId, toPhase!, date),
+    mutationFn: () => api.plants.updatePhase(
+      plant.plantId, toPhase!,
+      datetimeToDate(datetime),
+      datetimeToISO(datetime),
+    ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['plant', plant.plantId] })
       qc.invalidateQueries({ queryKey: ['logs', 'plant', plant.plantId] })
@@ -284,13 +301,6 @@ function PhaseChangeForm({ plant, date, onSuccess }: { plant: Plant; date: strin
 
   return (
     <div className="space-y-4 mt-2">
-      <div>
-        <p className={labelCls}>Current phase</p>
-        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border capitalize ${PHASE_COLORS[plant.phase]}`}>
-          {plant.phase}
-        </span>
-      </div>
-
       <div>
         <p className={labelCls}>Move to</p>
         <div className="grid grid-cols-3 gap-2">
@@ -325,7 +335,7 @@ function PhaseChangeForm({ plant, date, onSuccess }: { plant: Plant; date: strin
 
 // ── Photo form ────────────────────────────────────────────────────────────────
 
-function PhotoForm({ plantId, date, onSuccess }: { plantId: string; date: string; onSuccess: () => void }) {
+function PhotoForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
   const qc = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -355,7 +365,8 @@ function PhotoForm({ plantId, date, onSuccess }: { plantId: string; date: string
       const photoKey = await api.media.uploadFile(file, `plants/${plantId}/logs`)
       await api.logs.create(plantId, {
         logType: 'photo',
-        date,
+        date: datetimeToDate(datetime),
+        loggedAt: datetimeToISO(datetime),
         data: { photoKey, ...(caption ? { caption } : {}) } as PhotoData,
       })
       qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
@@ -453,17 +464,19 @@ interface Props {
 
 export function AddLogSheet({ open, onClose, plant, defaultDate }: Props) {
   const [selected, setSelected] = useState<LogType | null>(null)
-  const [date, setDate] = useState(defaultDate ?? todayDate())
+  const [datetime, setDatetime] = useState(nowDatetime)
 
   useEffect(() => {
-    if (open) setDate(defaultDate ?? todayDate())
+    if (open) {
+      const now = nowDatetime()
+      setDatetime(defaultDate ? `${defaultDate}T${now.slice(11)}` : now)
+    }
   }, [open, defaultDate])
 
   function reset() { setSelected(null) }
   function handleClose() { reset(); onClose() }
 
   const title = selected ? LABELS[selected] : 'Log Activity'
-  const showDatePicker = true
 
   return (
     <BottomSheet
@@ -472,31 +485,29 @@ export function AddLogSheet({ open, onClose, plant, defaultDate }: Props) {
       onClose={handleClose}
       onBack={selected ? reset : undefined}
     >
-      {showDatePicker && (
-        <div className="flex items-center justify-between mt-2 pb-3 border-b border-border">
-          <span className="text-xs text-dim">Date</span>
-          <input
-            type="date"
-            value={date}
-            max={todayDate()}
-            onChange={e => setDate(e.target.value)}
-            className="bg-raised border border-border rounded-lg px-3 py-1.5 text-sm text-primary focus:outline-none focus:border-fern"
-          />
-        </div>
-      )}
+      <div className="flex items-center justify-between mt-2 pb-3 border-b border-border">
+        <span className="text-xs text-dim">When</span>
+        <input
+          type="datetime-local"
+          value={datetime}
+          max={nowDatetime()}
+          onChange={e => setDatetime(e.target.value)}
+          className="bg-raised border border-border rounded-lg px-3 py-1.5 text-sm text-primary focus:outline-none focus:border-fern"
+        />
+      </div>
 
       {!selected ? (
         <TypePicker onSelect={setSelected} />
       ) : selected === 'watering' ? (
-        <WateringForm plantId={plant.plantId} date={date} onSuccess={handleClose} />
+        <WateringForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
       ) : selected === 'feeding' ? (
-        <FeedingForm plantId={plant.plantId} date={date} onSuccess={handleClose} />
+        <FeedingForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
       ) : selected === 'note' ? (
-        <NoteForm plantId={plant.plantId} date={date} onSuccess={handleClose} />
+        <NoteForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
       ) : selected === 'phase_change' ? (
-        <PhaseChangeForm plant={plant} date={date} onSuccess={handleClose} />
+        <PhaseChangeForm plant={plant} datetime={datetime} onSuccess={handleClose} />
       ) : selected === 'photo' ? (
-        <PhotoForm plantId={plant.plantId} date={date} onSuccess={handleClose} />
+        <PhotoForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
       ) : null}
     </BottomSheet>
   )

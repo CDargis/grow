@@ -28,8 +28,8 @@ export const api = {
     delete:            (id: string)                    => request<void>(`/plants/${id}`, { method: 'DELETE' }),
     assignEnvironment: (id: string, environmentId: string | null) =>
       request<void>(`/plants/${id}/environment`, { method: 'PUT', body: JSON.stringify({ environmentId }) }),
-    updatePhase:  (id: string, phase: string, date?: string) =>
-      request<void>(`/plants/${id}/phase`,  { method: 'PUT', body: JSON.stringify({ phase, ...(date ? { date } : {}) }) }),
+    updatePhase:  (id: string, phase: string, date?: string, loggedAt?: string) =>
+      request<void>(`/plants/${id}/phase`,  { method: 'PUT', body: JSON.stringify({ phase, ...(date ? { date } : {}), ...(loggedAt ? { loggedAt } : {}) }) }),
     updateAvatar: (id: string, avatarKey: string) =>
       request<void>(`/plants/${id}/avatar`, { method: 'PUT', body: JSON.stringify({ avatarKey }) }),
   },

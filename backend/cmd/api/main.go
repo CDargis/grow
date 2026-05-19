@@ -132,16 +132,18 @@ func (a *app) updateAvatar(w http.ResponseWriter, r *http.Request) {
 
 func (a *app) updatePhase(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Phase model.PlantPhase `json:"phase"`
-		Date  string           `json:"date"`
+		Phase    model.PlantPhase `json:"phase"`
+		Date     string           `json:"date"`
+		LoggedAt string           `json:"loggedAt"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, err, http.StatusBadRequest)
 		return
 	}
+	now := time.Now().UTC()
 	date := req.Date
 	if date == "" {
-		date = time.Now().UTC().Format("2006-01-02")
+		date = now.Format("2006-01-02")
 	}
 	plantID := r.PathValue("plantId")
 	fromPhase, err := a.plants.UpdatePhase(r.Context(), plantID, req.Phase, date)
@@ -149,12 +151,13 @@ func (a *app) updatePhase(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err, http.StatusInternalServerError)
 		return
 	}
-	data := model.PhaseChangeData{FromPhase: fromPhase, ToPhase: req.Phase}
-	dataBytes, _ := json.Marshal(data)
+	phaseData := model.PhaseChangeData{FromPhase: fromPhase, ToPhase: req.Phase}
+	dataBytes, _ := json.Marshal(phaseData)
 	if _, err := a.logs.Create(r.Context(), plantID, a.userID, model.CreateLogRequest{
-		LogType: model.LogPhaseChange,
-		Date:    date,
-		Data:    json.RawMessage(dataBytes),
+		LogType:  model.LogPhaseChange,
+		Date:     date,
+		LoggedAt: req.LoggedAt,
+		Data:     json.RawMessage(dataBytes),
 	}); err != nil {
 		log.Printf("warn: phase_change log: %v", err)
 	}

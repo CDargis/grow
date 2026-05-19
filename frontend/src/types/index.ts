@@ -76,6 +76,7 @@ export interface CreatePlantRequest {
 export interface CreateLogRequest {
   logType: LogType
   date?: string
+  loggedAt?: string
   data: LogData
 }
 

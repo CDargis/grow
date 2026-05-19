@@ -28,9 +28,10 @@ type Log struct {
 }
 
 type CreateLogRequest struct {
-	LogType LogType         `json:"logType"`
-	Date    string          `json:"date,omitempty"`
-	Data    json.RawMessage `json:"data"`
+	LogType  LogType         `json:"logType"`
+	Date     string          `json:"date,omitempty"`
+	LoggedAt string          `json:"loggedAt,omitempty"`
+	Data     json.RawMessage `json:"data"`
 }
 
 // ── Log data shapes (for validation / documentation) ─────────────────────────

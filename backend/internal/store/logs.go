@@ -71,13 +71,17 @@ func (s *LogStore) Create(ctx context.Context, plantID, userID string, req model
 	if date == "" {
 		date = now.Format("2006-01-02")
 	}
+	loggedAt := req.LoggedAt
+	if loggedAt == "" {
+		loggedAt = now.Format(time.RFC3339)
+	}
 	entry := model.Log{
 		PlantID:  plantID,
 		LogID:    ulid.Make().String(),
 		UserID:   userID,
 		LogType:  req.LogType,
 		Date:     date,
-		LoggedAt: now.Format(time.RFC3339),
+		LoggedAt: loggedAt,
 		Data:     req.Data,
 	}
 	item, err := attributevalue.MarshalMap(entry)
