@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, Plus, Trash2, X } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
@@ -49,38 +49,56 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
 }
 
 function LogEntry({ log, envMap, onDelete }: { log: Log; envMap: Map<string, string>; onDelete: (logId: string) => void }) {
+  const [lightbox, setLightbox] = useState(false)
   const summary = logSummary(log, envMap)
   const photoKey = log.logType === 'photo' ? (log.data as any).photoKey as string | undefined : undefined
   return (
-    <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
-      <div className="w-7 h-7 rounded-full bg-raised border border-border flex items-center justify-center text-dim flex-shrink-0 mt-0.5">
-        {LOG_ICONS[log.logType]}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium capitalize text-primary">
-            {log.logType.replace(/_/g, ' ')}
-          </span>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xs text-muted">
-              {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-            <button
-              onClick={() => onDelete(log.logId)}
-              className="text-muted/50 active:text-red-400 active:opacity-80 p-0.5"
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
+    <>
+      <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
+        <div className="w-7 h-7 rounded-full bg-raised border border-border flex items-center justify-center text-dim flex-shrink-0 mt-0.5">
+          {LOG_ICONS[log.logType]}
         </div>
-        {summary && <p className="text-xs text-dim mt-0.5 truncate">{summary}</p>}
-        {photoKey && (
-          <div className="mt-2 w-28 h-28 rounded-lg overflow-hidden">
-            <MediaImage photoKey={photoKey} alt="photo log" className="w-full h-full object-cover" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium capitalize text-primary">
+              {log.logType.replace(/_/g, ' ')}
+            </span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-xs text-muted">
+                {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              <button
+                onClick={() => onDelete(log.logId)}
+                className="text-muted/50 active:text-red-400 active:opacity-80 p-0.5"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
           </div>
-        )}
+          {summary && <p className="text-xs text-dim mt-0.5 truncate">{summary}</p>}
+          {photoKey && (
+            <button onClick={() => setLightbox(true)} className="mt-2 w-28 h-28 rounded-lg overflow-hidden block active:opacity-80">
+              <MediaImage photoKey={photoKey} alt="photo log" className="w-full h-full object-cover" />
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+
+      {lightbox && photoKey && (
+        <div
+          className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+          onClick={() => setLightbox(false)}
+        >
+          <button
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white"
+            onClick={() => setLightbox(false)}
+          >
+            <X size={20} />
+          </button>
+          <MediaImage photoKey={photoKey} alt="photo log" className="max-w-full max-h-full object-contain" />
+        </div>
+      )}
+    </>
   )
 }
 
