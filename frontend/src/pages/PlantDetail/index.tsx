@@ -345,7 +345,7 @@ export function PlantDetailPage() {
                 <h1 className="font-bold text-xl text-white leading-tight truncate">{plant.name}</h1>
                 <p className="text-sm text-white/70 truncate">{plant.strain}</p>
                 <p className="text-xs text-white/50 mt-0.5 truncate">
-                  {elapsed(plant.phaseStartDate)} in {plant.phase} · {elapsed(plant.createdAt)} old
+                  {elapsed(plant.phaseStartDate)} in {plant.phase}
                 </p>
               </div>
               <span className="text-xs text-fern capitalize font-semibold flex-shrink-0 mb-0.5">{plant.phase}</span>
@@ -379,7 +379,7 @@ export function PlantDetailPage() {
             <h1 className="font-semibold text-primary">{plant.name}</h1>
             <p className="text-xs text-dim truncate">{plant.strain}</p>
             <p className="text-xs text-muted truncate">
-              {elapsed(plant.phaseStartDate)} in {plant.phase} · {elapsed(plant.createdAt)} old
+              {elapsed(plant.phaseStartDate)} in {plant.phase}
             </p>
           </div>
           <span className="text-xs text-fern capitalize font-medium flex-shrink-0">{plant.phase}</span>
