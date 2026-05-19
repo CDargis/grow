@@ -89,6 +89,33 @@ func (s *PlantStore) Create(ctx context.Context, userID string, req model.Create
 	return &plant, nil
 }
 
+func (s *PlantStore) UpdatePhase(ctx context.Context, plantID string, phase model.PlantPhase) (model.PlantPhase, error) {
+	plant, err := s.Get(ctx, plantID)
+	if err != nil {
+		return "", err
+	}
+	if plant == nil {
+		return "", fmt.Errorf("plant not found: %s", plantID)
+	}
+	fromPhase := plant.Phase
+	_, err = s.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(s.tableName),
+		Key: map[string]types.AttributeValue{
+			"plantId": &types.AttributeValueMemberS{Value: plantID},
+		},
+		UpdateExpression: aws.String("SET #ph = :phase, phaseStartDate = :psd"),
+		ExpressionAttributeNames: map[string]string{"#ph": "phase"},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":phase": &types.AttributeValueMemberS{Value: string(phase)},
+			":psd":   &types.AttributeValueMemberS{Value: time.Now().UTC().Format("2006-01-02")},
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("update phase: %w", err)
+	}
+	return fromPhase, nil
+}
+
 // AssignEnvironment updates a plant's environmentId and returns the previous value.
 // Pass nil toEnvID to remove the assignment.
 func (s *PlantStore) AssignEnvironment(ctx context.Context, plantID string, toEnvID *string) (fromEnvID string, err error) {

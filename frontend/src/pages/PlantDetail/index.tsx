@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, Plus } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
+import { AddLogSheet } from '@/components/AddLogSheet'
 import type { Log, LogType, EnvironmentChangeData, Environment } from '@/types'
 
 const LOG_ICONS: Record<LogType, React.ReactNode> = {
@@ -139,6 +140,7 @@ export function PlantDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [envSheetOpen, setEnvSheetOpen] = useState(false)
+  const [logSheetOpen, setLogSheetOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   const { data: plant, isLoading: plantLoading } = useQuery({
@@ -188,6 +190,12 @@ export function PlantDetailPage() {
           <p className="text-xs text-dim">{plant.strain}</p>
         </div>
         <span className="text-xs text-fern capitalize font-medium">{plant.phase}</span>
+        <button
+          onClick={() => setLogSheetOpen(true)}
+          className="flex items-center gap-1 text-sm text-fern active:opacity-70 ml-2"
+        >
+          <Plus size={18} />
+        </button>
       </div>
 
       {/* Environment row */}
@@ -235,6 +243,11 @@ export function PlantDetailPage() {
         )}
       </div>
 
+      <AddLogSheet
+        open={logSheetOpen}
+        onClose={() => setLogSheetOpen(false)}
+        plant={plant}
+      />
       <ChangeEnvironmentSheet
         open={envSheetOpen}
         onClose={() => setEnvSheetOpen(false)}

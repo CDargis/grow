@@ -1,14 +1,15 @@
 import { useEffect, useRef } from 'react'
-import { X } from 'lucide-react'
+import { X, ArrowLeft } from 'lucide-react'
 
 interface BottomSheetProps {
   title: string
   open: boolean
   onClose: () => void
+  onBack?: () => void
   children: React.ReactNode
 }
 
-export function BottomSheet({ title, open, onClose, children }: BottomSheetProps) {
+export function BottomSheet({ title, open, onClose, onBack, children }: BottomSheetProps) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -28,7 +29,14 @@ export function BottomSheet({ title, open, onClose, children }: BottomSheetProps
         className="relative bg-surface rounded-t-2xl w-full max-h-[90dvh] overflow-y-auto"
       >
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <h2 className="text-base font-semibold">{title}</h2>
+          <div className="flex items-center gap-2">
+            {onBack && (
+              <button onClick={onBack} className="p-1 text-muted active:opacity-70 -ml-1">
+                <ArrowLeft size={20} />
+              </button>
+            )}
+            <h2 className="text-base font-semibold">{title}</h2>
+          </div>
           <button onClick={onClose} className="p-1 text-muted active:opacity-70">
             <X size={20} />
           </button>

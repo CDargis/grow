@@ -1,0 +1,382 @@
+import { useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, GitBranch, ArrowRightLeft } from 'lucide-react'
+import { BottomSheet } from './BottomSheet'
+import { api } from '@/api/client'
+import type { Plant, PlantPhase, LogType, WateringData, FeedingData, NoteData } from '@/types'
+
+// ── Types config ─────────────────────────────────────────────────────────────
+
+const PHASES: PlantPhase[] = ['germination', 'seedling', 'veg', 'flower', 'harvest', 'drying', 'curing', 'archived']
+
+const PHASE_COLORS: Record<PlantPhase, string> = {
+  germination: 'bg-yellow-400/20 text-yellow-300 border-yellow-400/30',
+  seedling:    'bg-lime/20 text-lime border-lime/30',
+  veg:         'bg-fern/20 text-fern border-fern/30',
+  flower:      'bg-purple-400/20 text-purple-300 border-purple-400/30',
+  harvest:     'bg-orange-400/20 text-orange-300 border-orange-400/30',
+  drying:      'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  curing:      'bg-amber-400/20 text-amber-300 border-amber-400/30',
+  archived:    'bg-muted/10 text-muted border-muted/20',
+}
+
+type TypeConfig = {
+  type: LogType
+  label: string
+  icon: React.ReactNode
+  ready: boolean
+}
+
+const LOG_TYPES: TypeConfig[] = [
+  { type: 'watering',   label: 'Water',    icon: <Droplets  size={22} />, ready: true  },
+  { type: 'feeding',    label: 'Feed',     icon: <Zap       size={22} />, ready: true  },
+  { type: 'note',       label: 'Note',     icon: <MessageSquare size={22} />, ready: true },
+  { type: 'phase_change', label: 'Phase',  icon: <ArrowRightLeft size={22} />, ready: true },
+  { type: 'training',   label: 'Training', icon: <GitBranch size={22} />, ready: false },
+  { type: 'trimming',   label: 'Trim',     icon: <Scissors  size={22} />, ready: false },
+  { type: 'height',     label: 'Height',   icon: <Ruler     size={22} />, ready: false },
+  { type: 'photo',      label: 'Photo',    icon: <Camera    size={22} />, ready: false },
+  { type: 'transplant', label: 'Transplant', icon: <span className="text-xl">🪴</span>, ready: false },
+]
+
+const LABELS: Record<LogType, string> = Object.fromEntries(
+  LOG_TYPES.map(t => [t.type, t.label])
+) as Record<LogType, string>
+
+// ── Shared field styles ───────────────────────────────────────────────────────
+
+const inputCls = 'w-full bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-fern'
+const labelCls = 'block text-xs text-dim mb-1'
+
+// ── Watering form ─────────────────────────────────────────────────────────────
+
+function WateringForm({ plantId, onSuccess }: { plantId: string; onSuccess: () => void }) {
+  const qc = useQueryClient()
+  const [amount, setAmount]  = useState('')
+  const [unit, setUnit]      = useState<WateringData['unit']>('ml')
+  const [ph, setPh]          = useState('')
+  const [runoff, setRunoff]  = useState('')
+
+  const mutation = useMutation({
+    mutationFn: () => api.logs.create(plantId, {
+      logType: 'watering',
+      data: {
+        amount: Number(amount),
+        unit,
+        ...(ph     ? { ph: Number(ph) }         : {}),
+        ...(runoff ? { runoff: Number(runoff) }  : {}),
+      } as WateringData,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
+      onSuccess()
+    },
+  })
+
+  return (
+    <div className="space-y-3 mt-2">
+      <div>
+        <label className={labelCls}>Amount *</label>
+        <div className="flex gap-2">
+          <input
+            type="number"
+            className={inputCls}
+            placeholder="0"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+          />
+          <select
+            className="bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary focus:outline-none focus:border-fern"
+            value={unit}
+            onChange={e => setUnit(e.target.value as WateringData['unit'])}
+          >
+            {(['ml','l','oz','gal'] as const).map(u => (
+              <option key={u} value={u} className="bg-raised">{u}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>pH</label>
+          <input type="number" step="0.1" className={inputCls} placeholder="6.2" value={ph} onChange={e => setPh(e.target.value)} />
+        </div>
+        <div>
+          <label className={labelCls}>Runoff pH</label>
+          <input type="number" step="0.1" className={inputCls} placeholder="6.5" value={runoff} onChange={e => setRunoff(e.target.value)} />
+        </div>
+      </div>
+
+      {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}
+
+      <button
+        onClick={() => { if (amount) mutation.mutate() }}
+        disabled={!amount || mutation.isPending}
+        className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
+      >
+        {mutation.isPending ? 'Saving…' : 'Log Watering'}
+      </button>
+    </div>
+  )
+}
+
+// ── Feeding form ──────────────────────────────────────────────────────────────
+
+type NutrientRow = { name: string; amount: string; unit: string }
+
+function FeedingForm({ plantId, onSuccess }: { plantId: string; onSuccess: () => void }) {
+  const qc = useQueryClient()
+  const [nutrients, setNutrients] = useState<NutrientRow[]>([{ name: '', amount: '', unit: 'ml' }])
+  const [ph, setPh]         = useState('')
+  const [totalVol, setVol]  = useState('')
+
+  function updateNutrient(i: number, field: keyof NutrientRow, value: string) {
+    setNutrients(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: value } : r))
+  }
+
+  const mutation = useMutation({
+    mutationFn: () => api.logs.create(plantId, {
+      logType: 'feeding',
+      data: {
+        nutrients: nutrients
+          .filter(n => n.name && n.amount)
+          .map(n => ({ name: n.name, amount: Number(n.amount), unit: n.unit })),
+        ...(ph      ? { ph: Number(ph) }           : {}),
+        ...(totalVol ? { totalVol: Number(totalVol) } : {}),
+      } as FeedingData,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
+      onSuccess()
+    },
+  })
+
+  const valid = nutrients.some(n => n.name && n.amount)
+
+  return (
+    <div className="space-y-3 mt-2">
+      <div>
+        <label className={labelCls}>Nutrients</label>
+        <div className="space-y-2">
+          {nutrients.map((n, i) => (
+            <div key={i} className="flex gap-2 items-center">
+              <input
+                className={inputCls + ' flex-1'}
+                placeholder="Name"
+                value={n.name}
+                onChange={e => updateNutrient(i, 'name', e.target.value)}
+              />
+              <input
+                type="number"
+                className="w-20 bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary focus:outline-none focus:border-fern"
+                placeholder="0"
+                value={n.amount}
+                onChange={e => updateNutrient(i, 'amount', e.target.value)}
+              />
+              <select
+                className="bg-raised border border-border rounded-lg px-2 py-2.5 text-sm text-primary focus:outline-none focus:border-fern"
+                value={n.unit}
+                onChange={e => updateNutrient(i, 'unit', e.target.value)}
+              >
+                {['ml','oz','g','tsp'].map(u => <option key={u} value={u} className="bg-raised">{u}</option>)}
+              </select>
+              {nutrients.length > 1 && (
+                <button onClick={() => setNutrients(rows => rows.filter((_, idx) => idx !== i))} className="text-muted active:opacity-60 flex-shrink-0">✕</button>
+              )}
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setNutrients(rows => [...rows, { name: '', amount: '', unit: 'ml' }])}
+          className="mt-2 text-xs text-fern active:opacity-70"
+        >
+          + Add nutrient
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>pH</label>
+          <input type="number" step="0.1" className={inputCls} placeholder="6.2" value={ph} onChange={e => setPh(e.target.value)} />
+        </div>
+        <div>
+          <label className={labelCls}>Total Vol (ml)</label>
+          <input type="number" className={inputCls} placeholder="1000" value={totalVol} onChange={e => setVol(e.target.value)} />
+        </div>
+      </div>
+
+      {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}
+
+      <button
+        onClick={() => { if (valid) mutation.mutate() }}
+        disabled={!valid || mutation.isPending}
+        className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
+      >
+        {mutation.isPending ? 'Saving…' : 'Log Feeding'}
+      </button>
+    </div>
+  )
+}
+
+// ── Note form ─────────────────────────────────────────────────────────────────
+
+function NoteForm({ plantId, onSuccess }: { plantId: string; onSuccess: () => void }) {
+  const qc = useQueryClient()
+  const [text, setText] = useState('')
+
+  const mutation = useMutation({
+    mutationFn: () => api.logs.create(plantId, {
+      logType: 'note',
+      data: { text } as NoteData,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
+      onSuccess()
+    },
+  })
+
+  return (
+    <div className="space-y-3 mt-2">
+      <textarea
+        className={inputCls + ' h-32 resize-none'}
+        placeholder="Write a note…"
+        value={text}
+        onChange={e => setText(e.target.value)}
+      />
+
+      {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}
+
+      <button
+        onClick={() => { if (text.trim()) mutation.mutate() }}
+        disabled={!text.trim() || mutation.isPending}
+        className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
+      >
+        {mutation.isPending ? 'Saving…' : 'Save Note'}
+      </button>
+    </div>
+  )
+}
+
+// ── Phase change form ─────────────────────────────────────────────────────────
+
+function PhaseChangeForm({ plant, onSuccess }: { plant: Plant; onSuccess: () => void }) {
+  const qc = useQueryClient()
+  const [toPhase, setToPhase] = useState<PlantPhase | null>(null)
+
+  const mutation = useMutation({
+    mutationFn: () => api.plants.updatePhase(plant.plantId, toPhase!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plant', plant.plantId] })
+      qc.invalidateQueries({ queryKey: ['logs', 'plant', plant.plantId] })
+      qc.invalidateQueries({ queryKey: ['plants'] })
+      onSuccess()
+    },
+  })
+
+  return (
+    <div className="space-y-4 mt-2">
+      <div>
+        <p className={labelCls}>Current phase</p>
+        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border capitalize ${PHASE_COLORS[plant.phase]}`}>
+          {plant.phase}
+        </span>
+      </div>
+
+      <div>
+        <p className={labelCls}>Move to</p>
+        <div className="grid grid-cols-3 gap-2">
+          {PHASES.filter(p => p !== plant.phase).map(phase => (
+            <button
+              key={phase}
+              onClick={() => setToPhase(phase)}
+              className={`py-2 px-2 rounded-xl text-xs font-medium border capitalize transition-colors ${
+                toPhase === phase
+                  ? PHASE_COLORS[phase]
+                  : 'border-border text-muted bg-raised active:opacity-70'
+              }`}
+            >
+              {phase}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}
+
+      <button
+        onClick={() => { if (toPhase) mutation.mutate() }}
+        disabled={!toPhase || mutation.isPending}
+        className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
+      >
+        {mutation.isPending ? 'Saving…' : 'Change Phase'}
+      </button>
+    </div>
+  )
+}
+
+// ── Type picker ───────────────────────────────────────────────────────────────
+
+function TypePicker({ onSelect }: { onSelect: (type: LogType) => void }) {
+  return (
+    <div className="grid grid-cols-3 gap-3 mt-3 pb-2">
+      {LOG_TYPES.map(({ type, label, icon, ready }) => (
+        <button
+          key={type}
+          onClick={() => ready && onSelect(type)}
+          disabled={!ready}
+          className={`relative flex flex-col items-center gap-2 py-4 rounded-2xl border transition-colors ${
+            ready
+              ? 'border-border bg-raised active:scale-95 active:opacity-80 text-primary'
+              : 'border-border/50 bg-raised/50 text-muted/40 cursor-default'
+          }`}
+        >
+          {icon}
+          <span className="text-xs font-medium">{label}</span>
+          {!ready && (
+            <span className="absolute top-1.5 right-1.5 text-[9px] font-medium text-muted/60 bg-raised rounded px-1">Soon</span>
+          )}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ── Main sheet ────────────────────────────────────────────────────────────────
+
+interface Props {
+  open: boolean
+  onClose: () => void
+  plant: Plant
+}
+
+export function AddLogSheet({ open, onClose, plant }: Props) {
+  const [selected, setSelected] = useState<LogType | null>(null)
+
+  function reset() { setSelected(null) }
+  function handleClose() { reset(); onClose() }
+
+  const title = selected ? LABELS[selected] : 'Log Activity'
+
+  return (
+    <BottomSheet
+      title={title}
+      open={open}
+      onClose={handleClose}
+      onBack={selected ? reset : undefined}
+    >
+      {!selected ? (
+        <TypePicker onSelect={setSelected} />
+      ) : selected === 'watering' ? (
+        <WateringForm plantId={plant.plantId} onSuccess={handleClose} />
+      ) : selected === 'feeding' ? (
+        <FeedingForm plantId={plant.plantId} onSuccess={handleClose} />
+      ) : selected === 'note' ? (
+        <NoteForm plantId={plant.plantId} onSuccess={handleClose} />
+      ) : selected === 'phase_change' ? (
+        <PhaseChangeForm plant={plant} onSuccess={handleClose} />
+      ) : null}
+    </BottomSheet>
+  )
+}
