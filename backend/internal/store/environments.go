@@ -72,6 +72,7 @@ func (s *EnvironmentStore) Create(ctx context.Context, userID string, req model.
 		LightSchedule:  req.LightSchedule,
 		TargetTempF:    req.TargetTempF,
 		TargetHumidity: req.TargetHumidity,
+		PhotoKey:       req.PhotoKey,
 		CreatedAt:      now.Format(time.RFC3339),
 	}
 	item, err := attributevalue.MarshalMap(env)
@@ -100,6 +101,7 @@ func (s *EnvironmentStore) Update(ctx context.Context, environmentID string, req
 	existing.LightSchedule  = req.LightSchedule
 	existing.TargetTempF    = req.TargetTempF
 	existing.TargetHumidity = req.TargetHumidity
+	existing.PhotoKey       = req.PhotoKey
 	item, err := attributevalue.MarshalMap(existing)
 	if err != nil {
 		return nil, fmt.Errorf("marshal environment: %w", err)

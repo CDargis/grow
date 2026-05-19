@@ -71,6 +71,7 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/environments/{envId}",   a.deleteEnvironment)
 
 	mux.HandleFunc("POST /api/media/upload",             a.presignUpload)
+	mux.HandleFunc("GET /api/media/url",                 a.presignDownload)
 }
 
 // ── Plants ───────────────────────────────────────────────────────────────────
@@ -257,6 +258,23 @@ func (a *app) deleteEnvironment(w http.ResponseWriter, r *http.Request) {
 }
 
 // ── Media ─────────────────────────────────────────────────────────────────────
+
+func (a *app) presignDownload(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Query().Get("key")
+	if key == "" {
+		httpError(w, fmt.Errorf("key required"), http.StatusBadRequest)
+		return
+	}
+	presigned, err := a.presign.PresignGetObject(r.Context(), &s3.GetObjectInput{
+		Bucket: aws.String(a.mediaBkt),
+		Key:    aws.String(key),
+	}, func(o *s3.PresignOptions) { o.Expires = time.Hour })
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]string{"url": presigned.URL})
+}
 
 func (a *app) presignUpload(w http.ResponseWriter, r *http.Request) {
 	var req struct {

@@ -30,6 +30,7 @@ type CreateEnvironmentRequest struct {
 	LightSchedule  string          `json:"lightSchedule,omitempty"`
 	TargetTempF    float64         `json:"targetTempF,omitempty"`
 	TargetHumidity float64         `json:"targetHumidity,omitempty"`
+	PhotoKey       string          `json:"photoKey,omitempty"`
 }
 
 type UpdateEnvironmentRequest struct {

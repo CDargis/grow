@@ -52,6 +52,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ prefix, contentType }),
       }),
+    getDownloadUrl: (key: string) =>
+      request<{ url: string }>(`/media/url?key=${encodeURIComponent(key)}`),
     uploadFile: async (file: File, prefix: string): Promise<string> => {
       const { uploadUrl, key } = await api.media.getUploadUrl(prefix, file.type)
       await fetch(uploadUrl, {

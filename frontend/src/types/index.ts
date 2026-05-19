@@ -85,4 +85,5 @@ export interface CreateEnvironmentRequest {
   lightSchedule?: string
   targetTempF?: number
   targetHumidity?: number
+  photoKey?: string
 }

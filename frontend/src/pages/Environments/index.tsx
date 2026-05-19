@@ -15,6 +15,16 @@ const ENV_ICONS: Record<string, string> = {
   other:      '📦',
 }
 
+function EnvPhoto({ photoKey, name }: { photoKey: string; name: string }) {
+  const { data } = useQuery({
+    queryKey: ['media-url', photoKey],
+    queryFn: () => api.media.getDownloadUrl(photoKey),
+    staleTime: 50 * 60 * 1000,
+  })
+  if (!data?.url) return <span className="text-xl">{ENV_ICONS['other']}</span>
+  return <img src={data.url} alt={name} className="w-full h-full object-cover rounded-full" />
+}
+
 export function EnvironmentsPage() {
   const [editing, setEditing] = useState<Environment | null>(null)
   const [addOpen, setAddOpen] = useState(false)
@@ -48,24 +58,23 @@ export function EnvironmentsPage() {
             onClick={() => setEditing(env)}
             className="w-full flex items-center gap-3 p-4 bg-surface rounded-xl border border-border active:scale-[0.98] transition-transform text-left"
           >
-            <div className="w-10 h-10 rounded-full bg-raised border border-border flex items-center justify-center flex-shrink-0 text-xl">
-              {ENV_ICONS[env.type] ?? '📦'}
+            <div className="w-12 h-12 rounded-full bg-raised border border-border flex items-center justify-center flex-shrink-0 text-xl overflow-hidden">
+              {env.photoKey
+                ? <EnvPhoto photoKey={env.photoKey} name={env.name} />
+                : <span>{ENV_ICONS[env.type] ?? '📦'}</span>}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{env.name}</p>
+              <p className="font-medium truncate text-primary">{env.name}</p>
               <p className="text-xs text-dim capitalize">{env.type}</p>
             </div>
             {env.lightSchedule && (
-              <span className="text-xs text-dim font-mono">{env.lightSchedule}</span>
+              <span className="text-xs text-dim font-mono flex-shrink-0">{env.lightSchedule}</span>
             )}
           </button>
         ))}
       </div>
 
-      <AddEnvironmentSheet
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-      />
+      <AddEnvironmentSheet open={addOpen} onClose={() => setAddOpen(false)} />
       <AddEnvironmentSheet
         open={!!editing}
         onClose={() => setEditing(null)}
