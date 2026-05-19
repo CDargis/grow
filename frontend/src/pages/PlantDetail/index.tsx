@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, Plus } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
@@ -48,7 +48,7 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
   }
 }
 
-function LogEntry({ log, envMap }: { log: Log; envMap: Map<string, string> }) {
+function LogEntry({ log, envMap, onDelete }: { log: Log; envMap: Map<string, string>; onDelete: (logId: string) => void }) {
   const summary = logSummary(log, envMap)
   const photoKey = log.logType === 'photo' ? (log.data as any).photoKey as string | undefined : undefined
   return (
@@ -61,9 +61,17 @@ function LogEntry({ log, envMap }: { log: Log; envMap: Map<string, string> }) {
           <span className="text-sm font-medium capitalize text-primary">
             {log.logType.replace(/_/g, ' ')}
           </span>
-          <span className="text-xs text-muted flex-shrink-0">
-            {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-xs text-muted">
+              {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <button
+              onClick={() => onDelete(log.logId)}
+              className="text-muted/50 active:text-red-400 active:opacity-80 p-0.5"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
         </div>
         {summary && <p className="text-xs text-dim mt-0.5 truncate">{summary}</p>}
         {photoKey && (
@@ -153,6 +161,11 @@ export function PlantDetailPage() {
   const [logSheetOpen, setLogSheetOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
+
+  const deleteLog = useMutation({
+    mutationFn: (logId: string) => api.logs.delete(id!, logId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['logs', 'plant', id] }),
+  })
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -322,7 +335,7 @@ export function PlantDetailPage() {
         ) : (
           <div>
             {displayLogs.map((log: Log) => (
-              <LogEntry key={log.logId} log={log} envMap={envMap} />
+              <LogEntry key={log.logId} log={log} envMap={envMap} onDelete={deleteLog.mutate} />
             ))}
           </div>
         )}
@@ -332,6 +345,7 @@ export function PlantDetailPage() {
         open={logSheetOpen}
         onClose={() => setLogSheetOpen(false)}
         plant={plant}
+        defaultDate={selectedDate ?? undefined}
       />
       <ChangeEnvironmentSheet
         open={envSheetOpen}
