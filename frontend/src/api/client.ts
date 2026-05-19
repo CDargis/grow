@@ -1,3 +1,4 @@
+import imageCompression from 'browser-image-compression'
 import type {
   Plant, Environment, Log,
   CreatePlantRequest, CreateEnvironmentRequest, CreateLogRequest,
@@ -59,11 +60,14 @@ export const api = {
     getDownloadUrl: (key: string) =>
       request<{ url: string }>(`/media/url?key=${encodeURIComponent(key)}`),
     uploadFile: async (file: File, prefix: string): Promise<string> => {
-      const { uploadUrl, key } = await api.media.getUploadUrl(prefix, file.type)
+      const toUpload = file.type.startsWith('image/')
+        ? await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true })
+        : file
+      const { uploadUrl, key } = await api.media.getUploadUrl(prefix, toUpload.type)
       await fetch(uploadUrl, {
         method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type },
+        body: toUpload,
+        headers: { 'Content-Type': toUpload.type },
       })
       return key
     },
