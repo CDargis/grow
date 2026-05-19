@@ -212,7 +212,7 @@ export function PlantDetailPage() {
           <ArrowLeft size={20} />
         </button>
 
-        <input ref={avatarRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAvatarChange} />
+        <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
         <button
           onClick={() => avatarRef.current?.click()}
           disabled={avatarUploading}

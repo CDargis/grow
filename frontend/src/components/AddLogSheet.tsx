@@ -76,7 +76,7 @@ function WateringForm({ plantId, onSuccess }: { plantId: string; onSuccess: () =
   return (
     <div className="space-y-3 mt-2">
       <div>
-        <label className={labelCls}>Amount *</label>
+        <label className={labelCls}>Amount</label>
         <div className="flex gap-2">
           <input
             type="number"
@@ -111,8 +111,8 @@ function WateringForm({ plantId, onSuccess }: { plantId: string; onSuccess: () =
       {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}
 
       <button
-        onClick={() => { if (amount) mutation.mutate() }}
-        disabled={!amount || mutation.isPending}
+        onClick={() => mutation.mutate()}
+        disabled={mutation.isPending}
         className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
       >
         {mutation.isPending ? 'Saving…' : 'Log Watering'}
@@ -361,7 +361,7 @@ function PhotoForm({ plantId, onSuccess }: { plantId: string; onSuccess: () => v
 
   return (
     <div className="space-y-3 mt-2">
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
 
       <button
         onClick={() => fileRef.current?.click()}
