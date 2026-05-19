@@ -151,7 +151,10 @@ func (a *app) updatePhase(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err, http.StatusInternalServerError)
 		return
 	}
-	phaseData := model.PhaseChangeData{FromPhase: fromPhase, ToPhase: req.Phase}
+	phaseData := model.PhaseChangeData{ToPhase: req.Phase}
+	if date == now.Format("2006-01-02") {
+		phaseData.FromPhase = fromPhase
+	}
 	dataBytes, _ := json.Marshal(phaseData)
 	if _, err := a.logs.Create(r.Context(), plantID, a.userID, model.CreateLogRequest{
 		LogType:  model.LogPhaseChange,

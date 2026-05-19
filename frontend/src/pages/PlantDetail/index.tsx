@@ -38,7 +38,7 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
     }
     case 'phase_change': {
       const d = log.data as any
-      return `${d.fromPhase} → ${d.toPhase}`
+      return d.fromPhase ? `${d.fromPhase} → ${d.toPhase}` : `→ ${d.toPhase}`
     }
     case 'note':     return (log.data as any).text
     case 'height':   { const d = log.data as any; return `${d.height} ${d.unit}` }

@@ -84,7 +84,7 @@ type PhotoData struct {
 }
 
 type PhaseChangeData struct {
-	FromPhase PlantPhase `json:"fromPhase"`
+	FromPhase PlantPhase `json:"fromPhase,omitempty"`
 	ToPhase   PlantPhase `json:"toPhase"`
 }
 
