@@ -9,7 +9,7 @@ export type EnvironmentType =
 export type LogType =
   | 'watering' | 'feeding' | 'training' | 'trimming'
   | 'transplant' | 'height' | 'note' | 'photo' | 'phase_change'
-  | 'environment_change'
+  | 'environment_change' | 'lighting_change'
 
 export interface Plant {
   plantId: string
@@ -58,11 +58,12 @@ export interface NoteData      { text: string }
 export interface PhotoData     { photoKey: string; caption?: string }
 export interface PhaseChangeData       { fromPhase: PlantPhase; toPhase: PlantPhase }
 export interface EnvironmentChangeData { fromEnvironmentId?: string; toEnvironmentId?: string }
+export interface LightingChangeData    { fromSchedule?: string; toSchedule?: string }
 
 export type LogData =
   | WateringData | FeedingData | TrainingData | TrimmingData
   | TransplantData | HeightData | NoteData | PhotoData | PhaseChangeData
-  | EnvironmentChangeData
+  | EnvironmentChangeData | LightingChangeData
 
 export interface CreatePlantRequest {
   name: string

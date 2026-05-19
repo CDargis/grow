@@ -1,13 +1,13 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, Plus, Trash2, X, CalendarDays, List } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, Plus, Trash2, X, CalendarDays, List, Sun } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
 import { AddLogSheet } from '@/components/AddLogSheet'
 import { MediaImage } from '@/components/MediaImage'
-import type { Log, LogType, EnvironmentChangeData, Environment } from '@/types'
+import type { Log, LogType, EnvironmentChangeData, LightingChangeData, Environment } from '@/types'
 
 const LOG_ICONS: Record<LogType, React.ReactNode> = {
   watering:           <Droplets size={16} />,
@@ -20,6 +20,7 @@ const LOG_ICONS: Record<LogType, React.ReactNode> = {
   photo:              <Camera size={16} />,
   phase_change:       <span className="text-xs">🔄</span>,
   environment_change: <Wind size={16} />,
+  lighting_change:    <Sun size={16} />,
 }
 
 function envName(id: string | undefined, envMap: Map<string, string>): string {
@@ -39,6 +40,12 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
     case 'phase_change': {
       const d = log.data as any
       return d.fromPhase ? `${d.fromPhase} → ${d.toPhase}` : `→ ${d.toPhase}`
+    }
+    case 'lighting_change': {
+      const d = log.data as unknown as LightingChangeData
+      if (d.fromSchedule && d.toSchedule) return `${d.fromSchedule} → ${d.toSchedule}`
+      if (d.toSchedule) return `Set to ${d.toSchedule}`
+      return null
     }
     case 'note':     return (log.data as any).text
     case 'height':   { const d = log.data as any; return `${d.height} ${d.unit}` }

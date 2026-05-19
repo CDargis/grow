@@ -15,6 +15,7 @@ const (
 	LogPhoto              LogType = "photo"
 	LogPhaseChange        LogType = "phase_change"
 	LogEnvironmentChange  LogType = "environment_change"
+	LogLightingChange     LogType = "lighting_change"
 )
 
 type Log struct {
@@ -91,4 +92,9 @@ type PhaseChangeData struct {
 type EnvironmentChangeData struct {
 	FromEnvironmentID string `json:"fromEnvironmentId,omitempty"`
 	ToEnvironmentID   string `json:"toEnvironmentId,omitempty"`
+}
+
+type LightingChangeData struct {
+	FromSchedule string `json:"fromSchedule,omitempty"`
+	ToSchedule   string `json:"toSchedule,omitempty"`
 }

@@ -295,10 +295,36 @@ func (a *app) updateEnvironment(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err, http.StatusBadRequest)
 		return
 	}
-	env, err := a.envs.Update(r.Context(), r.PathValue("envId"), req)
+	envID := r.PathValue("envId")
+	oldSchedule, env, err := a.envs.Update(r.Context(), envID, req)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
+	}
+	if oldSchedule != env.LightSchedule {
+		plants, err := a.plants.List(r.Context(), a.userID)
+		if err != nil {
+			log.Printf("warn: list plants for lighting change: %v", err)
+		} else {
+			now := time.Now().UTC()
+			date := now.Format("2006-01-02")
+			loggedAt := now.Format(time.RFC3339)
+			data := model.LightingChangeData{FromSchedule: oldSchedule, ToSchedule: env.LightSchedule}
+			dataBytes, _ := json.Marshal(data)
+			for _, p := range plants {
+				if p.EnvironmentID != envID {
+					continue
+				}
+				if _, err := a.logs.Create(r.Context(), p.PlantID, a.userID, model.CreateLogRequest{
+					LogType:  model.LogLightingChange,
+					Date:     date,
+					LoggedAt: loggedAt,
+					Data:     json.RawMessage(dataBytes),
+				}); err != nil {
+					log.Printf("warn: lighting_change log for plant %s: %v", p.PlantID, err)
+				}
+			}
+		}
 	}
 	jsonOK(w, env)
 }

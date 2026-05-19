@@ -88,14 +88,16 @@ func (s *EnvironmentStore) Create(ctx context.Context, userID string, req model.
 	return &env, nil
 }
 
-func (s *EnvironmentStore) Update(ctx context.Context, environmentID string, req model.CreateEnvironmentRequest) (*model.Environment, error) {
+// Update replaces an environment's fields and returns (oldLightSchedule, updated, error).
+func (s *EnvironmentStore) Update(ctx context.Context, environmentID string, req model.CreateEnvironmentRequest) (string, *model.Environment, error) {
 	existing, err := s.Get(ctx, environmentID)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	if existing == nil {
-		return nil, fmt.Errorf("environment not found: %s", environmentID)
+		return "", nil, fmt.Errorf("environment not found: %s", environmentID)
 	}
+	oldSchedule            := existing.LightSchedule
 	existing.Name           = req.Name
 	existing.Type           = req.Type
 	existing.LightSchedule  = req.LightSchedule
@@ -104,15 +106,15 @@ func (s *EnvironmentStore) Update(ctx context.Context, environmentID string, req
 	existing.PhotoKey       = req.PhotoKey
 	item, err := attributevalue.MarshalMap(existing)
 	if err != nil {
-		return nil, fmt.Errorf("marshal environment: %w", err)
+		return "", nil, fmt.Errorf("marshal environment: %w", err)
 	}
 	if _, err := s.ddb.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
 		Item:      item,
 	}); err != nil {
-		return nil, fmt.Errorf("update environment: %w", err)
+		return "", nil, fmt.Errorf("update environment: %w", err)
 	}
-	return existing, nil
+	return oldSchedule, existing, nil
 }
 
 func (s *EnvironmentStore) Delete(ctx context.Context, environmentID string) error {
