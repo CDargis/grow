@@ -206,41 +206,82 @@ export function PlantDetailPage() {
 
   return (
     <div className="flex flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-border">
-        <button onClick={() => navigate(-1)} className="text-dim active:opacity-70">
-          <ArrowLeft size={20} />
-        </button>
+      <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
 
-        <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-        <button
-          onClick={() => avatarRef.current?.click()}
-          disabled={avatarUploading}
-          className="relative w-11 h-11 rounded-full bg-raised border border-border flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden active:opacity-70"
-        >
-          {plant.avatarKey
-            ? <MediaImage photoKey={plant.avatarKey} alt={plant.name} className="w-full h-full object-cover" fallback={<span>🌱</span>} />
-            : <span>🌱</span>
-          }
-          {avatarUploading && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+      {plant.avatarKey ? (
+        /* Hero banner when photo is set */
+        <div className="relative h-60 w-full flex-shrink-0">
+          <MediaImage
+            photoKey={plant.avatarKey}
+            alt={plant.name}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+
+          {/* Top controls */}
+          <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 pt-5">
+            <button
+              onClick={() => navigate(-1)}
+              className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white active:opacity-70"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <button
+              onClick={() => setLogSheetOpen(true)}
+              className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white active:opacity-70"
+            >
+              <Plus size={20} />
+            </button>
+          </div>
+
+          {/* Bottom info overlay — tap to change photo */}
+          <button
+            onClick={() => avatarRef.current?.click()}
+            disabled={avatarUploading}
+            className="absolute bottom-0 left-0 right-0 p-4 text-left"
+          >
+            <div className="flex items-end justify-between gap-2">
+              <div className="min-w-0">
+                <h1 className="font-bold text-xl text-white leading-tight truncate">{plant.name}</h1>
+                <p className="text-sm text-white/70 truncate">{plant.strain}</p>
+              </div>
+              <span className="text-xs text-fern capitalize font-semibold flex-shrink-0 mb-0.5">{plant.phase}</span>
             </div>
-          )}
-        </button>
-
-        <div className="flex-1 min-w-0">
-          <h1 className="font-semibold text-primary">{plant.name}</h1>
-          <p className="text-xs text-dim">{plant.strain}</p>
+            {avatarUploading && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </button>
         </div>
-        <span className="text-xs text-fern capitalize font-medium">{plant.phase}</span>
-        <button
-          onClick={() => setLogSheetOpen(true)}
-          className="flex items-center gap-1 text-sm text-fern active:opacity-70 ml-2"
-        >
-          <Plus size={18} />
-        </button>
-      </div>
+      ) : (
+        /* Compact header when no photo */
+        <div className="flex items-center gap-3 p-4 border-b border-border flex-shrink-0">
+          <button onClick={() => navigate(-1)} className="text-dim active:opacity-70">
+            <ArrowLeft size={20} />
+          </button>
+          <button
+            onClick={() => avatarRef.current?.click()}
+            disabled={avatarUploading}
+            className="relative w-11 h-11 rounded-full bg-raised border border-border flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden active:opacity-70"
+          >
+            <span>🌱</span>
+            {avatarUploading && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </button>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-semibold text-primary">{plant.name}</h1>
+            <p className="text-xs text-dim">{plant.strain}</p>
+          </div>
+          <span className="text-xs text-fern capitalize font-medium">{plant.phase}</span>
+          <button onClick={() => setLogSheetOpen(true)} className="text-fern active:opacity-70 ml-2">
+            <Plus size={18} />
+          </button>
+        </div>
+      )}
 
       {/* Environment row */}
       <button
