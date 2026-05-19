@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, Plus, Trash2, X, CalendarDays, List } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
@@ -46,6 +46,48 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
     case 'photo':    return (log.data as any).caption ?? null
     default:         return null
   }
+}
+
+function todayDate() {
+  return new Date().toLocaleDateString('en-CA')
+}
+
+function formatDateHeader(date: string): string {
+  const today     = todayDate()
+  const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('en-CA')
+  if (date === today)     return 'Today'
+  if (date === yesterday) return 'Yesterday'
+  return new Date(date + 'T12:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+function TimelineView({ logs, envMap, onDelete }: { logs: Log[]; envMap: Map<string, string>; onDelete: (logId: string) => void }) {
+  const sorted = [...logs].sort((a, b) =>
+    b.date.localeCompare(a.date) || b.loggedAt.localeCompare(a.loggedAt)
+  )
+  const grouped: Record<string, Log[]> = {}
+  for (const log of sorted) {
+    if (!grouped[log.date]) grouped[log.date] = []
+    grouped[log.date].push(log)
+  }
+  const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
+
+  if (dates.length === 0) {
+    return <div className="text-muted text-sm py-8 text-center">No logs yet.</div>
+  }
+  return (
+    <>
+      {dates.map(date => (
+        <div key={date}>
+          <p className="text-xs text-muted uppercase tracking-wide font-medium pt-4 pb-1 sticky top-0 bg-base">
+            {formatDateHeader(date)}
+          </p>
+          {grouped[date].map(log => (
+            <LogEntry key={log.logId} log={log} envMap={envMap} onDelete={onDelete} />
+          ))}
+        </div>
+      ))}
+    </>
+  )
 }
 
 function LogEntry({ log, envMap, onDelete }: { log: Log; envMap: Map<string, string>; onDelete: (logId: string) => void }) {
@@ -170,6 +212,8 @@ function ChangeEnvironmentSheet({
   )
 }
 
+type View = 'journal' | 'timeline'
+
 export function PlantDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -179,6 +223,7 @@ export function PlantDetailPage() {
   const [logSheetOpen, setLogSheetOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
+  const [view, setView] = useState<View>('journal')
 
   const deleteLog = useMutation({
     mutationFn: (logId: string) => api.logs.delete(id!, logId),
@@ -222,9 +267,12 @@ export function PlantDetailPage() {
   )
 
   const activeDates = new Set(logs?.map((l: Log) => l.date) ?? [])
-  const displayLogs = selectedDate
-    ? (logs?.filter((l: Log) => l.date === selectedDate) ?? [])
-    : (logs ?? [])
+  const journalDate = selectedDate ?? todayDate()
+  const journalLogs = logs?.filter((l: Log) => l.date === journalDate) ?? []
+
+  function toggleView() {
+    setView(v => v === 'journal' ? 'timeline' : 'journal')
+  }
 
   if (plantLoading) {
     return <div className="flex items-center justify-center h-full text-muted">Loading…</div>
@@ -235,6 +283,19 @@ export function PlantDetailPage() {
 
   const currentEnvName = plant.environmentId ? (envMap.get(plant.environmentId) ?? plant.environmentId) : null
 
+  const ViewToggle = ({ dark }: { dark?: boolean }) => (
+    <button
+      onClick={toggleView}
+      className={`w-9 h-9 rounded-full flex items-center justify-center active:opacity-70 ${
+        dark
+          ? 'bg-black/40 backdrop-blur-sm text-white'
+          : 'text-muted active:text-primary'
+      }`}
+    >
+      {view === 'journal' ? <List size={18} /> : <CalendarDays size={18} />}
+    </button>
+  )
+
   return (
     <div className="flex flex-col">
       <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
@@ -242,14 +303,9 @@ export function PlantDetailPage() {
       {plant.avatarKey ? (
         /* Hero banner when photo is set */
         <div className="relative h-60 w-full flex-shrink-0">
-          <MediaImage
-            photoKey={plant.avatarKey}
-            alt={plant.name}
-            className="w-full h-full object-cover"
-          />
+          <MediaImage photoKey={plant.avatarKey} alt={plant.name} className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
 
-          {/* Top controls */}
           <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-4 pt-5">
             <button
               onClick={() => navigate(-1)}
@@ -257,15 +313,17 @@ export function PlantDetailPage() {
             >
               <ArrowLeft size={20} />
             </button>
-            <button
-              onClick={() => setLogSheetOpen(true)}
-              className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white active:opacity-70"
-            >
-              <Plus size={20} />
-            </button>
+            <div className="flex items-center gap-2">
+              <ViewToggle dark />
+              <button
+                onClick={() => setLogSheetOpen(true)}
+                className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white active:opacity-70"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
           </div>
 
-          {/* Bottom info overlay — tap to change photo */}
           <button
             onClick={() => avatarRef.current?.click()}
             disabled={avatarUploading}
@@ -287,8 +345,8 @@ export function PlantDetailPage() {
         </div>
       ) : (
         /* Compact header when no photo */
-        <div className="flex items-center gap-3 p-4 border-b border-border flex-shrink-0">
-          <button onClick={() => navigate(-1)} className="text-dim active:opacity-70">
+        <div className="flex items-center gap-2 p-4 border-b border-border flex-shrink-0">
+          <button onClick={() => navigate(-1)} className="text-dim active:opacity-70 mr-1">
             <ArrowLeft size={20} />
           </button>
           <button
@@ -307,8 +365,9 @@ export function PlantDetailPage() {
             <h1 className="font-semibold text-primary">{plant.name}</h1>
             <p className="text-xs text-dim">{plant.strain}</p>
           </div>
-          <span className="text-xs text-fern capitalize font-medium">{plant.phase}</span>
-          <button onClick={() => setLogSheetOpen(true)} className="text-fern active:opacity-70 ml-2">
+          <span className="text-xs text-fern capitalize font-medium flex-shrink-0">{plant.phase}</span>
+          <ViewToggle />
+          <button onClick={() => setLogSheetOpen(true)} className="text-fern active:opacity-70">
             <Plus size={18} />
           </button>
         </div>
@@ -326,38 +385,37 @@ export function PlantDetailPage() {
         <ChevronRight size={16} className="text-muted" />
       </button>
 
-      {/* Date picker */}
-      <DatePicker
-        activeDates={activeDates}
-        selected={selectedDate}
-        onSelect={setSelectedDate}
-      />
-
-      {/* Log timeline */}
-      <div className="p-4">
-        {selectedDate && (
-          <p className="text-xs text-muted mb-2 uppercase tracking-wide font-medium">
-            {new Date(selectedDate + 'T00:00:00').toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
-          </p>
-        )}
-        {!selectedDate && (
-          <p className="text-xs text-muted mb-2 uppercase tracking-wide font-medium">All Activity</p>
-        )}
-
-        {logsLoading ? (
-          <div className="text-muted text-sm">Loading…</div>
-        ) : displayLogs.length === 0 ? (
-          <div className="text-muted text-sm py-8 text-center">
-            {selectedDate ? 'No activity on this day.' : 'No logs yet.'}
+      {/* Journal view: date strip + single-day logs */}
+      {view === 'journal' && (
+        <>
+          <DatePicker activeDates={activeDates} selected={selectedDate} onSelect={setSelectedDate} />
+          <div className="p-4">
+            <p className="text-xs text-muted mb-2 uppercase tracking-wide font-medium">
+              {formatDateHeader(journalDate)}
+            </p>
+            {logsLoading ? (
+              <div className="text-muted text-sm">Loading…</div>
+            ) : journalLogs.length === 0 ? (
+              <div className="text-muted text-sm py-8 text-center">No activity on this day.</div>
+            ) : (
+              journalLogs.map((log: Log) => (
+                <LogEntry key={log.logId} log={log} envMap={envMap} onDelete={deleteLog.mutate} />
+              ))
+            )}
           </div>
-        ) : (
-          <div>
-            {displayLogs.map((log: Log) => (
-              <LogEntry key={log.logId} log={log} envMap={envMap} onDelete={deleteLog.mutate} />
-            ))}
-          </div>
-        )}
-      </div>
+        </>
+      )}
+
+      {/* Timeline view: all logs grouped by date */}
+      {view === 'timeline' && (
+        <div className="p-4">
+          {logsLoading ? (
+            <div className="text-muted text-sm">Loading…</div>
+          ) : (
+            <TimelineView logs={logs ?? []} envMap={envMap} onDelete={deleteLog.mutate} />
+          )}
+        </div>
+      )}
 
       <AddLogSheet
         open={logSheetOpen}
