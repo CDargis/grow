@@ -48,6 +48,17 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
   }
 }
 
+function elapsed(dateStr: string): string {
+  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000)
+  if (days === 0) return 'today'
+  if (days < 7) return `${days} ${days === 1 ? 'day' : 'days'}`
+  const weeks = Math.floor(days / 7)
+  const rem   = days % 7
+  const wLabel = `${weeks} ${weeks === 1 ? 'week' : 'weeks'}`
+  if (rem === 0) return wLabel
+  return `${wLabel} and ${rem} ${rem === 1 ? 'day' : 'days'}`
+}
+
 function todayDate() {
   return new Date().toLocaleDateString('en-CA')
 }
@@ -333,6 +344,9 @@ export function PlantDetailPage() {
               <div className="min-w-0">
                 <h1 className="font-bold text-xl text-white leading-tight truncate">{plant.name}</h1>
                 <p className="text-sm text-white/70 truncate">{plant.strain}</p>
+                <p className="text-xs text-white/50 mt-0.5 truncate">
+                  {elapsed(plant.phaseStartDate)} in {plant.phase} · {elapsed(plant.createdAt)} old
+                </p>
               </div>
               <span className="text-xs text-fern capitalize font-semibold flex-shrink-0 mb-0.5">{plant.phase}</span>
             </div>
@@ -363,7 +377,10 @@ export function PlantDetailPage() {
           </button>
           <div className="flex-1 min-w-0">
             <h1 className="font-semibold text-primary">{plant.name}</h1>
-            <p className="text-xs text-dim">{plant.strain}</p>
+            <p className="text-xs text-dim truncate">{plant.strain}</p>
+            <p className="text-xs text-muted truncate">
+              {elapsed(plant.phaseStartDate)} in {plant.phase} · {elapsed(plant.createdAt)} old
+            </p>
           </div>
           <span className="text-xs text-fern capitalize font-medium flex-shrink-0">{plant.phase}</span>
           <ViewToggle />
