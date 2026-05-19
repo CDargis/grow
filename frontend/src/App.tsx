@@ -7,7 +7,7 @@ import { PlantDetailPage } from '@/pages/PlantDetail'
 export default function App() {
   return (
     <div className="flex flex-col h-[100dvh] bg-base">
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 min-h-0 overflow-y-auto">
         <Routes>
           <Route path="/"               element={<Navigate to="/plants" replace />} />
           <Route path="/plants"         element={<PlantsPage />} />
