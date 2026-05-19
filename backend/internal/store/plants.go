@@ -89,6 +89,23 @@ func (s *PlantStore) Create(ctx context.Context, userID string, req model.Create
 	return &plant, nil
 }
 
+func (s *PlantStore) UpdateAvatar(ctx context.Context, plantID, avatarKey string) error {
+	_, err := s.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(s.tableName),
+		Key: map[string]types.AttributeValue{
+			"plantId": &types.AttributeValueMemberS{Value: plantID},
+		},
+		UpdateExpression: aws.String("SET avatarKey = :ak"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":ak": &types.AttributeValueMemberS{Value: avatarKey},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("update avatar: %w", err)
+	}
+	return nil
+}
+
 func (s *PlantStore) UpdatePhase(ctx context.Context, plantID string, phase model.PlantPhase) (model.PlantPhase, error) {
 	plant, err := s.Get(ctx, plantID)
 	if err != nil {

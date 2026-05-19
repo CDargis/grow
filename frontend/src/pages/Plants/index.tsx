@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { api } from '@/api/client'
 import { AddPlantSheet } from '@/components/AddPlantSheet'
+import { MediaImage } from '@/components/MediaImage'
 import type { Plant, PlantPhase } from '@/types'
 
 const PHASE_COLORS: Record<PlantPhase, string> = {
@@ -23,9 +24,9 @@ function PlantCard({ plant }: { plant: Plant }) {
       to={`/plants/${plant.plantId}`}
       className="flex items-center gap-3 p-4 bg-surface rounded-xl border border-border active:scale-[0.98] transition-transform"
     >
-      <div className="w-12 h-12 rounded-full bg-raised border border-border flex items-center justify-center text-2xl flex-shrink-0">
+      <div className="w-12 h-12 rounded-full bg-raised border border-border flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
         {plant.avatarKey
-          ? <img src={plant.avatarKey} alt={plant.name} className="w-full h-full object-cover rounded-full" />
+          ? <MediaImage photoKey={plant.avatarKey} alt={plant.name} className="w-full h-full object-cover" fallback={<span>🌱</span>} />
           : '🌱'}
       </div>
       <div className="flex-1 min-w-0">

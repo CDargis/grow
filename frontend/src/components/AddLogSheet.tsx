@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, GitBranch, ArrowRightLeft } from 'lucide-react'
+import { Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, GitBranch, ArrowRightLeft, ImagePlus, X } from 'lucide-react'
 import { BottomSheet } from './BottomSheet'
 import { api } from '@/api/client'
-import type { Plant, PlantPhase, LogType, WateringData, FeedingData, NoteData } from '@/types'
+import type { Plant, PlantPhase, LogType, WateringData, FeedingData, NoteData, PhotoData } from '@/types'
 
 // ── Types config ─────────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ const LOG_TYPES: TypeConfig[] = [
   { type: 'training',   label: 'Training', icon: <GitBranch size={22} />, ready: false },
   { type: 'trimming',   label: 'Trim',     icon: <Scissors  size={22} />, ready: false },
   { type: 'height',     label: 'Height',   icon: <Ruler     size={22} />, ready: false },
-  { type: 'photo',      label: 'Photo',    icon: <Camera    size={22} />, ready: false },
+  { type: 'photo',      label: 'Photo',    icon: <Camera    size={22} />, ready: true  },
   { type: 'transplant', label: 'Transplant', icon: <span className="text-xl">🪴</span>, ready: false },
 ]
 
@@ -61,7 +61,7 @@ function WateringForm({ plantId, onSuccess }: { plantId: string; onSuccess: () =
     mutationFn: () => api.logs.create(plantId, {
       logType: 'watering',
       data: {
-        amount: Number(amount),
+        ...(amount ? { amount: Number(amount) } : {}),
         unit,
         ...(ph     ? { ph: Number(ph) }         : {}),
         ...(runoff ? { runoff: Number(runoff) }  : {}),
@@ -316,6 +316,97 @@ function PhaseChangeForm({ plant, onSuccess }: { plant: Plant; onSuccess: () => 
   )
 }
 
+// ── Photo form ────────────────────────────────────────────────────────────────
+
+function PhotoForm({ plantId, onSuccess }: { plantId: string; onSuccess: () => void }) {
+  const qc = useQueryClient()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [caption, setCaption] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setFile(f)
+    setPreview(URL.createObjectURL(f))
+  }
+
+  function removePhoto() {
+    setFile(null)
+    setPreview(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  async function handleSubmit() {
+    if (!file) return
+    setUploading(true)
+    setError(null)
+    try {
+      const photoKey = await api.media.uploadFile(file, `plants/${plantId}/logs`)
+      await api.logs.create(plantId, {
+        logType: 'photo',
+        data: { photoKey, ...(caption ? { caption } : {}) } as PhotoData,
+      })
+      qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
+      onSuccess()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3 mt-2">
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
+
+      <button
+        onClick={() => fileRef.current?.click()}
+        className={`w-full h-52 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors overflow-hidden ${
+          preview ? 'border-transparent p-0' : 'border-border text-muted active:opacity-70'
+        }`}
+      >
+        {preview
+          ? <img src={preview} alt="preview" className="w-full h-full object-cover" />
+          : <>
+              <ImagePlus size={28} />
+              <span className="text-sm">Tap to select photo</span>
+            </>
+        }
+      </button>
+
+      {preview && (
+        <button onClick={removePhoto} className="text-xs text-muted active:opacity-70 flex items-center gap-1">
+          <X size={12} /> Remove photo
+        </button>
+      )}
+
+      <div>
+        <label className={labelCls}>Caption (optional)</label>
+        <input
+          className={inputCls}
+          placeholder="Add a caption…"
+          value={caption}
+          onChange={e => setCaption(e.target.value)}
+        />
+      </div>
+
+      {error && <p className="text-red-400 text-sm">{error}</p>}
+
+      <button
+        onClick={handleSubmit}
+        disabled={!file || uploading}
+        className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
+      >
+        {uploading ? 'Uploading…' : 'Save Photo'}
+      </button>
+    </div>
+  )
+}
+
 // ── Type picker ───────────────────────────────────────────────────────────────
 
 function TypePicker({ onSelect }: { onSelect: (type: LogType) => void }) {
@@ -376,6 +467,8 @@ export function AddLogSheet({ open, onClose, plant }: Props) {
         <NoteForm plantId={plant.plantId} onSuccess={handleClose} />
       ) : selected === 'phase_change' ? (
         <PhaseChangeForm plant={plant} onSuccess={handleClose} />
+      ) : selected === 'photo' ? (
+        <PhotoForm plantId={plant.plantId} onSuccess={handleClose} />
       ) : null}
     </BottomSheet>
   )

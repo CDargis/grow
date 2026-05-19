@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, Plus } from 'lucide-react'
@@ -6,6 +6,7 @@ import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
 import { AddLogSheet } from '@/components/AddLogSheet'
+import { MediaImage } from '@/components/MediaImage'
 import type { Log, LogType, EnvironmentChangeData, Environment } from '@/types'
 
 const LOG_ICONS: Record<LogType, React.ReactNode> = {
@@ -41,13 +42,15 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
     }
     case 'note':     return (log.data as any).text
     case 'height':   { const d = log.data as any; return `${d.height} ${d.unit}` }
-    case 'watering': { const d = log.data as any; return `${d.amount} ${d.unit}` }
+    case 'watering': { const d = log.data as any; return d.amount != null ? `${d.amount} ${d.unit}` : d.unit }
+    case 'photo':    return (log.data as any).caption ?? null
     default:         return null
   }
 }
 
 function LogEntry({ log, envMap }: { log: Log; envMap: Map<string, string> }) {
   const summary = logSummary(log, envMap)
+  const photoKey = log.logType === 'photo' ? (log.data as any).photoKey as string | undefined : undefined
   return (
     <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
       <div className="w-7 h-7 rounded-full bg-raised border border-border flex items-center justify-center text-dim flex-shrink-0 mt-0.5">
@@ -63,6 +66,11 @@ function LogEntry({ log, envMap }: { log: Log; envMap: Map<string, string> }) {
           </span>
         </div>
         {summary && <p className="text-xs text-dim mt-0.5 truncate">{summary}</p>}
+        {photoKey && (
+          <div className="mt-2 w-28 h-28 rounded-lg overflow-hidden">
+            <MediaImage photoKey={photoKey} alt="photo log" className="w-full h-full object-cover" />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -139,9 +147,27 @@ function ChangeEnvironmentSheet({
 export function PlantDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const qc = useQueryClient()
+  const avatarRef = useRef<HTMLInputElement>(null)
   const [envSheetOpen, setEnvSheetOpen] = useState(false)
   const [logSheetOpen, setLogSheetOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !id) return
+    setAvatarUploading(true)
+    try {
+      const key = await api.media.uploadFile(file, `plants/${id}/avatar`)
+      await api.plants.updateAvatar(id, key)
+      qc.invalidateQueries({ queryKey: ['plant', id] })
+      qc.invalidateQueries({ queryKey: ['plants'] })
+    } finally {
+      setAvatarUploading(false)
+      if (avatarRef.current) avatarRef.current.value = ''
+    }
+  }
 
   const { data: plant, isLoading: plantLoading } = useQuery({
     queryKey: ['plant', id],
@@ -185,6 +211,24 @@ export function PlantDetailPage() {
         <button onClick={() => navigate(-1)} className="text-dim active:opacity-70">
           <ArrowLeft size={20} />
         </button>
+
+        <input ref={avatarRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAvatarChange} />
+        <button
+          onClick={() => avatarRef.current?.click()}
+          disabled={avatarUploading}
+          className="relative w-11 h-11 rounded-full bg-raised border border-border flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden active:opacity-70"
+        >
+          {plant.avatarKey
+            ? <MediaImage photoKey={plant.avatarKey} alt={plant.name} className="w-full h-full object-cover" fallback={<span>🌱</span>} />
+            : <span>🌱</span>
+          }
+          {avatarUploading && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+        </button>
+
         <div className="flex-1 min-w-0">
           <h1 className="font-semibold text-primary">{plant.name}</h1>
           <p className="text-xs text-dim">{plant.strain}</p>
