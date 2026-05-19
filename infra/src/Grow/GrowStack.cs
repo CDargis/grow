@@ -116,7 +116,7 @@ public class GrowStack : Stack
             {
                 Bundling = new BundlingOptions
                 {
-                    Image   = DockerImage.FromRegistry("golang:1.22-alpine"),
+                    Image   = DockerImage.FromRegistry("public.ecr.aws/docker/library/golang:1.22-alpine"),
                     Command = new[]
                     {
                         "sh", "-c",
