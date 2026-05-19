@@ -1,13 +1,13 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, Plus, Trash2, X, CalendarDays, List, Sun } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
 import { AddLogSheet } from '@/components/AddLogSheet'
 import { MediaImage } from '@/components/MediaImage'
-import type { Log, LogType, EnvironmentChangeData, LightingChangeData, Environment } from '@/types'
+import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment } from '@/types'
 
 const LOG_ICONS: Record<LogType, React.ReactNode> = {
   watering:           <Droplets size={16} />,
@@ -78,33 +78,237 @@ function formatDateHeader(date: string): string {
   return new Date(date + 'T12:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
-function TimelineView({ logs, envMap, onDelete }: { logs: Log[]; envMap: Map<string, string>; onDelete: (logId: string) => void }) {
-  const sorted = [...logs].sort((a, b) =>
-    b.date.localeCompare(a.date) || b.loggedAt.localeCompare(a.loggedAt)
-  )
-  const grouped: Record<string, Log[]> = {}
-  for (const log of sorted) {
-    if (!grouped[log.date]) grouped[log.date] = []
-    grouped[log.date].push(log)
-  }
-  const dates = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
+// ── Phase hex colors (for timeline line/dot) ──────────────────────────────────
 
-  if (dates.length === 0) {
-    return <div className="text-muted text-sm py-8 text-center">No logs yet.</div>
+const PHASE_HEX: Record<PlantPhase, string> = {
+  germination: '#facc15',
+  seedling:    '#7CC96E',
+  veg:         '#4A9E50',
+  flower:      '#c084fc',
+  harvest:     '#fb923c',
+  drying:      '#f59e0b',
+  curing:      '#fbbf24',
+  archived:    '#666666',
+  dead:        '#f87171',
+}
+
+// ── Phase period helpers ───────────────────────────────────────────────────────
+
+interface PhasePeriod {
+  phase: PlantPhase
+  startDate: string
+  endDate: string | null
+  logs: Log[]
+}
+
+function buildPhasePeriods(plant: Plant, logs: Log[]): PhasePeriod[] {
+  const phaseChangeLogs = logs
+    .filter(l => l.logType === 'phase_change')
+    .sort((a, b) => a.date.localeCompare(b.date) || a.loggedAt.localeCompare(b.loggedAt))
+
+  const allDates = [...phaseChangeLogs.map(l => l.date), plant.phaseStartDate].filter(Boolean)
+  const plantStart = allDates.length > 0
+    ? allDates.reduce((min, d) => d < min ? d : min)
+    : plant.phaseStartDate
+
+  const periods: PhasePeriod[] = []
+
+  if (phaseChangeLogs.length === 0) {
+    periods.push({ phase: plant.phase, startDate: plantStart, endDate: null, logs: [] })
+  } else {
+    const first = phaseChangeLogs[0]
+    const initialPhase = (first.data as any).fromPhase as PlantPhase | undefined
+    if (initialPhase) {
+      periods.push({ phase: initialPhase, startDate: plantStart, endDate: first.date, logs: [] })
+    }
+    for (let i = 0; i < phaseChangeLogs.length; i++) {
+      const log  = phaseChangeLogs[i]
+      const next = phaseChangeLogs[i + 1] ?? null
+      periods.push({
+        phase:     (log.data as any).toPhase as PlantPhase,
+        startDate: log.date,
+        endDate:   next?.date ?? null,
+        logs:      [],
+      })
+    }
   }
+
+  for (const log of logs.filter(l => l.logType !== 'phase_change')) {
+    for (let i = periods.length - 1; i >= 0; i--) {
+      const p = periods[i]
+      if (log.date >= p.startDate && (p.endDate === null || log.date < p.endDate)) {
+        p.logs.push(log)
+        break
+      }
+    }
+  }
+
+  for (const p of periods) {
+    p.logs.sort((a, b) => b.date.localeCompare(a.date) || b.loggedAt.localeCompare(a.loggedAt))
+  }
+
+  return periods.reverse()
+}
+
+function phaseDuration(startDate: string, endDate: string | null): string {
+  const end   = endDate ? new Date(endDate + 'T00:00:00') : new Date()
+  const days  = Math.max(0, Math.floor((end.getTime() - new Date(startDate + 'T00:00:00').getTime()) / 86400000))
+  if (days < 7)  return `${days}d`
+  const weeks = Math.floor(days / 7)
+  const rem   = days % 7
+  return rem === 0 ? `${weeks}w` : `${weeks}w ${rem}d`
+}
+
+// ── Phase log entry (compact row inside an expanded phase) ────────────────────
+
+function PhaseLogEntry({ log, color, envMap, onDelete }: {
+  log: Log
+  color: string
+  envMap: Map<string, string>
+  onDelete: (logId: string) => void
+}) {
+  const [lightbox, setLightbox] = useState(false)
+  const summary  = logSummary(log, envMap)
+  const photoKey = log.logType === 'photo' ? (log.data as any).photoKey as string | undefined : undefined
+
   return (
     <>
-      {dates.map(date => (
-        <div key={date}>
-          <p className="text-xs text-muted uppercase tracking-wide font-medium pt-4 pb-1 sticky top-0 bg-base">
-            {formatDateHeader(date)}
-          </p>
-          {grouped[date].map(log => (
-            <LogEntry key={log.logId} log={log} envMap={envMap} onDelete={onDelete} />
-          ))}
+      <div className="flex items-start gap-2 py-2 border-b border-border/40 last:border-0">
+        <div
+          className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-[5px]"
+          style={{ backgroundColor: color, opacity: 0.65 }}
+        />
+        <div className="w-5 h-5 rounded-full bg-raised border border-border flex items-center justify-center text-dim flex-shrink-0 mt-0.5">
+          {LOG_ICONS[log.logType]}
         </div>
-      ))}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium capitalize text-primary">
+              {log.logType.replace(/_/g, ' ')}
+            </span>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-[10px] text-muted">
+                {new Date(log.date + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
+              </span>
+              <button onClick={() => onDelete(log.logId)} className="text-muted/40 active:text-red-400 p-0.5">
+                <Trash2 size={11} />
+              </button>
+            </div>
+          </div>
+          {summary && <p className="text-[11px] text-dim mt-0.5 truncate">{summary}</p>}
+          {photoKey && (
+            <button onClick={() => setLightbox(true)} className="mt-1.5 w-16 h-16 rounded-lg overflow-hidden block active:opacity-80">
+              <MediaImage photoKey={photoKey} alt="photo" className="w-full h-full object-cover" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {lightbox && photoKey && (
+        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" onClick={() => setLightbox(false)}>
+          <button
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white"
+            onClick={() => setLightbox(false)}
+          >
+            <X size={20} />
+          </button>
+          <MediaImage photoKey={photoKey} alt="photo" className="max-w-full max-h-full object-contain" />
+        </div>
+      )}
     </>
+  )
+}
+
+// ── Phase period section ───────────────────────────────────────────────────────
+
+function PhasePeriodSection({ period, isLast, envMap, onDelete }: {
+  period: PhasePeriod
+  isLast: boolean
+  envMap: Map<string, string>
+  onDelete: (logId: string) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const color   = PHASE_HEX[period.phase] ?? '#666'
+  const ongoing = period.endDate === null
+
+  return (
+    <div className="relative flex items-start gap-3">
+      {/* Dot + line column */}
+      <div className="flex flex-col items-center flex-shrink-0 w-3">
+        <div
+          className="w-3 h-3 rounded-full flex-shrink-0 mt-[5px] z-10 relative"
+          style={{ backgroundColor: color }}
+        />
+        {!isLast && (
+          <div
+            className="w-0.5 flex-1 min-h-[20px] mt-1"
+            style={{ backgroundColor: color, opacity: 0.25 }}
+          />
+        )}
+      </div>
+
+      {/* Phase content */}
+      <div className="flex-1 min-w-0 pb-4">
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm capitalize" style={{ color }}>
+              {period.phase}
+            </span>
+            {ongoing && (
+              <span className="text-[9px] text-muted border border-border rounded px-1 py-px uppercase tracking-wide">
+                live
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 text-muted flex-shrink-0">
+            <span className="text-xs">{phaseDuration(period.startDate, period.endDate)}</span>
+            {period.logs.length > 0 && (
+              <span className="text-[10px] opacity-50">· {period.logs.length}</span>
+            )}
+            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </div>
+        </button>
+
+        {expanded && (
+          <div className="mt-2 border-t border-border/30">
+            {period.logs.length === 0 ? (
+              <p className="text-xs text-muted py-2">No activity logged this phase.</p>
+            ) : (
+              period.logs.map(log => (
+                <PhaseLogEntry key={log.logId} log={log} color={color} envMap={envMap} onDelete={onDelete} />
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Timeline view ─────────────────────────────────────────────────────────────
+
+function TimelineView({ plant, logs, envMap, onDelete }: {
+  plant: Plant
+  logs: Log[]
+  envMap: Map<string, string>
+  onDelete: (logId: string) => void
+}) {
+  const periods = buildPhasePeriods(plant, logs)
+  return (
+    <div className="pt-2">
+      {periods.map((period, idx) => (
+        <PhasePeriodSection
+          key={period.phase + period.startDate}
+          period={period}
+          isLast={idx === periods.length - 1}
+          envMap={envMap}
+          onDelete={onDelete}
+        />
+      ))}
+    </div>
   )
 }
 
@@ -443,7 +647,7 @@ export function PlantDetailPage() {
           {logsLoading ? (
             <div className="text-muted text-sm">Loading…</div>
           ) : (
-            <TimelineView logs={logs ?? []} envMap={envMap} onDelete={deleteLog.mutate} />
+            <TimelineView plant={plant} logs={logs ?? []} envMap={envMap} onDelete={deleteLog.mutate} />
           )}
         </div>
       )}
