@@ -15,6 +15,7 @@ const PHASE_COLORS: Record<PlantPhase, string> = {
   drying:      'text-amber-500',
   curing:      'text-amber-400',
   archived:    'text-muted',
+  dead:        'text-red-400',
 }
 
 function EnvironmentCard({

@@ -7,7 +7,7 @@ import type { Plant, PlantPhase, LogType, WateringData, FeedingData, NoteData, P
 
 // ── Types config ─────────────────────────────────────────────────────────────
 
-const PHASES: PlantPhase[] = ['germination', 'seedling', 'veg', 'flower', 'harvest', 'drying', 'curing', 'archived']
+const PHASES: PlantPhase[] = ['germination', 'seedling', 'veg', 'flower', 'harvest', 'drying', 'curing', 'archived', 'dead']
 
 const PHASE_COLORS: Record<PlantPhase, string> = {
   germination: 'bg-yellow-400/20 text-yellow-300 border-yellow-400/30',
@@ -18,6 +18,7 @@ const PHASE_COLORS: Record<PlantPhase, string> = {
   drying:      'bg-amber-500/20 text-amber-400 border-amber-500/30',
   curing:      'bg-amber-400/20 text-amber-300 border-amber-400/30',
   archived:    'bg-muted/10 text-muted border-muted/20',
+  dead:        'bg-red-500/20 text-red-400 border-red-500/30',
 }
 
 type TypeConfig = {

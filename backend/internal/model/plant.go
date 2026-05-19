@@ -11,6 +11,7 @@ const (
 	PhaseDrying      PlantPhase = "drying"
 	PhaseCuring      PlantPhase = "curing"
 	PhaseArchived    PlantPhase = "archived"
+	PhaseDead        PlantPhase = "dead"
 )
 
 type Plant struct {

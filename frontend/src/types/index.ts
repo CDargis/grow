@@ -1,6 +1,6 @@
 export type PlantPhase =
   | 'germination' | 'seedling' | 'veg' | 'flower'
-  | 'harvest' | 'drying' | 'curing' | 'archived'
+  | 'harvest' | 'drying' | 'curing' | 'archived' | 'dead'
 
 export type EnvironmentType =
   | 'tent' | 'outdoor' | 'garage' | 'basement'
