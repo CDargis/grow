@@ -171,6 +171,31 @@ func (s *PlantStore) AssignEnvironment(ctx context.Context, plantID string, toEn
 	return fromEnvID, nil
 }
 
+func (s *PlantStore) UpdateDetails(ctx context.Context, plantID string, req model.UpdatePlantDetailsRequest) (*model.Plant, error) {
+	plant, err := s.Get(ctx, plantID)
+	if err != nil {
+		return nil, err
+	}
+	if plant == nil {
+		return nil, fmt.Errorf("plant not found: %s", plantID)
+	}
+	plant.Name     = req.Name
+	plant.Strain   = req.Strain
+	plant.Genetics = req.Genetics
+	plant.SeedBank = req.SeedBank
+	item, err := attributevalue.MarshalMap(plant)
+	if err != nil {
+		return nil, fmt.Errorf("marshal plant: %w", err)
+	}
+	if _, err := s.ddb.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(s.tableName),
+		Item:      item,
+	}); err != nil {
+		return nil, fmt.Errorf("update plant: %w", err)
+	}
+	return plant, nil
+}
+
 func (s *PlantStore) Delete(ctx context.Context, plantID string) error {
 	if _, err := s.ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.tableName),

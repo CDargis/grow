@@ -1,11 +1,12 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
 import { AddLogSheet } from '@/components/AddLogSheet'
+import { EditPlantSheet } from '@/components/EditPlantSheet'
 import { MediaImage } from '@/components/MediaImage'
 import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment } from '@/types'
 
@@ -447,7 +448,8 @@ export function PlantDetailPage() {
   const [logSheetOpen, setLogSheetOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
-  const [view, setView] = useState<View>('journal')
+  const [view, setView]           = useState<View>('journal')
+  const [editOpen, setEditOpen]   = useState(false)
 
   const deleteLog = useMutation({
     mutationFn: (logId: string) => api.logs.delete(id!, logId),
@@ -547,6 +549,12 @@ export function PlantDetailPage() {
             <div className="flex items-center gap-2">
               <ViewToggle dark />
               <button
+                onClick={() => setEditOpen(true)}
+                className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white active:opacity-70"
+              >
+                <Pencil size={16} />
+              </button>
+              <button
                 onClick={() => setLogSheetOpen(true)}
                 className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white active:opacity-70"
               >
@@ -604,6 +612,9 @@ export function PlantDetailPage() {
           </div>
           <span className="text-xs text-fern capitalize font-medium flex-shrink-0">{plant.phase}</span>
           <ViewToggle />
+          <button onClick={() => setEditOpen(true)} className="text-muted active:opacity-70">
+            <Pencil size={16} />
+          </button>
           <button onClick={() => setLogSheetOpen(true)} className="text-fern active:opacity-70">
             <Plus size={18} />
           </button>
@@ -654,6 +665,11 @@ export function PlantDetailPage() {
         </div>
       )}
 
+      <EditPlantSheet
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        plant={plant}
+      />
       <AddLogSheet
         open={logSheetOpen}
         onClose={() => setLogSheetOpen(false)}

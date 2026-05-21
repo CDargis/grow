@@ -65,6 +65,13 @@ export type LogData =
   | TransplantData | HeightData | NoteData | PhotoData | PhaseChangeData
   | EnvironmentChangeData | LightingChangeData
 
+export interface UpdatePlantDetailsRequest {
+  name: string
+  strain: string
+  genetics?: string
+  seedBank?: string
+}
+
 export interface CreatePlantRequest {
   name: string
   strain: string

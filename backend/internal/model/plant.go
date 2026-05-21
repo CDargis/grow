@@ -38,6 +38,13 @@ type CreatePlantRequest struct {
 	EnvironmentID string     `json:"environmentId,omitempty"`
 }
 
+type UpdatePlantDetailsRequest struct {
+	Name     string `json:"name"`
+	Strain   string `json:"strain"`
+	Genetics string `json:"genetics,omitempty"`
+	SeedBank string `json:"seedBank,omitempty"`
+}
+
 type UpdatePlantRequest struct {
 	Name          *string     `json:"name,omitempty"`
 	Strain        *string     `json:"strain,omitempty"`

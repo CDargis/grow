@@ -58,6 +58,7 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/plants/{plantId}",       a.deletePlant)
 	mux.HandleFunc("PUT /api/plants/{plantId}/environment", a.assignEnvironment)
 	mux.HandleFunc("PUT /api/plants/{plantId}/phase",       a.updatePhase)
+	mux.HandleFunc("PATCH /api/plants/{plantId}",            a.updatePlant)
 	mux.HandleFunc("PUT /api/plants/{plantId}/avatar",      a.updateAvatar)
 
 	mux.HandleFunc("GET /api/plants/{plantId}/logs",     a.listLogs)
@@ -112,6 +113,20 @@ func (a *app) createPlant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, plant)
+}
+
+func (a *app) updatePlant(w http.ResponseWriter, r *http.Request) {
+	var req model.UpdatePlantDetailsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	plant, err := a.plants.UpdateDetails(r.Context(), r.PathValue("plantId"), req)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
 	jsonOK(w, plant)
 }
 
