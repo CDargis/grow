@@ -50,7 +50,13 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
     }
     case 'note':     return (log.data as any).text
     case 'height':   { const d = log.data as any; return `${d.height} ${d.unit}` }
-    case 'watering':   { const d = log.data as any; return d.amount != null ? `${d.amount} ${d.unit}` : d.unit }
+    case 'watering': {
+      const d = log.data as any
+      const vol = d.amount != null ? `${d.amount} ${d.unit}` : d.unit
+      const ph  = d.ph != null ? ` · pH ${d.ph}` : ''
+      const runoff = d.runoff != null ? ` · runoff ${d.runoff}` : ''
+      return `${vol}${ph}${runoff}`
+    }
     case 'height':     { const d = log.data as any; return `${d.height} ${d.unit}` }
     case 'transplant': { const d = log.data as any; return d.medium ? `${d.potSize} · ${d.medium}` : d.potSize }
     case 'photo':      return (log.data as any).caption ?? null
