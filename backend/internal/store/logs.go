@@ -97,6 +97,38 @@ func (s *LogStore) Create(ctx context.Context, plantID, userID string, req model
 	return &entry, nil
 }
 
+func (s *LogStore) Update(ctx context.Context, plantID, logID, userID string, req model.CreateLogRequest) (*model.Log, error) {
+	now := time.Now().UTC()
+	date := req.Date
+	if date == "" {
+		date = now.Format("2006-01-02")
+	}
+	loggedAt := req.LoggedAt
+	if loggedAt == "" {
+		loggedAt = now.Format(time.RFC3339)
+	}
+	entry := model.Log{
+		PlantID:  plantID,
+		LogID:    logID,
+		UserID:   userID,
+		LogType:  req.LogType,
+		Date:     date,
+		LoggedAt: loggedAt,
+		Data:     req.Data,
+	}
+	item, err := attributevalue.MarshalMap(entry)
+	if err != nil {
+		return nil, fmt.Errorf("marshal log: %w", err)
+	}
+	if _, err := s.ddb.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(s.tableName),
+		Item:      item,
+	}); err != nil {
+		return nil, fmt.Errorf("update log: %w", err)
+	}
+	return &entry, nil
+}
+
 func (s *LogStore) Delete(ctx context.Context, plantID, logID string) error {
 	if _, err := s.ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.tableName),

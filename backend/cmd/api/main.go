@@ -63,6 +63,7 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/plants/{plantId}/logs",     a.listLogs)
 	mux.HandleFunc("POST /api/plants/{plantId}/logs",    a.createLog)
+	mux.HandleFunc("PATCH /api/plants/{plantId}/logs/{logId}",  a.updateLog)
 	mux.HandleFunc("DELETE /api/plants/{plantId}/logs/{logId}", a.deleteLog)
 
 	mux.HandleFunc("GET /api/logs",                      a.listLogsByDate)
@@ -254,6 +255,20 @@ func (a *app) createLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, entry)
+}
+
+func (a *app) updateLog(w http.ResponseWriter, r *http.Request) {
+	var req model.CreateLogRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	entry, err := a.logs.Update(r.Context(), r.PathValue("plantId"), r.PathValue("logId"), a.userID, req)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
 	jsonOK(w, entry)
 }
 

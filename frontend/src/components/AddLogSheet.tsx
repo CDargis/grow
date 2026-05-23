@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, GitBranch, ArrowRightLeft, ImagePlus, X } from 'lucide-react'
 import { BottomSheet } from './BottomSheet'
+import { MediaImage } from './MediaImage'
 import { api } from '@/api/client'
-import type { Plant, PlantPhase, LogType, WateringData, FeedingData, NoteData, PhotoData, TransplantData, HeightData } from '@/types'
+import type { Plant, PlantPhase, Log, LogType, WateringData, FeedingData, NoteData, PhotoData, TransplantData, HeightData } from '@/types'
 
 // ── Types config ─────────────────────────────────────────────────────────────
 
@@ -58,6 +59,12 @@ function datetimeToISO(dt: string): string {
   return new Date(dt).toISOString()
 }
 
+function isoToDatetime(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 // ── Shared field styles ───────────────────────────────────────────────────────
 
 const inputCls = 'w-full bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-fern'
@@ -65,25 +72,27 @@ const labelCls = 'block text-xs text-dim mb-1'
 
 // ── Watering form ─────────────────────────────────────────────────────────────
 
-function WateringForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
+function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: WateringData }) {
   const qc = useQueryClient()
-  const [amount, setAmount]  = useState('')
-  const [unit, setUnit]      = useState<WateringData['unit']>('ml')
-  const [ph, setPh]          = useState('')
-  const [runoff, setRunoff]  = useState('')
+  const [amount, setAmount]  = useState(init?.amount?.toString() ?? '')
+  const [unit, setUnit]      = useState<WateringData['unit']>(init?.unit ?? 'ml')
+  const [ph, setPh]          = useState(init?.ph?.toString() ?? '')
+  const [runoff, setRunoff]  = useState(init?.runoff?.toString() ?? '')
+
+  const body = {
+    logType: 'watering' as const,
+    date: datetimeToDate(datetime),
+    loggedAt: datetimeToISO(datetime),
+    data: {
+      ...(amount ? { amount: Number(amount) } : {}),
+      unit,
+      ...(ph     ? { ph: Number(ph) }         : {}),
+      ...(runoff ? { runoff: Number(runoff) }  : {}),
+    } as WateringData,
+  }
 
   const mutation = useMutation({
-    mutationFn: () => api.logs.create(plantId, {
-      logType: 'watering',
-      date: datetimeToDate(datetime),
-      loggedAt: datetimeToISO(datetime),
-      data: {
-        ...(amount ? { amount: Number(amount) } : {}),
-        unit,
-        ...(ph     ? { ph: Number(ph) }         : {}),
-        ...(runoff ? { runoff: Number(runoff) }  : {}),
-      } as WateringData,
-    }),
+    mutationFn: () => logId ? api.logs.update(plantId, logId, body) : api.logs.create(plantId, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
       onSuccess()
@@ -142,36 +151,40 @@ function WateringForm({ plantId, datetime, onSuccess }: { plantId: string; datet
 
 type NutrientRow = { name: string; amount: string; unit: string }
 
-function FeedingForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
+function FeedingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: FeedingData }) {
   const qc = useQueryClient()
-  const [nutrients, setNutrients] = useState<NutrientRow[]>([{ name: '', amount: '', unit: 'ml' }])
-  const [ph, setPh]         = useState('')
-  const [totalVol, setVol]  = useState('')
+  const [nutrients, setNutrients] = useState<NutrientRow[]>(
+    init?.nutrients?.map(n => ({ name: n.name, amount: String(n.amount), unit: n.unit })) ?? [{ name: '', amount: '', unit: 'ml' }]
+  )
+  const [ph, setPh]         = useState(init?.ph?.toString() ?? '')
+  const [totalVol, setVol]  = useState(init?.totalVol?.toString() ?? '')
 
   function updateNutrient(i: number, field: keyof NutrientRow, value: string) {
     setNutrients(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: value } : r))
   }
 
+  const valid = nutrients.some(n => n.name && n.amount)
+
+  const body = {
+    logType: 'feeding' as const,
+    date: datetimeToDate(datetime),
+    loggedAt: datetimeToISO(datetime),
+    data: {
+      nutrients: nutrients
+        .filter(n => n.name && n.amount)
+        .map(n => ({ name: n.name, amount: Number(n.amount), unit: n.unit })),
+      ...(ph       ? { ph: Number(ph) }             : {}),
+      ...(totalVol ? { totalVol: Number(totalVol) } : {}),
+    } as FeedingData,
+  }
+
   const mutation = useMutation({
-    mutationFn: () => api.logs.create(plantId, {
-      logType: 'feeding',
-      date: datetimeToDate(datetime),
-      loggedAt: datetimeToISO(datetime),
-      data: {
-        nutrients: nutrients
-          .filter(n => n.name && n.amount)
-          .map(n => ({ name: n.name, amount: Number(n.amount), unit: n.unit })),
-        ...(ph      ? { ph: Number(ph) }           : {}),
-        ...(totalVol ? { totalVol: Number(totalVol) } : {}),
-      } as FeedingData,
-    }),
+    mutationFn: () => logId ? api.logs.update(plantId, logId, body) : api.logs.create(plantId, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
       onSuccess()
     },
   })
-
-  const valid = nutrients.some(n => n.name && n.amount)
 
   return (
     <div className="space-y-3 mt-2">
@@ -241,17 +254,15 @@ function FeedingForm({ plantId, datetime, onSuccess }: { plantId: string; dateti
 
 // ── Note form ─────────────────────────────────────────────────────────────────
 
-function NoteForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
+function NoteForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: NoteData }) {
   const qc = useQueryClient()
-  const [text, setText] = useState('')
+  const [text, setText] = useState(init?.text ?? '')
 
   const mutation = useMutation({
-    mutationFn: () => api.logs.create(plantId, {
-      logType: 'note',
-      date: datetimeToDate(datetime),
-      loggedAt: datetimeToISO(datetime),
-      data: { text } as NoteData,
-    }),
+    mutationFn: () => {
+      const body = { logType: 'note' as const, date: datetimeToDate(datetime), loggedAt: datetimeToISO(datetime), data: { text } as NoteData }
+      return logId ? api.logs.update(plantId, logId, body) : api.logs.create(plantId, body)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
       onSuccess()
@@ -282,18 +293,16 @@ function NoteForm({ plantId, datetime, onSuccess }: { plantId: string; datetime:
 
 // ── Height form ───────────────────────────────────────────────────────────────
 
-function HeightForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
+function HeightForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: HeightData }) {
   const qc = useQueryClient()
-  const [height, setHeight] = useState('')
-  const [unit, setUnit]     = useState<HeightData['unit']>('cm')
+  const [height, setHeight] = useState(init?.height?.toString() ?? '')
+  const [unit, setUnit]     = useState<HeightData['unit']>(init?.unit ?? 'cm')
 
   const mutation = useMutation({
-    mutationFn: () => api.logs.create(plantId, {
-      logType: 'height',
-      date:     datetimeToDate(datetime),
-      loggedAt: datetimeToISO(datetime),
-      data: { height: Number(height), unit } as HeightData,
-    }),
+    mutationFn: () => {
+      const body = { logType: 'height' as const, date: datetimeToDate(datetime), loggedAt: datetimeToISO(datetime), data: { height: Number(height), unit } as HeightData }
+      return logId ? api.logs.update(plantId, logId, body) : api.logs.create(plantId, body)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
       onSuccess()
@@ -339,18 +348,16 @@ function HeightForm({ plantId, datetime, onSuccess }: { plantId: string; datetim
 
 // ── Transplant form ───────────────────────────────────────────────────────────
 
-function TransplantForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
+function TransplantForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: TransplantData }) {
   const qc = useQueryClient()
-  const [potSize, setPotSize] = useState('')
-  const [medium, setMedium]   = useState('')
+  const [potSize, setPotSize] = useState(init?.potSize ?? '')
+  const [medium, setMedium]   = useState(init?.medium ?? '')
 
   const mutation = useMutation({
-    mutationFn: () => api.logs.create(plantId, {
-      logType: 'transplant',
-      date:     datetimeToDate(datetime),
-      loggedAt: datetimeToISO(datetime),
-      data: { potSize, ...(medium ? { medium } : {}) } as TransplantData,
-    }),
+    mutationFn: () => {
+      const body = { logType: 'transplant' as const, date: datetimeToDate(datetime), loggedAt: datetimeToISO(datetime), data: { potSize, ...(medium ? { medium } : {}) } as TransplantData }
+      return logId ? api.logs.update(plantId, logId, body) : api.logs.create(plantId, body)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
       onSuccess()
@@ -447,12 +454,12 @@ function PhaseChangeForm({ plant, datetime, onSuccess }: { plant: Plant; datetim
 
 // ── Photo form ────────────────────────────────────────────────────────────────
 
-function PhotoForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
+function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: PhotoData }) {
   const qc = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
-  const [caption, setCaption] = useState('')
+  const [caption, setCaption] = useState(init?.caption ?? '')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -470,17 +477,24 @@ function PhotoForm({ plantId, datetime, onSuccess }: { plantId: string; datetime
   }
 
   async function handleSubmit() {
-    if (!file) return
+    if (!file && !init?.photoKey) return
     setUploading(true)
     setError(null)
     try {
-      const photoKey = await api.media.uploadFile(file, `plants/${plantId}/logs`)
-      await api.logs.create(plantId, {
-        logType: 'photo',
+      const photoKey = file
+        ? await api.media.uploadFile(file, `plants/${plantId}/logs`)
+        : init!.photoKey
+      const body = {
+        logType: 'photo' as const,
         date: datetimeToDate(datetime),
         loggedAt: datetimeToISO(datetime),
         data: { photoKey, ...(caption ? { caption } : {}) } as PhotoData,
-      })
+      }
+      if (logId) {
+        await api.logs.update(plantId, logId, body)
+      } else {
+        await api.logs.create(plantId, body)
+      }
       qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
       onSuccess()
     } catch (e) {
@@ -497,15 +511,17 @@ function PhotoForm({ plantId, datetime, onSuccess }: { plantId: string; datetime
       <button
         onClick={() => fileRef.current?.click()}
         className={`w-full h-52 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors overflow-hidden ${
-          preview ? 'border-transparent p-0' : 'border-border text-muted active:opacity-70'
+          preview || init?.photoKey ? 'border-transparent p-0' : 'border-border text-muted active:opacity-70'
         }`}
       >
         {preview
           ? <img src={preview} alt="preview" className="w-full h-full object-cover" />
-          : <>
-              <ImagePlus size={28} />
-              <span className="text-sm">Tap to select photo</span>
-            </>
+          : init?.photoKey
+            ? <MediaImage photoKey={init.photoKey} alt="current photo" className="w-full h-full object-cover" />
+            : <>
+                <ImagePlus size={28} />
+                <span className="text-sm">Tap to select photo</span>
+              </>
         }
       </button>
 
@@ -529,10 +545,10 @@ function PhotoForm({ plantId, datetime, onSuccess }: { plantId: string; datetime
 
       <button
         onClick={handleSubmit}
-        disabled={!file || uploading}
+        disabled={(!file && !init?.photoKey) || uploading}
         className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
       >
-        {uploading ? 'Uploading…' : 'Save Photo'}
+        {uploading ? 'Uploading…' : logId ? 'Save Changes' : 'Save Photo'}
       </button>
     </div>
   )
@@ -572,30 +588,39 @@ interface Props {
   onClose: () => void
   plant: Plant
   defaultDate?: string
+  editLog?: Log
 }
 
-export function AddLogSheet({ open, onClose, plant, defaultDate }: Props) {
+export function AddLogSheet({ open, onClose, plant, defaultDate, editLog }: Props) {
   const [selected, setSelected] = useState<LogType | null>(null)
   const [datetime, setDatetime] = useState(nowDatetime)
 
   useEffect(() => {
     if (open) {
-      const now = nowDatetime()
-      setDatetime(defaultDate ? `${defaultDate}T${now.slice(11)}` : now)
+      if (editLog) {
+        setSelected(editLog.logType)
+        setDatetime(isoToDatetime(editLog.loggedAt || (editLog.date + 'T12:00')))
+      } else {
+        const now = nowDatetime()
+        setDatetime(defaultDate ? `${defaultDate}T${now.slice(11)}` : now)
+        setSelected(null)
+      }
     }
-  }, [open, defaultDate])
+  }, [open, defaultDate, editLog])
 
   function reset() { setSelected(null) }
   function handleClose() { reset(); onClose() }
 
-  const title = selected ? LABELS[selected] : 'Log Activity'
+  const title = editLog
+    ? `Edit ${LABELS[editLog.logType] ?? editLog.logType}`
+    : selected ? LABELS[selected] : 'Log Activity'
 
   return (
     <BottomSheet
       title={title}
       open={open}
       onClose={handleClose}
-      onBack={selected ? reset : undefined}
+      onBack={selected && !editLog ? reset : undefined}
     >
       <div className="flex items-center justify-between mt-2 pb-3 border-b border-border">
         <span className="text-xs text-dim">When</span>
@@ -611,19 +636,19 @@ export function AddLogSheet({ open, onClose, plant, defaultDate }: Props) {
       {!selected ? (
         <TypePicker onSelect={setSelected} />
       ) : selected === 'watering' ? (
-        <WateringForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
+        <WateringForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as WateringData | undefined} />
       ) : selected === 'feeding' ? (
-        <FeedingForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
+        <FeedingForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as FeedingData | undefined} />
       ) : selected === 'note' ? (
-        <NoteForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
+        <NoteForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as NoteData | undefined} />
       ) : selected === 'height' ? (
-        <HeightForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
+        <HeightForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as HeightData | undefined} />
       ) : selected === 'transplant' ? (
-        <TransplantForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
+        <TransplantForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as TransplantData | undefined} />
       ) : selected === 'phase_change' ? (
         <PhaseChangeForm plant={plant} datetime={datetime} onSuccess={handleClose} />
       ) : selected === 'photo' ? (
-        <PhotoForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
+        <PhotoForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as PhotoData | undefined} />
       ) : null}
     </BottomSheet>
   )

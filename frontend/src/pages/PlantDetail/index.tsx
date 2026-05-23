@@ -10,6 +10,8 @@ import { EditPlantSheet } from '@/components/EditPlantSheet'
 import { MediaImage } from '@/components/MediaImage'
 import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment } from '@/types'
 
+const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'feeding', 'note', 'height', 'transplant', 'photo'])
+
 const LOG_ICONS: Record<LogType, React.ReactNode> = {
   watering:           <Droplets size={16} />,
   feeding:            <Zap size={16} />,
@@ -170,11 +172,12 @@ function phaseDuration(startDate: string, endDate: string | null): string {
 
 // ── Phase log entry (compact row inside an expanded phase) ────────────────────
 
-function PhaseLogEntry({ log, color, envMap, onDelete }: {
+function PhaseLogEntry({ log, color, envMap, onDelete, onEdit }: {
   log: Log
   color: string
   envMap: Map<string, string>
   onDelete: (logId: string) => void
+  onEdit: (log: Log) => void
 }) {
   const [lightbox, setLightbox] = useState(false)
   const summary  = logSummary(log, envMap)
@@ -199,6 +202,11 @@ function PhaseLogEntry({ log, color, envMap, onDelete }: {
               <span className="text-[10px] text-muted">
                 {new Date(log.date + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
               </span>
+              {EDITABLE_LOG_TYPES.has(log.logType) && (
+                <button onClick={() => onEdit(log)} className="text-muted/40 active:text-primary p-0.5">
+                  <Pencil size={11} />
+                </button>
+              )}
               <button onClick={() => onDelete(log.logId)} className="text-muted/40 active:text-red-400 p-0.5">
                 <Trash2 size={11} />
               </button>
@@ -230,11 +238,12 @@ function PhaseLogEntry({ log, color, envMap, onDelete }: {
 
 // ── Phase period section ───────────────────────────────────────────────────────
 
-function PhasePeriodSection({ period, isLast, envMap, onDelete }: {
+function PhasePeriodSection({ period, isLast, envMap, onDelete, onEdit }: {
   period: PhasePeriod
   isLast: boolean
   envMap: Map<string, string>
   onDelete: (logId: string) => void
+  onEdit: (log: Log) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const color   = PHASE_HEX[period.phase] ?? '#666'
@@ -287,7 +296,7 @@ function PhasePeriodSection({ period, isLast, envMap, onDelete }: {
               <p className="text-xs text-muted py-2">No activity logged this phase.</p>
             ) : (
               period.logs.map(log => (
-                <PhaseLogEntry key={log.logId} log={log} color={color} envMap={envMap} onDelete={onDelete} />
+                <PhaseLogEntry key={log.logId} log={log} color={color} envMap={envMap} onDelete={onDelete} onEdit={onEdit} />
               ))
             )}
           </div>
@@ -299,11 +308,12 @@ function PhasePeriodSection({ period, isLast, envMap, onDelete }: {
 
 // ── Timeline view ─────────────────────────────────────────────────────────────
 
-function TimelineView({ plant, logs, envMap, onDelete }: {
+function TimelineView({ plant, logs, envMap, onDelete, onEdit }: {
   plant: Plant
   logs: Log[]
   envMap: Map<string, string>
   onDelete: (logId: string) => void
+  onEdit: (log: Log) => void
 }) {
   const periods = buildPhasePeriods(plant, logs)
   return (
@@ -315,13 +325,14 @@ function TimelineView({ plant, logs, envMap, onDelete }: {
           isLast={idx === periods.length - 1}
           envMap={envMap}
           onDelete={onDelete}
+          onEdit={onEdit}
         />
       ))}
     </div>
   )
 }
 
-function LogEntry({ log, envMap, onDelete }: { log: Log; envMap: Map<string, string>; onDelete: (logId: string) => void }) {
+function LogEntry({ log, envMap, onDelete, onEdit }: { log: Log; envMap: Map<string, string>; onDelete: (logId: string) => void; onEdit: (log: Log) => void }) {
   const [lightbox, setLightbox] = useState(false)
   const summary = logSummary(log, envMap)
   const photoKey = log.logType === 'photo' ? (log.data as any).photoKey as string | undefined : undefined
@@ -340,10 +351,12 @@ function LogEntry({ log, envMap, onDelete }: { log: Log; envMap: Map<string, str
               <span className="text-xs text-muted">
                 {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
-              <button
-                onClick={() => onDelete(log.logId)}
-                className="text-muted/50 active:text-red-400 active:opacity-80 p-0.5"
-              >
+              {EDITABLE_LOG_TYPES.has(log.logType) && (
+                <button onClick={() => onEdit(log)} className="text-muted/50 active:text-primary p-0.5">
+                  <Pencil size={12} />
+                </button>
+              )}
+              <button onClick={() => onDelete(log.logId)} className="text-muted/50 active:text-red-400 active:opacity-80 p-0.5">
                 <Trash2 size={13} />
               </button>
             </div>
@@ -456,11 +469,17 @@ export function PlantDetailPage() {
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [view, setView]           = useState<View>('journal')
   const [editOpen, setEditOpen]   = useState(false)
+  const [editLog, setEditLog]     = useState<Log | null>(null)
 
   const deleteLog = useMutation({
     mutationFn: (logId: string) => api.logs.delete(id!, logId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['logs', 'plant', id] }),
   })
+
+  function handleEditLog(log: Log) {
+    setEditLog(log)
+    setLogSheetOpen(true)
+  }
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -653,7 +672,7 @@ export function PlantDetailPage() {
               <div className="text-muted text-sm py-8 text-center">No activity on this day.</div>
             ) : (
               journalLogs.map((log: Log) => (
-                <LogEntry key={log.logId} log={log} envMap={envMap} onDelete={deleteLog.mutate} />
+                <LogEntry key={log.logId} log={log} envMap={envMap} onDelete={deleteLog.mutate} onEdit={handleEditLog} />
               ))
             )}
           </div>
@@ -666,7 +685,7 @@ export function PlantDetailPage() {
           {logsLoading ? (
             <div className="text-muted text-sm">Loading…</div>
           ) : (
-            <TimelineView plant={plant} logs={logs ?? []} envMap={envMap} onDelete={deleteLog.mutate} />
+            <TimelineView plant={plant} logs={logs ?? []} envMap={envMap} onDelete={deleteLog.mutate} onEdit={handleEditLog} />
           )}
         </div>
       )}
@@ -678,9 +697,10 @@ export function PlantDetailPage() {
       />
       <AddLogSheet
         open={logSheetOpen}
-        onClose={() => setLogSheetOpen(false)}
+        onClose={() => { setLogSheetOpen(false); setEditLog(null) }}
         plant={plant}
         defaultDate={selectedDate ?? undefined}
+        editLog={editLog ?? undefined}
       />
       <ChangeEnvironmentSheet
         open={envSheetOpen}

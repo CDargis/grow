@@ -50,6 +50,8 @@ export const api = {
     listForDate:  (date: string)                => request<Log[]>(`/logs?date=${date}`),
     create:       (plantId: string, body: CreateLogRequest) =>
       request<Log>(`/plants/${plantId}/logs`, { method: 'POST', body: JSON.stringify(body) }),
+    update: (plantId: string, logId: string, body: CreateLogRequest) =>
+      request<Log>(`/plants/${plantId}/logs/${logId}`, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (plantId: string, logId: string)    => request<void>(`/plants/${plantId}/logs/${logId}`, { method: 'DELETE' }),
   },
 
