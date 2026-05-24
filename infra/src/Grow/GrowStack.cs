@@ -224,7 +224,7 @@ public class GrowStack : Stack
 
         Rule recalSchedule = new Rule(this, "RecalibrationSchedule", new RuleProps
         {
-            Schedule = Schedule.Cron(new CronOptions { Hour = "6", Minute = "0" })
+            Schedule = Schedule.Cron(new CronOptions { Hour = "14", Minute = "0" })
         });
         recalSchedule.AddTarget(new EventsLambdaTarget(recalibrateFunction));
 
