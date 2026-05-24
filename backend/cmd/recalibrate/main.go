@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +14,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/cdargis/grow/internal/model"
 	"github.com/cdargis/grow/internal/store"
 )
@@ -21,15 +25,29 @@ type app struct {
 	logs         *store.LogStore
 	milestones   *store.MilestoneStore
 	observations *store.ObservationStore
+	s3           *s3.Client
+	mediaBkt     string
 	userID       string
 	anthropicKey string
 }
 
 // ── Claude API ────────────────────────────────────────────────────────────────
 
+type claudeImageSource struct {
+	Type      string `json:"type"`       // "base64"
+	MediaType string `json:"media_type"` // "image/jpeg"
+	Data      string `json:"data"`
+}
+
+type claudeContentBlock struct {
+	Type   string             `json:"type"`             // "text" or "image"
+	Text   string             `json:"text,omitempty"`
+	Source *claudeImageSource `json:"source,omitempty"`
+}
+
 type claudeMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string      `json:"role"`
+	Content interface{} `json:"content"` // string or []claudeContentBlock
 }
 
 type claudeRequest struct {
@@ -39,13 +57,13 @@ type claudeRequest struct {
 	Messages  []claudeMessage `json:"messages"`
 }
 
-type claudeContentBlock struct {
+type claudeResponseBlock struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
 }
 
 type claudeResponse struct {
-	Content []claudeContentBlock `json:"content"`
+	Content []claudeResponseBlock `json:"content"`
 }
 
 type milestonePredict struct {
@@ -112,14 +130,51 @@ Rules:
 - For photoperiods: include flip_to_flower if still in veg or seedling.
 - Only predict leaf sets if the plant is currently in germination or seedling phase.
 - Keep observations sparse — only note something if the log data provides a meaningful signal.
-- Be conservative with confidence; prefer low/medium over false high confidence.`
+- Be conservative with confidence; prefer low/medium over false high confidence.
+- If a photo is provided, use it as the PRIMARY signal for current growth stage. Override text-based estimates if the image clearly shows a different stage. Don't predict milestones the photo shows have already passed.`
 
-func (a *app) callClaude(ctx context.Context, prompt string) (*recalResponse, error) {
+func (a *app) fetchImageBase64(ctx context.Context, key string) (data, mediaType string, err error) {
+	out, err := a.s3.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(a.mediaBkt),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("get object: %w", err)
+	}
+	defer out.Body.Close()
+	raw, err := io.ReadAll(out.Body)
+	if err != nil {
+		return "", "", fmt.Errorf("read body: %w", err)
+	}
+	mt := "image/jpeg"
+	if out.ContentType != nil && *out.ContentType != "" {
+		mt = *out.ContentType
+	}
+	return base64.StdEncoding.EncodeToString(raw), mt, nil
+}
+
+func (a *app) callClaude(ctx context.Context, prompt, photoKey string) (*recalResponse, error) {
+	var content interface{}
+	if photoKey != "" && a.s3 != nil {
+		imgData, mediaType, err := a.fetchImageBase64(ctx, photoKey)
+		if err != nil {
+			log.Printf("warn: fetch photo for claude: %v", err)
+			content = prompt
+		} else {
+			content = []claudeContentBlock{
+				{Type: "image", Source: &claudeImageSource{Type: "base64", MediaType: mediaType, Data: imgData}},
+				{Type: "text", Text: prompt},
+			}
+		}
+	} else {
+		content = prompt
+	}
+
 	reqBody, _ := json.Marshal(claudeRequest{
 		Model:     "claude-haiku-4-5-20251001",
 		MaxTokens: 1000,
 		System:    systemPrompt,
-		Messages:  []claudeMessage{{Role: "user", Content: prompt}},
+		Messages:  []claudeMessage{{Role: "user", Content: content}},
 	})
 
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages", bytes.NewReader(reqBody))
@@ -173,7 +228,8 @@ func min(a, b int) int {
 
 // ── Prompt builder ────────────────────────────────────────────────────────────
 
-func buildPrompt(plant *model.Plant, logs []model.Log, now time.Time) string {
+// buildPrompt returns the text prompt and the S3 key of the most recent photo log (if any).
+func buildPrompt(plant *model.Plant, logs []model.Log, now time.Time) (string, string) {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Plant: %s\n", plant.Name))
 	sb.WriteString(fmt.Sprintf("Strain: %s\n", plant.Strain))
@@ -211,8 +267,20 @@ func buildPrompt(plant *model.Plant, logs []model.Log, now time.Time) string {
 	cutoff := now.AddDate(0, 0, -30).Format("2006-01-02")
 	sb.WriteString("\nRecent Care (last 30 days):\n")
 	careCount := 0
+	latestPhotoKey := ""
+	latestPhotoDate := ""
 	for i := len(logs) - 1; i >= 0; i-- {
 		l := logs[i]
+		// Track most recent photo regardless of cutoff
+		if l.LogType == model.LogPhoto {
+			var d model.PhotoData
+			if err := json.Unmarshal(l.Data, &d); err == nil && d.PhotoKey != "" {
+				if latestPhotoDate == "" || l.LoggedAt > latestPhotoDate {
+					latestPhotoKey = d.PhotoKey
+					latestPhotoDate = l.LoggedAt
+				}
+			}
+		}
 		if l.Date < cutoff {
 			continue
 		}
@@ -260,8 +328,11 @@ func buildPrompt(plant *model.Plant, logs []model.Log, now time.Time) string {
 	if careCount == 0 {
 		sb.WriteString("  (no recent care logs)\n")
 	}
+	if latestPhotoKey != "" {
+		sb.WriteString("\nA recent photo is attached. Use it as the primary signal for current growth stage.\n")
+	}
 
-	return sb.String()
+	return sb.String(), latestPhotoKey
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -286,8 +357,8 @@ func (a *app) handle(ctx context.Context) error {
 			continue
 		}
 
-		prompt := buildPrompt(&plant, logs, now)
-		result, err := a.callClaude(ctx, prompt)
+		prompt, photoKey := buildPrompt(&plant, logs, now)
+		result, err := a.callClaude(ctx, prompt, photoKey)
 		if err != nil {
 			log.Printf("warn: claude for %s: %v", plant.PlantID, err)
 			continue
@@ -361,6 +432,8 @@ func main() {
 			os.Getenv("MILESTONES_HISTORY_TABLE"),
 		),
 		observations: store.NewObservationStore(clients.DDB, os.Getenv("OBSERVATIONS_TABLE")),
+		s3:           clients.S3,
+		mediaBkt:     os.Getenv("MEDIA_BUCKET"),
 		userID:       getEnvOrDefault("USER_ID", "default"),
 		anthropicKey: os.Getenv("ANTHROPIC_API_KEY"),
 	}

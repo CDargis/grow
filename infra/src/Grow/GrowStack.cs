@@ -208,6 +208,7 @@ public class GrowStack : Stack
                 ["MILESTONES_TABLE"]         = milestonesTable.TableName,
                 ["MILESTONES_HISTORY_TABLE"] = milestonesHistoryTable.TableName,
                 ["OBSERVATIONS_TABLE"]       = observationsTable.TableName,
+                ["MEDIA_BUCKET"]             = mediaBucket.BucketName,
                 ["USER_ID"]                  = "default",
                 ["ANTHROPIC_API_KEY"]        = anthropicApiKey
             }
@@ -218,6 +219,7 @@ public class GrowStack : Stack
         milestonesTable.GrantReadWriteData(recalibrateFunction);
         milestonesHistoryTable.GrantReadWriteData(recalibrateFunction);
         observationsTable.GrantReadWriteData(recalibrateFunction);
+        mediaBucket.GrantRead(recalibrateFunction);
 
         Rule recalSchedule = new Rule(this, "RecalibrationSchedule", new RuleProps
         {

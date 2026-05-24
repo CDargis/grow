@@ -363,13 +363,15 @@ function PhasePeriodSection({ period, isLast, envMap, milestones, onDelete, onEd
   const color = PHASE_HEX[period.phase] ?? '#666'
 
   // Active phase shows all milestones; completed phases only show their own
-  const phaseMilestones = milestones.filter(m =>
-    m.status !== 'skipped' && (
-      ongoing
-        ? true
-        : MILESTONE_PHASES[m.milestoneType]?.includes(period.phase)
+  const phaseMilestones = milestones
+    .filter(m =>
+      m.status !== 'skipped' && (
+        ongoing
+          ? true
+          : MILESTONE_PHASES[m.milestoneType]?.includes(period.phase)
+      )
     )
-  )
+    .sort((a, b) => a.predictedDate.localeCompare(b.predictedDate))
 
   const hasContent = period.logs.length > 0 || phaseMilestones.length > 0
 
