@@ -101,6 +101,16 @@ export type LogData =
   | TransplantData | HeightData | NoteData | PhotoData | PhaseChangeData
   | EnvironmentChangeData | LightingChangeData
 
+export interface MilestoneHistory {
+  plantId: string
+  recalSK: string
+  milestoneType: MilestoneType
+  predictedDate: string
+  confidence: MilestoneConfidence
+  recalibratedAt: string
+  reason?: string
+}
+
 export interface UpdatePlantDetailsRequest {
   name: string
   strain: string
