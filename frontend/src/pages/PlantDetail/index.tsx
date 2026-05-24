@@ -1,14 +1,14 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, Flag, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, Flag, CheckCircle2, Sparkles, AlertTriangle } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
 import { AddLogSheet } from '@/components/AddLogSheet'
 import { EditPlantSheet } from '@/components/EditPlantSheet'
 import { MediaImage } from '@/components/MediaImage'
-import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment, Milestone, MilestoneType } from '@/types'
+import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment, Milestone, MilestoneType, PlantObservation } from '@/types'
 
 const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'feeding', 'note', 'height', 'transplant', 'photo'])
 
@@ -533,6 +533,63 @@ function LogEntry({ log, envMap, onDelete, onEdit }: { log: Log; envMap: Map<str
   )
 }
 
+// ── Observation components ────────────────────────────────────────────────────
+
+function ObservationAlert({ obs, onAction }: {
+  obs: PlantObservation
+  onAction: (id: string) => void
+}) {
+  return (
+    <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+      <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-primary leading-snug">{obs.text}</p>
+        <p className="text-[10px] text-muted mt-1 capitalize">{obs.category}</p>
+      </div>
+      <button
+        onClick={() => onAction(obs.observationId)}
+        className="text-[10px] px-2 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 active:opacity-70 flex-shrink-0"
+      >
+        Done
+      </button>
+    </div>
+  )
+}
+
+function ObservationsSection({ observations }: { observations: PlantObservation[] }) {
+  const [expanded, setExpanded] = useState(false)
+  if (observations.length === 0) return null
+  return (
+    <div className="border-t border-border mx-4 mt-2 pt-3 pb-4">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="flex items-center gap-2 w-full text-left"
+      >
+        <Sparkles size={13} className="text-muted" />
+        <span className="text-xs text-muted flex-1">AI Notes ({observations.length})</span>
+        {expanded ? <ChevronUp size={12} className="text-muted" /> : <ChevronDown size={12} className="text-muted" />}
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-2">
+          {observations.map(obs => (
+            <div key={obs.observationId} className="flex items-start gap-2">
+              <Sparkles size={11} className="text-muted/50 flex-shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-[11px] text-dim leading-snug">{obs.text}</p>
+                <p className="text-[10px] text-muted/60 mt-0.5">
+                  {new Date(obs.observedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                  {' · '}<span className="capitalize">{obs.category}</span>
+                  {obs.actionedAt && <span className="text-fern"> · actioned</span>}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ChangeEnvironmentSheet({
   open, onClose, currentEnvId, plantId,
 }: {
@@ -673,6 +730,17 @@ export function PlantDetailPage() {
     queryKey: ['milestones', id],
     queryFn: () => api.milestones.listForPlant(id!),
     enabled: !!id,
+  })
+
+  const { data: observations = [] } = useQuery({
+    queryKey: ['observations', id],
+    queryFn: () => api.observations.listForPlant(id!),
+    enabled: !!id,
+  })
+
+  const actionObservation = useMutation({
+    mutationFn: (observationId: string) => api.observations.markActioned(id!, observationId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['observations', id] }),
   })
 
   const envMap = new Map<string, string>(
@@ -820,6 +888,18 @@ export function PlantDetailPage() {
         <ChevronRight size={16} className="text-muted" />
       </button>
 
+      {/* Action-required observations */}
+      {observations.filter((o: PlantObservation) => o.requiresAction && !o.actionedAt).length > 0 && (
+        <div className="px-4 pt-3 space-y-2">
+          {observations
+            .filter((o: PlantObservation) => o.requiresAction && !o.actionedAt)
+            .map((o: PlantObservation) => (
+              <ObservationAlert key={o.observationId} obs={o} onAction={actionObservation.mutate} />
+            ))
+          }
+        </div>
+      )}
+
       {/* Journal view: date strip + single-day logs */}
       {view === 'journal' && (
         <>
@@ -860,6 +940,10 @@ export function PlantDetailPage() {
           )}
         </div>
       )}
+
+      <ObservationsSection
+        observations={observations.filter((o: PlantObservation) => !o.requiresAction || !!o.actionedAt)}
+      />
 
       <EditPlantSheet
         open={editOpen}

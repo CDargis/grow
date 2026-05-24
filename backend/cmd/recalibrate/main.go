@@ -171,8 +171,8 @@ func (a *app) callClaude(ctx context.Context, prompt, photoKey string) (*recalRe
 	}
 
 	reqBody, _ := json.Marshal(claudeRequest{
-		Model:     "claude-haiku-4-5-20251001",
-		MaxTokens: 1000,
+		Model:     "claude-sonnet-4-6",
+		MaxTokens: 2000,
 		System:    systemPrompt,
 		Messages:  []claudeMessage{{Role: "user", Content: content}},
 	})
