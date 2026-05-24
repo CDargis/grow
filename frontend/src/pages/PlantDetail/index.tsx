@@ -535,55 +535,60 @@ function LogEntry({ log, envMap, onDelete, onEdit }: { log: Log; envMap: Map<str
 
 // ── Observation components ────────────────────────────────────────────────────
 
-function ObservationAlert({ obs, onAction }: {
-  obs: PlantObservation
+function ObservationsSection({ observations, onAction }: {
+  observations: PlantObservation[]
   onAction: (id: string) => void
 }) {
-  return (
-    <div className="flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
-      <AlertTriangle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-primary leading-snug">{obs.text}</p>
-        <p className="text-[10px] text-muted mt-1 capitalize">{obs.category}</p>
-      </div>
-      <button
-        onClick={() => onAction(obs.observationId)}
-        className="text-[10px] px-2 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 active:opacity-70 flex-shrink-0"
-      >
-        Done
-      </button>
-    </div>
-  )
-}
-
-function ObservationsSection({ observations }: { observations: PlantObservation[] }) {
-  const [expanded, setExpanded] = useState(false)
+  const hasActionable = observations.some(o => o.requiresAction && !o.actionedAt)
+  const [expanded, setExpanded] = useState(hasActionable)
   if (observations.length === 0) return null
   return (
-    <div className="border-t border-border mx-4 mt-2 pt-3 pb-4">
+    <div className="border-b border-border">
       <button
         onClick={() => setExpanded(e => !e)}
-        className="flex items-center gap-2 w-full text-left"
+        className="flex items-center gap-2 w-full px-4 py-2.5 text-left"
       >
-        <Sparkles size={13} className="text-muted" />
-        <span className="text-xs text-muted flex-1">AI Notes ({observations.length})</span>
+        <Sparkles size={13} className={hasActionable ? 'text-amber-400' : 'text-muted'} />
+        <span className="text-xs text-muted flex-1">
+          AI Notes
+          {hasActionable && <span className="ml-1.5 text-amber-400">· {observations.filter(o => o.requiresAction && !o.actionedAt).length} need attention</span>}
+        </span>
         {expanded ? <ChevronUp size={12} className="text-muted" /> : <ChevronDown size={12} className="text-muted" />}
       </button>
       {expanded && (
-        <div className="mt-2 space-y-2">
-          {observations.map(obs => (
-            <div key={obs.observationId} className="flex items-start gap-2">
-              <Sparkles size={11} className="text-muted/50 flex-shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <p className="text-[11px] text-dim leading-snug">{obs.text}</p>
-                <p className="text-[10px] text-muted/60 mt-0.5">
-                  {new Date(obs.observedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                  {' · '}<span className="capitalize">{obs.category}</span>
-                  {obs.actionedAt && <span className="text-fern"> · actioned</span>}
-                </p>
+        <div className="px-4 pb-3 space-y-2">
+          {observations.map(obs => {
+            const isActionable = obs.requiresAction && !obs.actionedAt
+            return (
+              <div
+                key={obs.observationId}
+                className={`flex items-start gap-2.5 rounded-xl p-2.5 ${
+                  isActionable ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-raised'
+                }`}
+              >
+                {isActionable
+                  ? <AlertTriangle size={13} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                  : <Sparkles size={13} className="text-muted/50 flex-shrink-0 mt-0.5" />
+                }
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] text-primary leading-snug">{obs.text}</p>
+                  <p className="text-[10px] text-muted/60 mt-0.5">
+                    {new Date(obs.observedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                    {' · '}<span className="capitalize">{obs.category}</span>
+                    {obs.actionedAt && <span className="text-fern"> · done</span>}
+                  </p>
+                </div>
+                {isActionable && (
+                  <button
+                    onClick={() => onAction(obs.observationId)}
+                    className="text-[10px] px-2 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 active:opacity-70 flex-shrink-0"
+                  >
+                    Done
+                  </button>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -888,17 +893,7 @@ export function PlantDetailPage() {
         <ChevronRight size={16} className="text-muted" />
       </button>
 
-      {/* Action-required observations */}
-      {observations.filter((o: PlantObservation) => o.requiresAction && !o.actionedAt).length > 0 && (
-        <div className="px-4 pt-3 space-y-2">
-          {observations
-            .filter((o: PlantObservation) => o.requiresAction && !o.actionedAt)
-            .map((o: PlantObservation) => (
-              <ObservationAlert key={o.observationId} obs={o} onAction={actionObservation.mutate} />
-            ))
-          }
-        </div>
-      )}
+      <ObservationsSection observations={observations} onAction={actionObservation.mutate} />
 
       {/* Journal view: date strip + single-day logs */}
       {view === 'journal' && (
@@ -940,10 +935,6 @@ export function PlantDetailPage() {
           )}
         </div>
       )}
-
-      <ObservationsSection
-        observations={observations.filter((o: PlantObservation) => !o.requiresAction || !!o.actionedAt)}
-      />
 
       <EditPlantSheet
         open={editOpen}
