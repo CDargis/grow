@@ -173,6 +173,7 @@ public class GrowStack : Stack
         environmentsTable.GrantReadWriteData(apiFunction);
         logsTable.GrantReadWriteData(apiFunction);
         milestonesTable.GrantReadWriteData(apiFunction);
+        milestonesHistoryTable.GrantReadData(apiFunction);
         observationsTable.GrantReadWriteData(apiFunction);
         mediaBucket.GrantReadWrite(apiFunction);
 
