@@ -339,10 +339,12 @@ func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Mileston
 		}
 	}
 	if len(predicted) > 0 {
-		sb.WriteString("\nExisting predicted milestones (you MUST include every one of these in your response):\n")
+		sb.WriteString("\nExisting predicted milestones:\n")
 		for _, m := range predicted {
-			sb.WriteString(fmt.Sprintf("  - %s: predicted %s\n", m.MilestoneType, m.PredictedDate))
+			sb.WriteString(fmt.Sprintf("  - %s: currently predicted %s\n", m.MilestoneType, m.PredictedDate))
 		}
+		sb.WriteString("\nFor each existing milestone above: only include it in your response if your estimate has changed or you believe it has already occurred.\n")
+		sb.WriteString("If you agree with the current predicted date, omit it entirely — no need to repeat it.\n")
 		sb.WriteString("If you believe one has already occurred, include it with your best estimate of when it happened and confidence=high.\n")
 	}
 
@@ -391,10 +393,8 @@ func (a *app) handle(ctx context.Context) error {
 		}
 
 		// Upsert milestones — skip any already confirmed or skipped
-		returnedTypes := make(map[model.MilestoneType]bool, len(result.Milestones))
 		for _, mp := range result.Milestones {
 			mt := model.MilestoneType(mp.Type)
-			returnedTypes[mt] = true
 
 			if ex, found := existingByType[mt]; found {
 				if ex.Status == model.MilestoneStatusConfirmed || ex.Status == model.MilestoneStatusSkipped {
@@ -432,22 +432,6 @@ func (a *app) handle(ctx context.Context) error {
 			}
 		}
 
-		// Delete stale predicted milestones: not returned by Claude and predicted date is in the future
-		today := now.Format("2006-01-02")
-		for _, m := range existing {
-			if m.Status != model.MilestoneStatusPredicted {
-				continue
-			}
-			if returnedTypes[m.MilestoneType] {
-				continue
-			}
-			if m.PredictedDate <= today {
-				continue
-			}
-			if err := a.milestones.Delete(ctx, plant.PlantID, m.MilestoneType); err != nil {
-				log.Printf("warn: delete stale milestone %s/%s: %v", plant.PlantID, m.MilestoneType, err)
-			}
-		}
 
 		// Replace observations: drop un-actioned ones, write fresh set
 		if err := a.observations.DeleteUnactioned(ctx, plant.PlantID); err != nil {
