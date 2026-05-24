@@ -74,7 +74,7 @@ Respond with ONLY valid JSON (no markdown fences) matching this exact schema:
 {
   "milestones": [
     {
-      "type": "flip_to_flower|peak_flower|harvest|dry_complete|cure_ready",
+      "type": "<see valid types below>",
       "predicted_date": "YYYY-MM-DD",
       "confidence": "low|medium|high",
       "notes": "optional brief explanation"
@@ -90,14 +90,29 @@ Respond with ONLY valid JSON (no markdown fences) matching this exact schema:
   "reason": "one sentence summary of reasoning"
 }
 
+Valid milestone types and typical timing from sprout/germination:
+- cotyledons_off      — cotyledons yellowing/falling off (~10-21 days)
+- leaf_set_1          — 1st true leaf set visible (~7-12 days)
+- leaf_set_2          — 2nd true leaf set (~14-20 days)
+- leaf_set_3          — 3rd true leaf set (~20-28 days)
+- leaf_set_4          — 4th true leaf set, stop predicting leaf sets after this (~28-40 days)
+- early_veg           — 3-4 nodes, transition from seedling (~3-5 weeks from sprout)
+- full_veg            — 5+ nodes, vigorous growth established (~5-8 weeks from sprout)
+- pre_flower          — first pistils/sex signs at nodes; for autos this happens automatically (~4-7 weeks), for photos it's before the flip
+- flip_to_flower      — photoperiod only: light schedule change to 12/12 (grower decision, typically after 4-8 weeks veg)
+- peak_flower         — full canopy coverage, trichomes forming (~weeks 4-6 of flower)
+- harvest             — trichomes amber/milky, pistils receding (~weeks 8-10 photo flower, 10-14 auto from sprout)
+- dry_complete        — buds dry enough to jar (~7-14 days after harvest)
+- cure_ready          — properly cured, burping complete (~2-6 weeks after jarring)
+
 Rules:
-- Only predict milestones relevant to the current and future phases.
-- For photoperiod plants in veg: include flip_to_flower (typical 4-8 weeks veg).
-- For autoflowers: skip flip_to_flower; predict harvest based on ~70-90 days from sprout.
-- For flower phase: predict peak_flower (weeks 5-6) and harvest (weeks 8-10 photo, 10-12 auto).
-- For harvest phase: predict dry_complete (~7-10 days) and cure_ready (~2-4 weeks after dry).
-- Keep observations sparse — only note something if the data provides a meaningful signal.
-- Be conservative; prefer medium/low confidence over false high confidence.`
+- Only predict milestones that are STILL IN THE FUTURE based on today's date and current phase.
+- Skip milestones that have clearly already passed (e.g., don't predict leaf_set_1 if the plant is already in veg).
+- For autoflowers: skip flip_to_flower entirely. Adjust harvest timing (~70-100 days from sprout).
+- For photoperiods: include flip_to_flower if still in veg or seedling.
+- Only predict leaf sets if the plant is currently in germination or seedling phase.
+- Keep observations sparse — only note something if the log data provides a meaningful signal.
+- Be conservative with confidence; prefer low/medium over false high confidence.`
 
 func (a *app) callClaude(ctx context.Context, prompt string) (*recalResponse, error) {
 	reqBody, _ := json.Marshal(claudeRequest{

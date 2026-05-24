@@ -3,11 +3,19 @@ package model
 type MilestoneType string
 
 const (
-	MilestoneFlipToFlower MilestoneType = "flip_to_flower"
-	MilestonePeakFlower   MilestoneType = "peak_flower"
-	MilestoneHarvest      MilestoneType = "harvest"
-	MilestoneDryComplete  MilestoneType = "dry_complete"
-	MilestoneCureReady    MilestoneType = "cure_ready"
+	MilestoneCotyledonsOff MilestoneType = "cotyledons_off"
+	MilestoneLeafSet1      MilestoneType = "leaf_set_1"
+	MilestoneLeafSet2      MilestoneType = "leaf_set_2"
+	MilestoneLeafSet3      MilestoneType = "leaf_set_3"
+	MilestoneLeafSet4      MilestoneType = "leaf_set_4"
+	MilestoneEarlyVeg      MilestoneType = "early_veg"
+	MilestoneFullVeg       MilestoneType = "full_veg"
+	MilestonePreFlower     MilestoneType = "pre_flower"
+	MilestoneFlipToFlower  MilestoneType = "flip_to_flower"
+	MilestonePeakFlower    MilestoneType = "peak_flower"
+	MilestoneHarvest       MilestoneType = "harvest"
+	MilestoneDryComplete   MilestoneType = "dry_complete"
+	MilestoneCureReady     MilestoneType = "cure_ready"
 )
 
 type MilestoneStatus string

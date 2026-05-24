@@ -4,7 +4,10 @@ export type PlantPhase =
 
 export type PlantType = 'autoflower' | 'photoperiod' | 'unknown'
 
-export type MilestoneType = 'flip_to_flower' | 'peak_flower' | 'harvest' | 'dry_complete' | 'cure_ready'
+export type MilestoneType =
+  | 'cotyledons_off' | 'leaf_set_1' | 'leaf_set_2' | 'leaf_set_3' | 'leaf_set_4'
+  | 'early_veg' | 'full_veg' | 'pre_flower'
+  | 'flip_to_flower' | 'peak_flower' | 'harvest' | 'dry_complete' | 'cure_ready'
 
 export type MilestoneStatus = 'predicted' | 'confirmed' | 'skipped'
 

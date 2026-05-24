@@ -106,15 +106,31 @@ const PHASE_HEX: Record<PlantPhase, string> = {
 // ── Milestone helpers ─────────────────────────────────────────────────────────
 
 const MILESTONE_LABELS: Record<MilestoneType, string> = {
+  cotyledons_off: 'Cotyledons Fall Off',
+  leaf_set_1:     '1st True Leaves',
+  leaf_set_2:     '2nd Leaf Set',
+  leaf_set_3:     '3rd Leaf Set',
+  leaf_set_4:     '4th Leaf Set',
+  early_veg:      'Early Veg',
+  full_veg:       'Full Veg',
+  pre_flower:     'Pre-Flower / Sex Signs',
   flip_to_flower: 'Flip to Flower',
-  peak_flower:    'Peak Flower',
+  peak_flower:    'Full Flower',
   harvest:        'Harvest Window',
   dry_complete:   'Dry Complete',
   cure_ready:     'Cure Ready',
 }
 
-// Which phases each milestone type is surfaced in
+// Which historical phases each milestone is shown in (active phase shows all)
 const MILESTONE_PHASES: Record<MilestoneType, PlantPhase[]> = {
+  cotyledons_off: ['germination', 'seedling'],
+  leaf_set_1:     ['germination', 'seedling'],
+  leaf_set_2:     ['seedling'],
+  leaf_set_3:     ['seedling'],
+  leaf_set_4:     ['seedling'],
+  early_veg:      ['seedling', 'veg'],
+  full_veg:       ['veg'],
+  pre_flower:     ['veg', 'flower'],
   flip_to_flower: ['veg'],
   peak_flower:    ['flower'],
   harvest:        ['flower', 'harvest'],
