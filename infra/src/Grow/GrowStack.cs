@@ -178,7 +178,7 @@ public class GrowStack : Stack
 
         // ── Recalibration Lambda ──────────────────────────────────────────
 
-        string anthropicApiKey = StringParameter.ValueForStringParameter(this, "/grow/anthropic-api-key");
+        string anthropicApiKey = StringParameter.ValueForStringParameter(this, "/anthropic-api-key");
 
         LambdaFunction recalibrateFunction = new LambdaFunction(this, "RecalibrateFunction", new LambdaFunctionProps
         {
