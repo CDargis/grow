@@ -96,6 +96,20 @@ func (s *MilestoneStore) Skip(ctx context.Context, plantID string, milestoneType
 	return nil
 }
 
+func (s *MilestoneStore) Delete(ctx context.Context, plantID string, milestoneType model.MilestoneType) error {
+	_, err := s.ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(s.tableName),
+		Key: map[string]types.AttributeValue{
+			"plantId":       &types.AttributeValueMemberS{Value: plantID},
+			"milestoneType": &types.AttributeValueMemberS{Value: string(milestoneType)},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("delete milestone: %w", err)
+	}
+	return nil
+}
+
 func (s *MilestoneStore) AppendHistory(ctx context.Context, h model.MilestoneRecalibrationHistory) error {
 	item, err := attributevalue.MarshalMap(h)
 	if err != nil {

@@ -229,7 +229,7 @@ func min(a, b int) int {
 // ── Prompt builder ────────────────────────────────────────────────────────────
 
 // buildPrompt returns the text prompt and the S3 key of the most recent photo log (if any).
-func buildPrompt(plant *model.Plant, logs []model.Log, now time.Time) (string, string) {
+func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Milestone, now time.Time) (string, string) {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Plant: %s\n", plant.Name))
 	sb.WriteString(fmt.Sprintf("Strain: %s\n", plant.Strain))
@@ -332,6 +332,20 @@ func buildPrompt(plant *model.Plant, logs []model.Log, now time.Time) (string, s
 		sb.WriteString("\nA recent photo is attached. Use it as the primary signal for current growth stage.\n")
 	}
 
+	predicted := make([]model.Milestone, 0)
+	for _, m := range existing {
+		if m.Status == model.MilestoneStatusPredicted {
+			predicted = append(predicted, m)
+		}
+	}
+	if len(predicted) > 0 {
+		sb.WriteString("\nExisting predicted milestones (you MUST include every one of these in your response):\n")
+		for _, m := range predicted {
+			sb.WriteString(fmt.Sprintf("  - %s: predicted %s\n", m.MilestoneType, m.PredictedDate))
+		}
+		sb.WriteString("If you believe one has already occurred, include it with your best estimate of when it happened and confidence=high.\n")
+	}
+
 	return sb.String(), latestPhotoKey
 }
 
@@ -357,22 +371,44 @@ func (a *app) handle(ctx context.Context) error {
 			continue
 		}
 
-		prompt, photoKey := buildPrompt(&plant, logs, now)
+		existing, err := a.milestones.ListForPlant(ctx, plant.PlantID)
+		if err != nil {
+			log.Printf("warn: get milestones for %s: %v", plant.PlantID, err)
+			continue
+		}
+
+		// Index existing milestones by type for quick lookup
+		existingByType := make(map[model.MilestoneType]model.Milestone, len(existing))
+		for _, m := range existing {
+			existingByType[m.MilestoneType] = m
+		}
+
+		prompt, photoKey := buildPrompt(&plant, logs, existing, now)
 		result, err := a.callClaude(ctx, prompt, photoKey)
 		if err != nil {
 			log.Printf("warn: claude for %s: %v", plant.PlantID, err)
 			continue
 		}
 
-		// Upsert milestones
+		// Upsert milestones — skip any already confirmed or skipped
+		returnedTypes := make(map[model.MilestoneType]bool, len(result.Milestones))
 		for _, mp := range result.Milestones {
+			mt := model.MilestoneType(mp.Type)
+			returnedTypes[mt] = true
+
+			if ex, found := existingByType[mt]; found {
+				if ex.Status == model.MilestoneStatusConfirmed || ex.Status == model.MilestoneStatusSkipped {
+					continue
+				}
+			}
+
 			confidence := model.MilestoneConfidence(mp.Confidence)
 			if confidence != model.ConfidenceLow && confidence != model.ConfidenceMedium && confidence != model.ConfidenceHigh {
 				confidence = model.ConfidenceLow
 			}
 			m := model.Milestone{
 				PlantID:       plant.PlantID,
-				MilestoneType: model.MilestoneType(mp.Type),
+				MilestoneType: mt,
 				PredictedDate: mp.PredictedDate,
 				Confidence:    confidence,
 				Status:        model.MilestoneStatusPredicted,
@@ -385,7 +421,7 @@ func (a *app) handle(ctx context.Context) error {
 			h := model.MilestoneRecalibrationHistory{
 				PlantID:        plant.PlantID,
 				RecalSK:        fmt.Sprintf("recal#%s#%s", nowStr, mp.Type),
-				MilestoneType:  model.MilestoneType(mp.Type),
+				MilestoneType:  mt,
 				PredictedDate:  mp.PredictedDate,
 				Confidence:     confidence,
 				RecalibratedAt: nowStr,
@@ -393,6 +429,23 @@ func (a *app) handle(ctx context.Context) error {
 			}
 			if err := a.milestones.AppendHistory(ctx, h); err != nil {
 				log.Printf("warn: append history %s/%s: %v", plant.PlantID, mp.Type, err)
+			}
+		}
+
+		// Delete stale predicted milestones: not returned by Claude and predicted date is in the future
+		today := now.Format("2006-01-02")
+		for _, m := range existing {
+			if m.Status != model.MilestoneStatusPredicted {
+				continue
+			}
+			if returnedTypes[m.MilestoneType] {
+				continue
+			}
+			if m.PredictedDate <= today {
+				continue
+			}
+			if err := a.milestones.Delete(ctx, plant.PlantID, m.MilestoneType); err != nil {
+				log.Printf("warn: delete stale milestone %s/%s: %v", plant.PlantID, m.MilestoneType, err)
 			}
 		}
 
