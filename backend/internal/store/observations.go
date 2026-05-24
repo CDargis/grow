@@ -58,6 +58,28 @@ func (s *ObservationStore) Create(ctx context.Context, plantID string, o model.P
 	return &o, nil
 }
 
+func (s *ObservationStore) DeleteUnactioned(ctx context.Context, plantID string) error {
+	existing, err := s.ListForPlant(ctx, plantID)
+	if err != nil {
+		return err
+	}
+	for _, o := range existing {
+		if o.ActionedAt != "" {
+			continue
+		}
+		if _, err := s.ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+			TableName: aws.String(s.tableName),
+			Key: map[string]types.AttributeValue{
+				"plantId":       &types.AttributeValueMemberS{Value: plantID},
+				"observationId": &types.AttributeValueMemberS{Value: o.ObservationID},
+			},
+		}); err != nil {
+			return fmt.Errorf("delete observation %s: %w", o.ObservationID, err)
+		}
+	}
+	return nil
+}
+
 func (s *ObservationStore) MarkActioned(ctx context.Context, plantID, observationID, actionNote string) error {
 	_, err := s.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(s.tableName),

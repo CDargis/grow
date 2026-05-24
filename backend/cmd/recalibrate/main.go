@@ -449,7 +449,10 @@ func (a *app) handle(ctx context.Context) error {
 			}
 		}
 
-		// Write observations
+		// Replace observations: drop un-actioned ones, write fresh set
+		if err := a.observations.DeleteUnactioned(ctx, plant.PlantID); err != nil {
+			log.Printf("warn: delete unactioned observations %s: %v", plant.PlantID, err)
+		}
 		for _, op := range result.Observations {
 			cat := model.ObservationCategory(op.Category)
 			obs := model.PlantObservation{
