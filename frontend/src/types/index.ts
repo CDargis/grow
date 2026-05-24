@@ -2,6 +2,38 @@ export type PlantPhase =
   | 'germination' | 'seedling' | 'veg' | 'flower'
   | 'harvest' | 'drying' | 'curing' | 'archived' | 'dead'
 
+export type PlantType = 'autoflower' | 'photoperiod' | 'unknown'
+
+export type MilestoneType = 'flip_to_flower' | 'peak_flower' | 'harvest' | 'dry_complete' | 'cure_ready'
+
+export type MilestoneStatus = 'predicted' | 'confirmed' | 'skipped'
+
+export type MilestoneConfidence = 'low' | 'medium' | 'high'
+
+export interface Milestone {
+  plantId: string
+  milestoneType: MilestoneType
+  predictedDate: string
+  confidence: MilestoneConfidence
+  confirmedDate?: string
+  status: MilestoneStatus
+  updatedAt: string
+  notes?: string
+}
+
+export type ObservationCategory = 'health' | 'growth' | 'pest' | 'nutrient' | 'general'
+
+export interface PlantObservation {
+  plantId: string
+  observationId: string
+  observedAt: string
+  category: ObservationCategory
+  text: string
+  requiresAction: boolean
+  actionedAt?: string
+  actionNote?: string
+}
+
 export type EnvironmentType =
   | 'tent' | 'outdoor' | 'garage' | 'basement'
   | 'room' | 'greenhouse' | 'other'
@@ -18,6 +50,7 @@ export interface Plant {
   strain: string
   genetics?: string
   seedBank?: string
+  plantType?: PlantType
   phase: PlantPhase
   phaseStartDate: string
   avatarKey?: string
@@ -70,6 +103,7 @@ export interface UpdatePlantDetailsRequest {
   strain: string
   genetics?: string
   seedBank?: string
+  plantType?: PlantType
 }
 
 export interface CreatePlantRequest {
@@ -77,6 +111,7 @@ export interface CreatePlantRequest {
   strain: string
   genetics?: string
   seedBank?: string
+  plantType?: PlantType
   phase: PlantPhase
   environmentId?: string
 }

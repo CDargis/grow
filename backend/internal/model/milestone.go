@@ -1,0 +1,48 @@
+package model
+
+type MilestoneType string
+
+const (
+	MilestoneFlipToFlower MilestoneType = "flip_to_flower"
+	MilestonePeakFlower   MilestoneType = "peak_flower"
+	MilestoneHarvest      MilestoneType = "harvest"
+	MilestoneDryComplete  MilestoneType = "dry_complete"
+	MilestoneCureReady    MilestoneType = "cure_ready"
+)
+
+type MilestoneStatus string
+
+const (
+	MilestoneStatusPredicted MilestoneStatus = "predicted"
+	MilestoneStatusConfirmed MilestoneStatus = "confirmed"
+	MilestoneStatusSkipped   MilestoneStatus = "skipped"
+)
+
+type MilestoneConfidence string
+
+const (
+	ConfidenceLow    MilestoneConfidence = "low"
+	ConfidenceMedium MilestoneConfidence = "medium"
+	ConfidenceHigh   MilestoneConfidence = "high"
+)
+
+type Milestone struct {
+	PlantID       string              `dynamodbav:"plantId"       json:"plantId"`
+	MilestoneType MilestoneType       `dynamodbav:"milestoneType" json:"milestoneType"`
+	PredictedDate string              `dynamodbav:"predictedDate" json:"predictedDate"`
+	Confidence    MilestoneConfidence `dynamodbav:"confidence"    json:"confidence"`
+	ConfirmedDate string              `dynamodbav:"confirmedDate" json:"confirmedDate,omitempty"`
+	Status        MilestoneStatus     `dynamodbav:"status"        json:"status"`
+	UpdatedAt     string              `dynamodbav:"updatedAt"     json:"updatedAt"`
+	Notes         string              `dynamodbav:"notes"         json:"notes,omitempty"`
+}
+
+type MilestoneRecalibrationHistory struct {
+	PlantID        string              `dynamodbav:"plantId"        json:"plantId"`
+	RecalSK        string              `dynamodbav:"recalSK"        json:"recalSK"` // recal#{recalibratedAt}#{milestoneType}
+	MilestoneType  MilestoneType       `dynamodbav:"milestoneType"  json:"milestoneType"`
+	PredictedDate  string              `dynamodbav:"predictedDate"  json:"predictedDate"`
+	Confidence     MilestoneConfidence `dynamodbav:"confidence"     json:"confidence"`
+	RecalibratedAt string              `dynamodbav:"recalibratedAt" json:"recalibratedAt"`
+	Reason         string              `dynamodbav:"reason"         json:"reason,omitempty"`
+}

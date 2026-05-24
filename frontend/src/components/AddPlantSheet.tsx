@@ -2,9 +2,15 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BottomSheet } from './BottomSheet'
 import { api } from '@/api/client'
-import type { PlantPhase, CreatePlantRequest } from '@/types'
+import type { PlantPhase, PlantType, CreatePlantRequest } from '@/types'
 
 const PHASES: PlantPhase[] = ['germination', 'seedling', 'veg', 'flower', 'harvest', 'drying', 'curing']
+
+const PLANT_TYPE_LABELS: Record<PlantType, string> = {
+  autoflower:  'Autoflower',
+  photoperiod: 'Photoperiod',
+  unknown:     'Unknown / TBD',
+}
 
 const inputCls = 'w-full bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-fern'
 const labelCls = 'block text-xs text-dim mb-1'
@@ -85,6 +91,20 @@ export function AddPlantSheet({ open, onClose }: Props) {
               onChange={e => setForm(f => ({ ...f, seedBank: e.target.value || undefined }))}
             />
           </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>Plant Type</label>
+          <select
+            className={inputCls}
+            value={form.plantType ?? ''}
+            onChange={e => setForm(f => ({ ...f, plantType: (e.target.value as PlantType) || undefined }))}
+          >
+            <option value="" className="bg-raised">Select type…</option>
+            {(Object.keys(PLANT_TYPE_LABELS) as PlantType[]).map(t => (
+              <option key={t} value={t} className="bg-raised">{PLANT_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
         </div>
 
         <div>

@@ -14,6 +14,14 @@ const (
 	PhaseDead        PlantPhase = "dead"
 )
 
+type PlantType string
+
+const (
+	PlantTypeAutoflower  PlantType = "autoflower"
+	PlantTypePhotoperiod PlantType = "photoperiod"
+	PlantTypeUnknown     PlantType = "unknown"
+)
+
 type Plant struct {
 	PlantID        string     `dynamodbav:"plantId"        json:"plantId"`
 	UserID         string     `dynamodbav:"userId"         json:"userId"`
@@ -21,6 +29,7 @@ type Plant struct {
 	Strain         string     `dynamodbav:"strain"         json:"strain"`
 	Genetics       string     `dynamodbav:"genetics"       json:"genetics,omitempty"`
 	SeedBank       string     `dynamodbav:"seedBank"       json:"seedBank,omitempty"`
+	PlantType      PlantType  `dynamodbav:"plantType"      json:"plantType,omitempty"`
 	Phase          PlantPhase `dynamodbav:"phase"          json:"phase"`
 	PhaseStartDate string     `dynamodbav:"phaseStartDate" json:"phaseStartDate"`
 	AvatarKey      string     `dynamodbav:"avatarKey"      json:"avatarKey,omitempty"`
@@ -34,15 +43,17 @@ type CreatePlantRequest struct {
 	Strain        string     `json:"strain"`
 	Genetics      string     `json:"genetics,omitempty"`
 	SeedBank      string     `json:"seedBank,omitempty"`
+	PlantType     PlantType  `json:"plantType,omitempty"`
 	Phase         PlantPhase `json:"phase"`
 	EnvironmentID string     `json:"environmentId,omitempty"`
 }
 
 type UpdatePlantDetailsRequest struct {
-	Name     string `json:"name"`
-	Strain   string `json:"strain"`
-	Genetics string `json:"genetics,omitempty"`
-	SeedBank string `json:"seedBank,omitempty"`
+	Name      string    `json:"name"`
+	Strain    string    `json:"strain"`
+	Genetics  string    `json:"genetics,omitempty"`
+	SeedBank  string    `json:"seedBank,omitempty"`
+	PlantType PlantType `json:"plantType,omitempty"`
 }
 
 type UpdatePlantRequest struct {

@@ -1,0 +1,361 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/cdargis/grow/internal/model"
+	"github.com/cdargis/grow/internal/store"
+)
+
+type app struct {
+	plants       *store.PlantStore
+	logs         *store.LogStore
+	milestones   *store.MilestoneStore
+	observations *store.ObservationStore
+	userID       string
+	anthropicKey string
+}
+
+// ── Claude API ────────────────────────────────────────────────────────────────
+
+type claudeMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type claudeRequest struct {
+	Model     string          `json:"model"`
+	MaxTokens int             `json:"max_tokens"`
+	System    string          `json:"system"`
+	Messages  []claudeMessage `json:"messages"`
+}
+
+type claudeContentBlock struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+type claudeResponse struct {
+	Content []claudeContentBlock `json:"content"`
+}
+
+type milestonePredict struct {
+	Type          string `json:"type"`
+	PredictedDate string `json:"predicted_date"`
+	Confidence    string `json:"confidence"`
+	Notes         string `json:"notes,omitempty"`
+}
+
+type observationPredict struct {
+	Category       string `json:"category"`
+	Text           string `json:"text"`
+	RequiresAction bool   `json:"requires_action"`
+}
+
+type recalResponse struct {
+	Milestones   []milestonePredict   `json:"milestones"`
+	Observations []observationPredict `json:"observations"`
+	Reason       string               `json:"reason"`
+}
+
+const systemPrompt = `You are an AI assistant helping track cannabis plant growth milestones.
+Given information about a cannabis plant, predict upcoming milestone dates and note any observations.
+
+Respond with ONLY valid JSON (no markdown fences) matching this exact schema:
+{
+  "milestones": [
+    {
+      "type": "flip_to_flower|peak_flower|harvest|dry_complete|cure_ready",
+      "predicted_date": "YYYY-MM-DD",
+      "confidence": "low|medium|high",
+      "notes": "optional brief explanation"
+    }
+  ],
+  "observations": [
+    {
+      "category": "health|growth|pest|nutrient|general",
+      "text": "brief observation (1-2 sentences)",
+      "requires_action": false
+    }
+  ],
+  "reason": "one sentence summary of reasoning"
+}
+
+Rules:
+- Only predict milestones relevant to the current and future phases.
+- For photoperiod plants in veg: include flip_to_flower (typical 4-8 weeks veg).
+- For autoflowers: skip flip_to_flower; predict harvest based on ~70-90 days from sprout.
+- For flower phase: predict peak_flower (weeks 5-6) and harvest (weeks 8-10 photo, 10-12 auto).
+- For harvest phase: predict dry_complete (~7-10 days) and cure_ready (~2-4 weeks after dry).
+- Keep observations sparse — only note something if the data provides a meaningful signal.
+- Be conservative; prefer medium/low confidence over false high confidence.`
+
+func (a *app) callClaude(ctx context.Context, prompt string) (*recalResponse, error) {
+	reqBody, _ := json.Marshal(claudeRequest{
+		Model:     "claude-haiku-4-5-20251001",
+		MaxTokens: 1000,
+		System:    systemPrompt,
+		Messages:  []claudeMessage{{Role: "user", Content: prompt}},
+	})
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages", bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", a.anthropicKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("claude request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("claude status %d", resp.StatusCode)
+	}
+
+	var cr claudeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&cr); err != nil {
+		return nil, fmt.Errorf("decode claude response: %w", err)
+	}
+	if len(cr.Content) == 0 || cr.Content[0].Text == "" {
+		return nil, fmt.Errorf("empty claude response")
+	}
+
+	text := strings.TrimSpace(cr.Content[0].Text)
+	// Strip accidental markdown fences
+	if strings.HasPrefix(text, "```") {
+		text = strings.TrimPrefix(text, "```json")
+		text = strings.TrimPrefix(text, "```")
+		text = strings.TrimSuffix(text, "```")
+		text = strings.TrimSpace(text)
+	}
+
+	var result recalResponse
+	if err := json.Unmarshal([]byte(text), &result); err != nil {
+		return nil, fmt.Errorf("parse claude JSON (%s): %w", text[:min(len(text), 200)], err)
+	}
+	return &result, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// ── Prompt builder ────────────────────────────────────────────────────────────
+
+func buildPrompt(plant *model.Plant, logs []model.Log, now time.Time) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Plant: %s\n", plant.Name))
+	sb.WriteString(fmt.Sprintf("Strain: %s\n", plant.Strain))
+	if plant.PlantType != "" {
+		sb.WriteString(fmt.Sprintf("Type: %s\n", plant.PlantType))
+	}
+	if plant.Genetics != "" {
+		sb.WriteString(fmt.Sprintf("Genetics: %s\n", plant.Genetics))
+	}
+	sb.WriteString(fmt.Sprintf("Current Phase: %s (since %s)\n", plant.Phase, plant.PhaseStartDate))
+	sb.WriteString(fmt.Sprintf("Today: %s\n", now.Format("2006-01-02")))
+
+	sb.WriteString("\nPhase History:\n")
+	hasPhaseHistory := false
+	for i := len(logs) - 1; i >= 0; i-- {
+		l := logs[i]
+		if l.LogType != model.LogPhaseChange {
+			continue
+		}
+		var d model.PhaseChangeData
+		if err := json.Unmarshal(l.Data, &d); err != nil {
+			continue
+		}
+		if d.FromPhase != "" {
+			sb.WriteString(fmt.Sprintf("  %s: %s → %s\n", l.Date, d.FromPhase, d.ToPhase))
+		} else {
+			sb.WriteString(fmt.Sprintf("  %s: started as %s\n", l.Date, d.ToPhase))
+		}
+		hasPhaseHistory = true
+	}
+	if !hasPhaseHistory {
+		sb.WriteString("  (no phase history recorded)\n")
+	}
+
+	cutoff := now.AddDate(0, 0, -30).Format("2006-01-02")
+	sb.WriteString("\nRecent Care (last 30 days):\n")
+	careCount := 0
+	for i := len(logs) - 1; i >= 0; i-- {
+		l := logs[i]
+		if l.Date < cutoff {
+			continue
+		}
+		switch l.LogType {
+		case model.LogWatering:
+			var d model.WateringData
+			if err := json.Unmarshal(l.Data, &d); err == nil {
+				if d.PH != 0 {
+					sb.WriteString(fmt.Sprintf("  %s: watering pH=%.1f\n", l.Date, d.PH))
+				} else {
+					sb.WriteString(fmt.Sprintf("  %s: watering\n", l.Date))
+				}
+				careCount++
+			}
+		case model.LogFeeding:
+			var d model.FeedingData
+			if err := json.Unmarshal(l.Data, &d); err == nil {
+				sb.WriteString(fmt.Sprintf("  %s: feeding (pH=%.1f)\n", l.Date, d.PH))
+				careCount++
+			}
+		case model.LogHeight:
+			var d model.HeightData
+			if err := json.Unmarshal(l.Data, &d); err == nil {
+				sb.WriteString(fmt.Sprintf("  %s: height %.0f%s\n", l.Date, d.Height, d.Unit))
+				careCount++
+			}
+		case model.LogTransplant:
+			var d model.TransplantData
+			if err := json.Unmarshal(l.Data, &d); err == nil {
+				sb.WriteString(fmt.Sprintf("  %s: transplant → %s\n", l.Date, d.PotSize))
+				careCount++
+			}
+		case model.LogNote:
+			var d model.NoteData
+			if err := json.Unmarshal(l.Data, &d); err == nil && d.Text != "" {
+				text := d.Text
+				if len(text) > 80 {
+					text = text[:80] + "…"
+				}
+				sb.WriteString(fmt.Sprintf("  %s: note: %s\n", l.Date, text))
+				careCount++
+			}
+		}
+	}
+	if careCount == 0 {
+		sb.WriteString("  (no recent care logs)\n")
+	}
+
+	return sb.String()
+}
+
+// ── Handler ───────────────────────────────────────────────────────────────────
+
+func (a *app) handle(ctx context.Context) error {
+	plants, err := a.plants.List(ctx, a.userID)
+	if err != nil {
+		return fmt.Errorf("list plants: %w", err)
+	}
+
+	now := time.Now().UTC()
+	nowStr := now.Format(time.RFC3339)
+
+	for _, plant := range plants {
+		if plant.Phase == model.PhaseArchived || plant.Phase == model.PhaseDead {
+			continue
+		}
+
+		logs, err := a.logs.ListForPlant(ctx, plant.PlantID)
+		if err != nil {
+			log.Printf("warn: get logs for %s: %v", plant.PlantID, err)
+			continue
+		}
+
+		prompt := buildPrompt(&plant, logs, now)
+		result, err := a.callClaude(ctx, prompt)
+		if err != nil {
+			log.Printf("warn: claude for %s: %v", plant.PlantID, err)
+			continue
+		}
+
+		// Upsert milestones
+		for _, mp := range result.Milestones {
+			confidence := model.MilestoneConfidence(mp.Confidence)
+			if confidence != model.ConfidenceLow && confidence != model.ConfidenceMedium && confidence != model.ConfidenceHigh {
+				confidence = model.ConfidenceLow
+			}
+			m := model.Milestone{
+				PlantID:       plant.PlantID,
+				MilestoneType: model.MilestoneType(mp.Type),
+				PredictedDate: mp.PredictedDate,
+				Confidence:    confidence,
+				Status:        model.MilestoneStatusPredicted,
+				Notes:         mp.Notes,
+			}
+			if err := a.milestones.Upsert(ctx, m); err != nil {
+				log.Printf("warn: upsert milestone %s/%s: %v", plant.PlantID, mp.Type, err)
+				continue
+			}
+			h := model.MilestoneRecalibrationHistory{
+				PlantID:        plant.PlantID,
+				RecalSK:        fmt.Sprintf("recal#%s#%s", nowStr, mp.Type),
+				MilestoneType:  model.MilestoneType(mp.Type),
+				PredictedDate:  mp.PredictedDate,
+				Confidence:     confidence,
+				RecalibratedAt: nowStr,
+				Reason:         result.Reason,
+			}
+			if err := a.milestones.AppendHistory(ctx, h); err != nil {
+				log.Printf("warn: append history %s/%s: %v", plant.PlantID, mp.Type, err)
+			}
+		}
+
+		// Write observations
+		for _, op := range result.Observations {
+			cat := model.ObservationCategory(op.Category)
+			obs := model.PlantObservation{
+				Category:       cat,
+				Text:           op.Text,
+				RequiresAction: op.RequiresAction,
+			}
+			if _, err := a.observations.Create(ctx, plant.PlantID, obs); err != nil {
+				log.Printf("warn: create observation %s: %v", plant.PlantID, err)
+			}
+		}
+
+		log.Printf("recalibrated %s (%s): %d milestones, %d observations",
+			plant.Name, plant.PlantID, len(result.Milestones), len(result.Observations))
+	}
+
+	return nil
+}
+
+func main() {
+	ctx := context.Background()
+	clients, err := store.NewClients(ctx)
+	if err != nil {
+		log.Fatalf("init clients: %v", err)
+	}
+
+	a := &app{
+		plants: store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
+		logs:   store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI")),
+		milestones: store.NewMilestoneStore(
+			clients.DDB,
+			os.Getenv("MILESTONES_TABLE"),
+			os.Getenv("MILESTONES_HISTORY_TABLE"),
+		),
+		observations: store.NewObservationStore(clients.DDB, os.Getenv("OBSERVATIONS_TABLE")),
+		userID:       getEnvOrDefault("USER_ID", "default"),
+		anthropicKey: os.Getenv("ANTHROPIC_API_KEY"),
+	}
+
+	lambda.Start(a.handle)
+}
+
+func getEnvOrDefault(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}

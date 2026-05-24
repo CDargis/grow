@@ -19,13 +19,15 @@ import (
 )
 
 type app struct {
-	plants   *store.PlantStore
-	envs     *store.EnvironmentStore
-	logs     *store.LogStore
-	s3       *s3.Client
-	presign  *s3.PresignClient
-	mediaBkt string
-	userID   string
+	plants       *store.PlantStore
+	envs         *store.EnvironmentStore
+	logs         *store.LogStore
+	milestones   *store.MilestoneStore
+	observations *store.ObservationStore
+	s3           *s3.Client
+	presign      *s3.PresignClient
+	mediaBkt     string
+	userID       string
 }
 
 func main() {
@@ -36,13 +38,19 @@ func main() {
 	}
 
 	a := &app{
-		plants:   store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
-		envs:     store.NewEnvironmentStore(clients.DDB, os.Getenv("ENVIRONMENTS_TABLE")),
-		logs:     store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI")),
-		s3:       clients.S3,
-		presign:  s3.NewPresignClient(clients.S3),
-		mediaBkt: os.Getenv("MEDIA_BUCKET"),
-		userID:   getEnvOrDefault("USER_ID", "default"),
+		plants: store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
+		envs:   store.NewEnvironmentStore(clients.DDB, os.Getenv("ENVIRONMENTS_TABLE")),
+		logs:   store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI")),
+		milestones: store.NewMilestoneStore(
+			clients.DDB,
+			os.Getenv("MILESTONES_TABLE"),
+			os.Getenv("MILESTONES_HISTORY_TABLE"),
+		),
+		observations: store.NewObservationStore(clients.DDB, os.Getenv("OBSERVATIONS_TABLE")),
+		s3:           clients.S3,
+		presign:      s3.NewPresignClient(clients.S3),
+		mediaBkt:     os.Getenv("MEDIA_BUCKET"),
+		userID:       getEnvOrDefault("USER_ID", "default"),
 	}
 
 	mux := http.NewServeMux()
@@ -76,6 +84,11 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /api/media/upload",             a.presignUpload)
 	mux.HandleFunc("GET /api/media/url",                 a.presignDownload)
+
+	mux.HandleFunc("GET /api/plants/{plantId}/milestones",                     a.listMilestones)
+	mux.HandleFunc("PATCH /api/plants/{plantId}/milestones/{milestoneType}",   a.updateMilestone)
+	mux.HandleFunc("GET /api/plants/{plantId}/observations",                   a.listObservations)
+	mux.HandleFunc("PATCH /api/plants/{plantId}/observations/{observationId}", a.updateObservation)
 }
 
 // ── Plants ───────────────────────────────────────────────────────────────────
@@ -409,6 +422,82 @@ func (a *app) presignUpload(w http.ResponseWriter, r *http.Request) {
 		"uploadUrl": presigned.URL,
 		"key":       key,
 	})
+}
+
+// ── Milestones ────────────────────────────────────────────────────────────────
+
+func (a *app) listMilestones(w http.ResponseWriter, r *http.Request) {
+	milestones, err := a.milestones.ListForPlant(r.Context(), r.PathValue("plantId"))
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, milestones)
+}
+
+func (a *app) updateMilestone(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Action        string `json:"action"` // "confirm" | "skip"
+		ConfirmedDate string `json:"confirmedDate,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	plantID       := r.PathValue("plantId")
+	milestoneType := model.MilestoneType(r.PathValue("milestoneType"))
+
+	switch req.Action {
+	case "confirm":
+		date := req.ConfirmedDate
+		if date == "" {
+			date = time.Now().UTC().Format("2006-01-02")
+		}
+		if err := a.milestones.Confirm(r.Context(), plantID, milestoneType, date); err != nil {
+			httpError(w, err, http.StatusInternalServerError)
+			return
+		}
+	case "skip":
+		if err := a.milestones.Skip(r.Context(), plantID, milestoneType); err != nil {
+			httpError(w, err, http.StatusInternalServerError)
+			return
+		}
+	default:
+		httpError(w, fmt.Errorf("unknown action: %s", req.Action), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Observations ──────────────────────────────────────────────────────────────
+
+func (a *app) listObservations(w http.ResponseWriter, r *http.Request) {
+	obs, err := a.observations.ListForPlant(r.Context(), r.PathValue("plantId"))
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, obs)
+}
+
+func (a *app) updateObservation(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ActionNote string `json:"actionNote"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	if err := a.observations.MarkActioned(
+		r.Context(),
+		r.PathValue("plantId"),
+		r.PathValue("observationId"),
+		req.ActionNote,
+	); err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

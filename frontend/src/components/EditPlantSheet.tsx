@@ -2,10 +2,16 @@ import { useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { BottomSheet } from './BottomSheet'
 import { api } from '@/api/client'
-import type { Plant } from '@/types'
+import type { Plant, PlantType } from '@/types'
 
 const inputCls = 'w-full bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-fern'
 const labelCls = 'block text-xs text-dim mb-1'
+
+const PLANT_TYPE_LABELS: Record<PlantType, string> = {
+  autoflower:  'Autoflower',
+  photoperiod: 'Photoperiod',
+  unknown:     'Unknown / TBD',
+}
 
 interface Props {
   open: boolean
@@ -15,10 +21,11 @@ interface Props {
 
 export function EditPlantSheet({ open, onClose, plant }: Props) {
   const qc = useQueryClient()
-  const [name,     setName]     = useState(plant.name)
-  const [strain,   setStrain]   = useState(plant.strain)
-  const [genetics, setGenetics] = useState(plant.genetics ?? '')
-  const [seedBank, setSeedBank] = useState(plant.seedBank ?? '')
+  const [name,      setName]      = useState(plant.name)
+  const [strain,    setStrain]    = useState(plant.strain)
+  const [genetics,  setGenetics]  = useState(plant.genetics ?? '')
+  const [seedBank,  setSeedBank]  = useState(plant.seedBank ?? '')
+  const [plantType, setPlantType] = useState<PlantType | ''>(plant.plantType ?? '')
 
   useEffect(() => {
     if (open) {
@@ -26,15 +33,17 @@ export function EditPlantSheet({ open, onClose, plant }: Props) {
       setStrain(plant.strain)
       setGenetics(plant.genetics ?? '')
       setSeedBank(plant.seedBank ?? '')
+      setPlantType(plant.plantType ?? '')
     }
   }, [open, plant])
 
   const mutation = useMutation({
     mutationFn: () => api.plants.update(plant.plantId, {
-      name:     name.trim(),
-      strain:   strain.trim(),
-      genetics: genetics.trim() || undefined,
-      seedBank: seedBank.trim() || undefined,
+      name:      name.trim(),
+      strain:    strain.trim(),
+      genetics:  genetics.trim() || undefined,
+      seedBank:  seedBank.trim() || undefined,
+      plantType: plantType || undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['plant', plant.plantId] })
@@ -91,6 +100,20 @@ export function EditPlantSheet({ open, onClose, plant }: Props) {
               onChange={e => setSeedBank(e.target.value)}
             />
           </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>Plant Type</label>
+          <select
+            className={inputCls}
+            value={plantType}
+            onChange={e => setPlantType(e.target.value as PlantType | '')}
+          >
+            <option value="" className="bg-raised">Select type…</option>
+            {(Object.keys(PLANT_TYPE_LABELS) as PlantType[]).map(t => (
+              <option key={t} value={t} className="bg-raised">{PLANT_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
         </div>
 
         {mutation.isError && (

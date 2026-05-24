@@ -1,14 +1,14 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, Flag, CheckCircle2 } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
 import { AddLogSheet } from '@/components/AddLogSheet'
 import { EditPlantSheet } from '@/components/EditPlantSheet'
 import { MediaImage } from '@/components/MediaImage'
-import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment } from '@/types'
+import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment, Milestone, MilestoneType } from '@/types'
 
 const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'feeding', 'note', 'height', 'transplant', 'photo'])
 
@@ -101,6 +101,40 @@ const PHASE_HEX: Record<PlantPhase, string> = {
   curing:      '#fbbf24',
   archived:    '#666666',
   dead:        '#f87171',
+}
+
+// ── Milestone helpers ─────────────────────────────────────────────────────────
+
+const MILESTONE_LABELS: Record<MilestoneType, string> = {
+  flip_to_flower: 'Flip to Flower',
+  peak_flower:    'Peak Flower',
+  harvest:        'Harvest Window',
+  dry_complete:   'Dry Complete',
+  cure_ready:     'Cure Ready',
+}
+
+// Which phases each milestone type is surfaced in
+const MILESTONE_PHASES: Record<MilestoneType, PlantPhase[]> = {
+  flip_to_flower: ['veg'],
+  peak_flower:    ['flower'],
+  harvest:        ['flower', 'harvest'],
+  dry_complete:   ['drying'],
+  cure_ready:     ['curing'],
+}
+
+const CONFIDENCE_COLORS: Record<string, string> = {
+  high:   'text-fern border-fern/40',
+  medium: 'text-amber-400 border-amber-400/40',
+  low:    'text-muted border-border',
+}
+
+function formatMilestoneDate(dateStr: string): string {
+  const today = todayDate()
+  const d = new Date(dateStr + 'T12:00:00')
+  const diff = Math.round((d.getTime() - new Date(today + 'T12:00:00').getTime()) / 86400000)
+  if (diff === 0) return 'Today'
+  if (diff > 0) return `in ${diff}d · ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}`
+  return `${Math.abs(diff)}d ago · ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}`
 }
 
 // ── Phase period helpers ───────────────────────────────────────────────────────
@@ -236,18 +270,88 @@ function PhaseLogEntry({ log, color, envMap, onDelete, onEdit }: {
   )
 }
 
+// ── Milestone entry ───────────────────────────────────────────────────────────
+
+function MilestoneEntry({ milestone, onConfirm, onSkip }: {
+  milestone: Milestone
+  onConfirm: (type: MilestoneType, date: string) => void
+  onSkip: (type: MilestoneType) => void
+}) {
+  const today     = todayDate()
+  const isPastDue = milestone.predictedDate <= today
+  const canAct    = milestone.status === 'predicted' && isPastDue
+
+  if (milestone.status === 'skipped') return null
+
+  const label       = MILESTONE_LABELS[milestone.milestoneType] ?? milestone.milestoneType.replace(/_/g, ' ')
+  const colorCls    = CONFIDENCE_COLORS[milestone.confidence] ?? CONFIDENCE_COLORS.low
+  const isConfirmed = milestone.status === 'confirmed'
+
+  return (
+    <div className={`flex items-start gap-2 py-2 border-b border-border/40 last:border-0 ${isConfirmed ? 'opacity-60' : ''}`}>
+      <div className="flex-shrink-0 mt-0.5">
+        {isConfirmed
+          ? <CheckCircle2 size={14} className="text-fern" />
+          : <Flag size={14} className={isPastDue ? 'text-amber-400' : 'text-muted'} />
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-primary">{label}</span>
+          <span className={`text-[10px] border rounded px-1 py-px flex-shrink-0 ${colorCls}`}>
+            {milestone.confidence}
+          </span>
+        </div>
+        <p className="text-[11px] text-dim mt-0.5">
+          {isConfirmed
+            ? `Confirmed ${new Date(milestone.confirmedDate! + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}`
+            : formatMilestoneDate(milestone.predictedDate)
+          }
+          {milestone.notes && !isConfirmed && <span className="ml-1 text-muted">· {milestone.notes}</span>}
+        </p>
+        {canAct && (
+          <div className="flex gap-2 mt-1.5">
+            <button
+              onClick={() => onConfirm(milestone.milestoneType, today)}
+              className="text-[10px] px-2 py-0.5 rounded bg-fern/20 text-fern border border-fern/30 active:opacity-70"
+            >
+              Confirm today
+            </button>
+            <button
+              onClick={() => onSkip(milestone.milestoneType)}
+              className="text-[10px] px-2 py-0.5 rounded bg-raised text-muted border border-border active:opacity-70"
+            >
+              Skip
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Phase period section ───────────────────────────────────────────────────────
 
-function PhasePeriodSection({ period, isLast, envMap, onDelete, onEdit }: {
+function PhasePeriodSection({ period, isLast, envMap, milestones, onDelete, onEdit, onConfirmMilestone, onSkipMilestone }: {
   period: PhasePeriod
   isLast: boolean
   envMap: Map<string, string>
+  milestones: Milestone[]
   onDelete: (logId: string) => void
   onEdit: (log: Log) => void
+  onConfirmMilestone: (type: MilestoneType, date: string) => void
+  onSkipMilestone: (type: MilestoneType) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const color   = PHASE_HEX[period.phase] ?? '#666'
   const ongoing = period.endDate === null
+
+  const phaseMilestones = milestones.filter(m =>
+    MILESTONE_PHASES[m.milestoneType]?.includes(period.phase) &&
+    m.status !== 'skipped'
+  )
+
+  const hasContent = period.logs.length > 0 || phaseMilestones.length > 0
 
   return (
     <div className="relative flex items-start gap-3">
@@ -280,6 +384,11 @@ function PhasePeriodSection({ period, isLast, envMap, onDelete, onEdit }: {
                 live
               </span>
             )}
+            {phaseMilestones.length > 0 && !expanded && (
+              <span className="text-[9px] text-amber-400 border border-amber-400/30 rounded px-1 py-px">
+                {phaseMilestones.length} milestone{phaseMilestones.length > 1 ? 's' : ''}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1.5 text-muted flex-shrink-0">
             <span className="text-xs">{phaseDuration(period.startDate, period.endDate)}</span>
@@ -292,7 +401,15 @@ function PhasePeriodSection({ period, isLast, envMap, onDelete, onEdit }: {
 
         {expanded && (
           <div className="mt-2 border-t border-border/30">
-            {period.logs.length === 0 ? (
+            {phaseMilestones.map(m => (
+              <MilestoneEntry
+                key={m.milestoneType}
+                milestone={m}
+                onConfirm={onConfirmMilestone}
+                onSkip={onSkipMilestone}
+              />
+            ))}
+            {!hasContent ? (
               <p className="text-xs text-muted py-2">No activity logged this phase.</p>
             ) : (
               period.logs.map(log => (
@@ -308,12 +425,15 @@ function PhasePeriodSection({ period, isLast, envMap, onDelete, onEdit }: {
 
 // ── Timeline view ─────────────────────────────────────────────────────────────
 
-function TimelineView({ plant, logs, envMap, onDelete, onEdit }: {
+function TimelineView({ plant, logs, envMap, milestones, onDelete, onEdit, onConfirmMilestone, onSkipMilestone }: {
   plant: Plant
   logs: Log[]
   envMap: Map<string, string>
+  milestones: Milestone[]
   onDelete: (logId: string) => void
   onEdit: (log: Log) => void
+  onConfirmMilestone: (type: MilestoneType, date: string) => void
+  onSkipMilestone: (type: MilestoneType) => void
 }) {
   const periods = buildPhasePeriods(plant, logs)
   return (
@@ -324,8 +444,11 @@ function TimelineView({ plant, logs, envMap, onDelete, onEdit }: {
           period={period}
           isLast={idx === periods.length - 1}
           envMap={envMap}
+          milestones={milestones}
           onDelete={onDelete}
           onEdit={onEdit}
+          onConfirmMilestone={onConfirmMilestone}
+          onSkipMilestone={onSkipMilestone}
         />
       ))}
     </div>
@@ -476,6 +599,17 @@ export function PlantDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['logs', 'plant', id] }),
   })
 
+  const confirmMilestone = useMutation({
+    mutationFn: ({ type, date }: { type: MilestoneType; date: string }) =>
+      api.milestones.confirm(id!, type, date),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['milestones', id] }),
+  })
+
+  const skipMilestone = useMutation({
+    mutationFn: (type: MilestoneType) => api.milestones.skip(id!, type),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['milestones', id] }),
+  })
+
   function handleEditLog(log: Log) {
     setEditLog(log)
     setLogSheetOpen(true)
@@ -511,6 +645,12 @@ export function PlantDetailPage() {
   const { data: envs } = useQuery({
     queryKey: ['environments'],
     queryFn: api.environments.list,
+  })
+
+  const { data: milestones = [] } = useQuery({
+    queryKey: ['milestones', id],
+    queryFn: () => api.milestones.listForPlant(id!),
+    enabled: !!id,
   })
 
   const envMap = new Map<string, string>(
@@ -685,7 +825,16 @@ export function PlantDetailPage() {
           {logsLoading ? (
             <div className="text-muted text-sm">Loading…</div>
           ) : (
-            <TimelineView plant={plant} logs={logs ?? []} envMap={envMap} onDelete={deleteLog.mutate} onEdit={handleEditLog} />
+            <TimelineView
+              plant={plant}
+              logs={logs ?? []}
+              envMap={envMap}
+              milestones={milestones}
+              onDelete={deleteLog.mutate}
+              onEdit={handleEditLog}
+              onConfirmMilestone={(type, date) => confirmMilestone.mutate({ type, date })}
+              onSkipMilestone={type => skipMilestone.mutate(type)}
+            />
           )}
         </div>
       )}

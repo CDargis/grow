@@ -4,6 +4,9 @@ using Amazon.CDK.AWS.CloudFront;
 using Amazon.CDK.AWS.CloudFront.Origins;
 using Amazon.CDK.AWS.DynamoDB;
 using DynamoAttribute = Amazon.CDK.AWS.DynamoDB.Attribute;
+using Amazon.CDK.AWS.Events;
+using Amazon.CDK.AWS.Events.Targets;
+using EventsLambdaTarget = Amazon.CDK.AWS.Events.Targets.LambdaFunction;
 using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
 using LambdaFunction      = Amazon.CDK.AWS.Lambda.Function;
@@ -17,6 +20,7 @@ using Amazon.CDK.AWS.Route53;
 using Amazon.CDK.AWS.Route53.Targets;
 using Amazon.CDK.AWS.S3;
 using Amazon.CDK.AWS.S3.Deployment;
+using Amazon.CDK.AWS.SSM;
 using Constructs;
 
 namespace Grow;
@@ -76,6 +80,33 @@ public class GrowStack : Stack
             ProjectionType = ProjectionType.ALL
         });
 
+        Table milestonesTable = new Table(this, "MilestonesTable", new TableProps
+        {
+            TableName     = "grow-milestones",
+            PartitionKey  = new DynamoAttribute { Name = "plantId",       Type = AttributeType.STRING },
+            SortKey       = new DynamoAttribute { Name = "milestoneType", Type = AttributeType.STRING },
+            BillingMode   = BillingMode.PAY_PER_REQUEST,
+            RemovalPolicy = RemovalPolicy.RETAIN
+        });
+
+        Table milestonesHistoryTable = new Table(this, "MilestonesHistoryTable", new TableProps
+        {
+            TableName     = "grow-milestones-history",
+            PartitionKey  = new DynamoAttribute { Name = "plantId", Type = AttributeType.STRING },
+            SortKey       = new DynamoAttribute { Name = "recalSK", Type = AttributeType.STRING },
+            BillingMode   = BillingMode.PAY_PER_REQUEST,
+            RemovalPolicy = RemovalPolicy.RETAIN
+        });
+
+        Table observationsTable = new Table(this, "ObservationsTable", new TableProps
+        {
+            TableName     = "grow-observations",
+            PartitionKey  = new DynamoAttribute { Name = "plantId",       Type = AttributeType.STRING },
+            SortKey       = new DynamoAttribute { Name = "observationId", Type = AttributeType.STRING },
+            BillingMode   = BillingMode.PAY_PER_REQUEST,
+            RemovalPolicy = RemovalPolicy.RETAIN
+        });
+
         // ── S3 Buckets ────────────────────────────────────────────────────
 
         Bucket mediaBucket = new Bucket(this, "MediaBucket", new BucketProps
@@ -126,19 +157,73 @@ public class GrowStack : Stack
             }),
             Environment = new Dictionary<string, string>
             {
-                ["PLANTS_TABLE"]       = plantsTable.TableName,
-                ["ENVIRONMENTS_TABLE"] = environmentsTable.TableName,
-                ["LOGS_TABLE"]         = logsTable.TableName,
-                ["LOGS_DATE_GSI"]      = "user-date-index",
-                ["MEDIA_BUCKET"]       = mediaBucket.BucketName,
-                ["USER_ID"]            = "default"
+                ["PLANTS_TABLE"]             = plantsTable.TableName,
+                ["ENVIRONMENTS_TABLE"]       = environmentsTable.TableName,
+                ["LOGS_TABLE"]               = logsTable.TableName,
+                ["LOGS_DATE_GSI"]            = "user-date-index",
+                ["MILESTONES_TABLE"]         = milestonesTable.TableName,
+                ["MILESTONES_HISTORY_TABLE"] = milestonesHistoryTable.TableName,
+                ["OBSERVATIONS_TABLE"]       = observationsTable.TableName,
+                ["MEDIA_BUCKET"]             = mediaBucket.BucketName,
+                ["USER_ID"]                  = "default"
             }
         });
 
         plantsTable.GrantReadWriteData(apiFunction);
         environmentsTable.GrantReadWriteData(apiFunction);
         logsTable.GrantReadWriteData(apiFunction);
+        milestonesTable.GrantReadWriteData(apiFunction);
+        observationsTable.GrantReadWriteData(apiFunction);
         mediaBucket.GrantReadWrite(apiFunction);
+
+        // ── Recalibration Lambda ──────────────────────────────────────────
+
+        string anthropicApiKey = StringParameter.ValueForStringParameter(this, "/grow/anthropic-api-key");
+
+        LambdaFunction recalibrateFunction = new LambdaFunction(this, "RecalibrateFunction", new LambdaFunctionProps
+        {
+            FunctionName = "grow-recalibrate",
+            Runtime      = LambdaRuntime.PROVIDED_AL2023,
+            Architecture = LambdaArchitecture.ARM_64,
+            Handler      = "bootstrap",
+            Timeout      = Duration.Minutes(5),
+            MemorySize   = 256,
+            Code = LambdaCode.FromAsset("../backend", new Amazon.CDK.AWS.S3.Assets.AssetOptions
+            {
+                Bundling = new BundlingOptions
+                {
+                    Image   = DockerImage.FromRegistry("public.ecr.aws/docker/library/golang:1.22-alpine"),
+                    Command = new[]
+                    {
+                        "sh", "-c",
+                        "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOCACHE=/tmp/go-build go build -tags lambda.norpc -o /asset-output/bootstrap ./cmd/recalibrate"
+                    }
+                }
+            }),
+            Environment = new Dictionary<string, string>
+            {
+                ["PLANTS_TABLE"]             = plantsTable.TableName,
+                ["LOGS_TABLE"]               = logsTable.TableName,
+                ["LOGS_DATE_GSI"]            = "user-date-index",
+                ["MILESTONES_TABLE"]         = milestonesTable.TableName,
+                ["MILESTONES_HISTORY_TABLE"] = milestonesHistoryTable.TableName,
+                ["OBSERVATIONS_TABLE"]       = observationsTable.TableName,
+                ["USER_ID"]                  = "default",
+                ["ANTHROPIC_API_KEY"]        = anthropicApiKey
+            }
+        });
+
+        plantsTable.GrantReadData(recalibrateFunction);
+        logsTable.GrantReadData(recalibrateFunction);
+        milestonesTable.GrantReadWriteData(recalibrateFunction);
+        milestonesHistoryTable.GrantReadWriteData(recalibrateFunction);
+        observationsTable.GrantReadWriteData(recalibrateFunction);
+
+        Rule recalSchedule = new Rule(this, "RecalibrationSchedule", new RuleProps
+        {
+            Schedule = Schedule.Cron(new CronOptions { Hour = "6", Minute = "0" })
+        });
+        recalSchedule.AddTarget(new EventsLambdaTarget(recalibrateFunction));
 
         // ── API Gateway ───────────────────────────────────────────────────
 

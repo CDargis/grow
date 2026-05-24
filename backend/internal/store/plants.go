@@ -71,6 +71,7 @@ func (s *PlantStore) Create(ctx context.Context, userID string, req model.Create
 		Strain:         req.Strain,
 		Genetics:       req.Genetics,
 		SeedBank:       req.SeedBank,
+		PlantType:      req.PlantType,
 		Phase:          req.Phase,
 		PhaseStartDate: now.Format("2006-01-02"),
 		EnvironmentID:  req.EnvironmentID,
@@ -179,10 +180,11 @@ func (s *PlantStore) UpdateDetails(ctx context.Context, plantID string, req mode
 	if plant == nil {
 		return nil, fmt.Errorf("plant not found: %s", plantID)
 	}
-	plant.Name     = req.Name
-	plant.Strain   = req.Strain
-	plant.Genetics = req.Genetics
-	plant.SeedBank = req.SeedBank
+	plant.Name      = req.Name
+	plant.Strain    = req.Strain
+	plant.Genetics  = req.Genetics
+	plant.SeedBank  = req.SeedBank
+	plant.PlantType = req.PlantType
 	item, err := attributevalue.MarshalMap(plant)
 	if err != nil {
 		return nil, fmt.Errorf("marshal plant: %w", err)
