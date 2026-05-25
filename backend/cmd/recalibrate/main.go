@@ -420,7 +420,7 @@ func (a *app) handle(ctx context.Context) error {
 			}
 			h := model.MilestoneRecalibrationHistory{
 				PlantID:        plant.PlantID,
-				RecalSK:        fmt.Sprintf("recal#%s#%s", nowStr, mp.Type),
+				RecalSK:        fmt.Sprintf("recal#%s", mp.Type),
 				MilestoneType:  mt,
 				PredictedDate:  mp.PredictedDate,
 				Confidence:     confidence,

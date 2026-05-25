@@ -47,7 +47,7 @@ type Milestone struct {
 
 type MilestoneRecalibrationHistory struct {
 	PlantID        string              `dynamodbav:"plantId"        json:"plantId"`
-	RecalSK        string              `dynamodbav:"recalSK"        json:"recalSK"` // recal#{recalibratedAt}#{milestoneType}
+	RecalSK        string              `dynamodbav:"recalSK"        json:"recalSK"` // recal#{milestoneType}
 	MilestoneType  MilestoneType       `dynamodbav:"milestoneType"  json:"milestoneType"`
 	PredictedDate  string              `dynamodbav:"predictedDate"  json:"predictedDate"`
 	Confidence     MilestoneConfidence `dynamodbav:"confidence"     json:"confidence"`
