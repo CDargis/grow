@@ -71,6 +71,7 @@ type milestonePredict struct {
 	PredictedDate string `json:"predicted_date"`
 	Confidence    string `json:"confidence"`
 	Notes         string `json:"notes,omitempty"`
+	ChangeReason  string `json:"change_reason,omitempty"`
 }
 
 type observationPredict struct {
@@ -82,7 +83,6 @@ type observationPredict struct {
 type recalResponse struct {
 	Milestones   []milestonePredict   `json:"milestones"`
 	Observations []observationPredict `json:"observations"`
-	Reason       string               `json:"reason"`
 }
 
 const systemPrompt = `You are an AI assistant helping track cannabis plant growth milestones.
@@ -95,7 +95,8 @@ Respond with ONLY valid JSON (no markdown fences) matching this exact schema:
       "type": "<see valid types below>",
       "predicted_date": "YYYY-MM-DD",
       "confidence": "low|medium|high",
-      "notes": "optional brief explanation"
+      "notes": "optional brief explanation",
+      "change_reason": "required if changing an existing prediction — reference what was previously predicted and why you are updating it"
     }
   ],
   "observations": [
@@ -104,8 +105,7 @@ Respond with ONLY valid JSON (no markdown fences) matching this exact schema:
       "text": "brief observation (1-2 sentences)",
       "requires_action": false
     }
-  ],
-  "reason": "one sentence summary of reasoning"
+  ]
 }
 
 Valid milestone types and typical timing from sprout/germination:
@@ -131,7 +131,8 @@ Rules:
 - Only predict leaf sets if the plant is currently in germination or seedling phase.
 - Keep observations sparse — only note something if the log data provides a meaningful signal.
 - Be conservative with confidence; prefer low/medium over false high confidence.
-- If a photo is provided, use it as the PRIMARY signal for current growth stage. Override text-based estimates if the image clearly shows a different stage. Don't predict milestones the photo shows have already passed.`
+- If a photo is provided, use it as the PRIMARY signal for current growth stage. Override text-based estimates if the image clearly shows a different stage. Don't predict milestones the photo shows have already passed.
+- For existing predicted milestones: omit them entirely if you agree with the current date. Only include them if you are changing the date or believe they have already occurred.`
 
 func (a *app) fetchImageBase64(ctx context.Context, key string) (data, mediaType string, err error) {
 	out, err := a.s3.GetObject(ctx, &s3.GetObjectInput{
@@ -406,6 +407,7 @@ func (a *app) handle(ctx context.Context) error {
 			if confidence != model.ConfidenceLow && confidence != model.ConfidenceMedium && confidence != model.ConfidenceHigh {
 				confidence = model.ConfidenceLow
 			}
+
 			m := model.Milestone{
 				PlantID:       plant.PlantID,
 				MilestoneType: mt,
@@ -414,21 +416,22 @@ func (a *app) handle(ctx context.Context) error {
 				Status:        model.MilestoneStatusPredicted,
 				Notes:         mp.Notes,
 			}
+
+			// Carry forward existing last-change fields; overwrite only if date actually changed
+			if ex, found := existingByType[mt]; found {
+				if ex.PredictedDate != mp.PredictedDate {
+					m.LastChangedAt   = nowStr
+					m.LastChangedFrom = ex.PredictedDate
+					m.LastChangeReason = mp.ChangeReason
+				} else {
+					m.LastChangedAt   = ex.LastChangedAt
+					m.LastChangedFrom = ex.LastChangedFrom
+					m.LastChangeReason = ex.LastChangeReason
+				}
+			}
+
 			if err := a.milestones.Upsert(ctx, m); err != nil {
 				log.Printf("warn: upsert milestone %s/%s: %v", plant.PlantID, mp.Type, err)
-				continue
-			}
-			h := model.MilestoneRecalibrationHistory{
-				PlantID:        plant.PlantID,
-				RecalSK:        fmt.Sprintf("recal#%s", mp.Type),
-				MilestoneType:  mt,
-				PredictedDate:  mp.PredictedDate,
-				Confidence:     confidence,
-				RecalibratedAt: nowStr,
-				Reason:         result.Reason,
-			}
-			if err := a.milestones.AppendHistory(ctx, h); err != nil {
-				log.Printf("warn: append history %s/%s: %v", plant.PlantID, mp.Type, err)
 			}
 		}
 
@@ -466,11 +469,7 @@ func main() {
 	a := &app{
 		plants: store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
 		logs:   store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI")),
-		milestones: store.NewMilestoneStore(
-			clients.DDB,
-			os.Getenv("MILESTONES_TABLE"),
-			os.Getenv("MILESTONES_HISTORY_TABLE"),
-		),
+		milestones: store.NewMilestoneStore(clients.DDB, os.Getenv("MILESTONES_TABLE")),
 		observations: store.NewObservationStore(clients.DDB, os.Getenv("OBSERVATIONS_TABLE")),
 		s3:           clients.S3,
 		mediaBkt:     os.Getenv("MEDIA_BUCKET"),

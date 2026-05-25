@@ -89,15 +89,6 @@ public class GrowStack : Stack
             RemovalPolicy = RemovalPolicy.RETAIN
         });
 
-        Table milestonesHistoryTable = new Table(this, "MilestonesHistoryTable", new TableProps
-        {
-            TableName     = "grow-milestones-history",
-            PartitionKey  = new DynamoAttribute { Name = "plantId", Type = AttributeType.STRING },
-            SortKey       = new DynamoAttribute { Name = "recalSK", Type = AttributeType.STRING },
-            BillingMode   = BillingMode.PAY_PER_REQUEST,
-            RemovalPolicy = RemovalPolicy.RETAIN
-        });
-
         Table observationsTable = new Table(this, "ObservationsTable", new TableProps
         {
             TableName     = "grow-observations",
@@ -162,7 +153,6 @@ public class GrowStack : Stack
                 ["LOGS_TABLE"]               = logsTable.TableName,
                 ["LOGS_DATE_GSI"]            = "user-date-index",
                 ["MILESTONES_TABLE"]         = milestonesTable.TableName,
-                ["MILESTONES_HISTORY_TABLE"] = milestonesHistoryTable.TableName,
                 ["OBSERVATIONS_TABLE"]       = observationsTable.TableName,
                 ["MEDIA_BUCKET"]             = mediaBucket.BucketName,
                 ["USER_ID"]                  = "default"
@@ -173,7 +163,6 @@ public class GrowStack : Stack
         environmentsTable.GrantReadWriteData(apiFunction);
         logsTable.GrantReadWriteData(apiFunction);
         milestonesTable.GrantReadWriteData(apiFunction);
-        milestonesHistoryTable.GrantReadData(apiFunction);
         observationsTable.GrantReadWriteData(apiFunction);
         mediaBucket.GrantReadWrite(apiFunction);
 
@@ -207,7 +196,6 @@ public class GrowStack : Stack
                 ["LOGS_TABLE"]               = logsTable.TableName,
                 ["LOGS_DATE_GSI"]            = "user-date-index",
                 ["MILESTONES_TABLE"]         = milestonesTable.TableName,
-                ["MILESTONES_HISTORY_TABLE"] = milestonesHistoryTable.TableName,
                 ["OBSERVATIONS_TABLE"]       = observationsTable.TableName,
                 ["MEDIA_BUCKET"]             = mediaBucket.BucketName,
                 ["USER_ID"]                  = "default",
@@ -218,7 +206,6 @@ public class GrowStack : Stack
         plantsTable.GrantReadData(recalibrateFunction);
         logsTable.GrantReadData(recalibrateFunction);
         milestonesTable.GrantReadWriteData(recalibrateFunction);
-        milestonesHistoryTable.GrantReadWriteData(recalibrateFunction);
         observationsTable.GrantReadWriteData(recalibrateFunction);
         mediaBucket.GrantRead(recalibrateFunction);
 

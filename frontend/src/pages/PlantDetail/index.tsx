@@ -8,7 +8,7 @@ import { DatePicker } from '@/components/DatePicker'
 import { AddLogSheet } from '@/components/AddLogSheet'
 import { EditPlantSheet } from '@/components/EditPlantSheet'
 import { MediaImage } from '@/components/MediaImage'
-import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment, Milestone, MilestoneHistory, MilestoneType, PlantObservation } from '@/types'
+import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment, Milestone, MilestoneType, PlantObservation } from '@/types'
 
 const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'feeding', 'note', 'height', 'transplant', 'photo'])
 
@@ -288,13 +288,11 @@ function PhaseLogEntry({ log, color, envMap, onDelete, onEdit }: {
 
 // ── Milestone entry ───────────────────────────────────────────────────────────
 
-function MilestoneEntry({ milestone, history, onConfirm, onSkip }: {
+function MilestoneEntry({ milestone, onConfirm, onSkip }: {
   milestone: Milestone
-  history: MilestoneHistory[]
   onConfirm: (type: MilestoneType, date: string) => void
   onSkip: (type: MilestoneType) => void
 }) {
-  const [showHistory, setShowHistory] = useState(false)
   const today     = todayDate()
   const isPastDue = milestone.predictedDate <= today
   const canAct    = milestone.status === 'predicted' && isPastDue
@@ -304,7 +302,6 @@ function MilestoneEntry({ milestone, history, onConfirm, onSkip }: {
   const label       = MILESTONE_LABELS[milestone.milestoneType] ?? milestone.milestoneType.replace(/_/g, ' ')
   const colorCls    = CONFIDENCE_COLORS[milestone.confidence] ?? CONFIDENCE_COLORS.low
   const isConfirmed = milestone.status === 'confirmed'
-  const typeHistory = history.filter(h => h.milestoneType === milestone.milestoneType)
 
   return (
     <div className={`py-2 border-b border-border/40 last:border-0 ${isConfirmed ? 'opacity-60' : ''}`}>
@@ -318,20 +315,9 @@ function MilestoneEntry({ milestone, history, onConfirm, onSkip }: {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-primary">{label}</span>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <span className={`text-[10px] border rounded px-1 py-px ${colorCls}`}>
-                {milestone.confidence}
-              </span>
-              {typeHistory.length > 0 && (
-                <button
-                  onClick={() => setShowHistory(v => !v)}
-                  className="text-[10px] text-muted flex items-center gap-0.5 active:opacity-70"
-                >
-                  {typeHistory.length}x
-                  {showHistory ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                </button>
-              )}
-            </div>
+            <span className={`text-[10px] border rounded px-1 py-px flex-shrink-0 ${colorCls}`}>
+              {milestone.confidence}
+            </span>
           </div>
           <p className="text-[11px] text-dim mt-0.5">
             {isConfirmed
@@ -340,6 +326,14 @@ function MilestoneEntry({ milestone, history, onConfirm, onSkip }: {
             }
             {milestone.notes && !isConfirmed && <span className="ml-1 text-muted">· {milestone.notes}</span>}
           </p>
+          {milestone.lastChangedAt && milestone.lastChangedFrom && (
+            <p className="text-[10px] text-muted mt-0.5">
+              ↻ changed from {new Date(milestone.lastChangedFrom + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
+              {' on '}
+              {new Date(milestone.lastChangedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+              {milestone.lastChangeReason && <span className="italic"> · {milestone.lastChangeReason}</span>}
+            </p>
+          )}
           {canAct && (
             <div className="flex gap-2 mt-1.5">
               <button
@@ -356,22 +350,6 @@ function MilestoneEntry({ milestone, history, onConfirm, onSkip }: {
               </button>
             </div>
           )}
-          {showHistory && (
-            <div className="mt-2 space-y-1 border-l-2 border-border pl-2">
-              {typeHistory.map(h => (
-                <div key={h.recalSK} className="text-[10px] text-muted">
-                  <span className="text-dim">
-                    {new Date(h.recalibratedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                  </span>
-                  {' → '}
-                  {new Date(h.predictedDate + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                  {' '}
-                  <span className={`${CONFIDENCE_COLORS[h.confidence]} border rounded px-1`}>{h.confidence}</span>
-                  {h.reason && <span className="ml-1 italic">· {h.reason}</span>}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -380,12 +358,11 @@ function MilestoneEntry({ milestone, history, onConfirm, onSkip }: {
 
 // ── Phase period section ───────────────────────────────────────────────────────
 
-function PhasePeriodSection({ period, isLast, envMap, milestones, history, onDelete, onEdit, onConfirmMilestone, onSkipMilestone }: {
+function PhasePeriodSection({ period, isLast, envMap, milestones, onDelete, onEdit, onConfirmMilestone, onSkipMilestone }: {
   period: PhasePeriod
   isLast: boolean
   envMap: Map<string, string>
   milestones: Milestone[]
-  history: MilestoneHistory[]
   onDelete: (logId: string) => void
   onEdit: (log: Log) => void
   onConfirmMilestone: (type: MilestoneType, date: string) => void
@@ -460,7 +437,6 @@ function PhasePeriodSection({ period, isLast, envMap, milestones, history, onDel
               <MilestoneEntry
                 key={m.milestoneType}
                 milestone={m}
-                history={history}
                 onConfirm={onConfirmMilestone}
                 onSkip={onSkipMilestone}
               />
@@ -481,12 +457,11 @@ function PhasePeriodSection({ period, isLast, envMap, milestones, history, onDel
 
 // ── Timeline view ─────────────────────────────────────────────────────────────
 
-function TimelineView({ plant, logs, envMap, milestones, history, onDelete, onEdit, onConfirmMilestone, onSkipMilestone }: {
+function TimelineView({ plant, logs, envMap, milestones, onDelete, onEdit, onConfirmMilestone, onSkipMilestone }: {
   plant: Plant
   logs: Log[]
   envMap: Map<string, string>
   milestones: Milestone[]
-  history: MilestoneHistory[]
   onDelete: (logId: string) => void
   onEdit: (log: Log) => void
   onConfirmMilestone: (type: MilestoneType, date: string) => void
@@ -502,7 +477,6 @@ function TimelineView({ plant, logs, envMap, milestones, history, onDelete, onEd
           isLast={idx === periods.length - 1}
           envMap={envMap}
           milestones={milestones}
-          history={history}
           onDelete={onDelete}
           onEdit={onEdit}
           onConfirmMilestone={onConfirmMilestone}
@@ -773,12 +747,6 @@ export function PlantDetailPage() {
     enabled: !!id,
   })
 
-  const { data: milestoneHistory = [] } = useQuery({
-    queryKey: ['milestones-history', id],
-    queryFn: () => api.milestones.listHistory(id!),
-    enabled: !!id,
-  })
-
   const { data: observations = [] } = useQuery({
     queryKey: ['observations', id],
     queryFn: () => api.observations.listForPlant(id!),
@@ -969,7 +937,6 @@ export function PlantDetailPage() {
               logs={logs ?? []}
               envMap={envMap}
               milestones={milestones}
-              history={milestoneHistory}
               onDelete={deleteLog.mutate}
               onEdit={handleEditLog}
               onConfirmMilestone={(type, date) => confirmMilestone.mutate({ type, date })}

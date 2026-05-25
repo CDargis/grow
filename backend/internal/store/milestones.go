@@ -13,13 +13,12 @@ import (
 )
 
 type MilestoneStore struct {
-	ddb          *dynamodb.Client
-	tableName    string
-	historyTable string
+	ddb       *dynamodb.Client
+	tableName string
 }
 
-func NewMilestoneStore(ddb *dynamodb.Client, tableName, historyTable string) *MilestoneStore {
-	return &MilestoneStore{ddb: ddb, tableName: tableName, historyTable: historyTable}
+func NewMilestoneStore(ddb *dynamodb.Client, tableName string) *MilestoneStore {
+	return &MilestoneStore{ddb: ddb, tableName: tableName}
 }
 
 func (s *MilestoneStore) ListForPlant(ctx context.Context, plantID string) ([]model.Milestone, error) {
@@ -92,53 +91,6 @@ func (s *MilestoneStore) Skip(ctx context.Context, plantID string, milestoneType
 	})
 	if err != nil {
 		return fmt.Errorf("skip milestone: %w", err)
-	}
-	return nil
-}
-
-func (s *MilestoneStore) Delete(ctx context.Context, plantID string, milestoneType model.MilestoneType) error {
-	_, err := s.ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: aws.String(s.tableName),
-		Key: map[string]types.AttributeValue{
-			"plantId":       &types.AttributeValueMemberS{Value: plantID},
-			"milestoneType": &types.AttributeValueMemberS{Value: string(milestoneType)},
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("delete milestone: %w", err)
-	}
-	return nil
-}
-
-func (s *MilestoneStore) ListHistoryForPlant(ctx context.Context, plantID string) ([]model.MilestoneRecalibrationHistory, error) {
-	out, err := s.ddb.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(s.historyTable),
-		KeyConditionExpression: aws.String("plantId = :pid"),
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":pid": &types.AttributeValueMemberS{Value: plantID},
-		},
-		ScanIndexForward: aws.Bool(false),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("list milestone history: %w", err)
-	}
-	history := make([]model.MilestoneRecalibrationHistory, 0, len(out.Items))
-	if err := attributevalue.UnmarshalListOfMaps(out.Items, &history); err != nil {
-		return nil, fmt.Errorf("unmarshal milestone history: %w", err)
-	}
-	return history, nil
-}
-
-func (s *MilestoneStore) AppendHistory(ctx context.Context, h model.MilestoneRecalibrationHistory) error {
-	item, err := attributevalue.MarshalMap(h)
-	if err != nil {
-		return fmt.Errorf("marshal recal history: %w", err)
-	}
-	if _, err := s.ddb.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(s.historyTable),
-		Item:      item,
-	}); err != nil {
-		return fmt.Errorf("append recal history: %w", err)
 	}
 	return nil
 }

@@ -22,6 +22,9 @@ export interface Milestone {
   status: MilestoneStatus
   updatedAt: string
   notes?: string
+  lastChangedAt?: string
+  lastChangedFrom?: string
+  lastChangeReason?: string
 }
 
 export type ObservationCategory = 'health' | 'growth' | 'pest' | 'nutrient' | 'general'

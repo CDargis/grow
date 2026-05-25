@@ -35,22 +35,15 @@ const (
 )
 
 type Milestone struct {
-	PlantID       string              `dynamodbav:"plantId"       json:"plantId"`
-	MilestoneType MilestoneType       `dynamodbav:"milestoneType" json:"milestoneType"`
-	PredictedDate string              `dynamodbav:"predictedDate" json:"predictedDate"`
-	Confidence    MilestoneConfidence `dynamodbav:"confidence"    json:"confidence"`
-	ConfirmedDate string              `dynamodbav:"confirmedDate" json:"confirmedDate,omitempty"`
-	Status        MilestoneStatus     `dynamodbav:"status"        json:"status"`
-	UpdatedAt     string              `dynamodbav:"updatedAt"     json:"updatedAt"`
-	Notes         string              `dynamodbav:"notes"         json:"notes,omitempty"`
-}
-
-type MilestoneRecalibrationHistory struct {
-	PlantID        string              `dynamodbav:"plantId"        json:"plantId"`
-	RecalSK        string              `dynamodbav:"recalSK"        json:"recalSK"` // recal#{milestoneType}
-	MilestoneType  MilestoneType       `dynamodbav:"milestoneType"  json:"milestoneType"`
-	PredictedDate  string              `dynamodbav:"predictedDate"  json:"predictedDate"`
-	Confidence     MilestoneConfidence `dynamodbav:"confidence"     json:"confidence"`
-	RecalibratedAt string              `dynamodbav:"recalibratedAt" json:"recalibratedAt"`
-	Reason         string              `dynamodbav:"reason"         json:"reason,omitempty"`
+	PlantID          string              `dynamodbav:"plantId"          json:"plantId"`
+	MilestoneType    MilestoneType       `dynamodbav:"milestoneType"    json:"milestoneType"`
+	PredictedDate    string              `dynamodbav:"predictedDate"    json:"predictedDate"`
+	Confidence       MilestoneConfidence `dynamodbav:"confidence"       json:"confidence"`
+	ConfirmedDate    string              `dynamodbav:"confirmedDate"    json:"confirmedDate,omitempty"`
+	Status           MilestoneStatus     `dynamodbav:"status"           json:"status"`
+	UpdatedAt        string              `dynamodbav:"updatedAt"        json:"updatedAt"`
+	Notes            string              `dynamodbav:"notes"            json:"notes,omitempty"`
+	LastChangedAt    string              `dynamodbav:"lastChangedAt"    json:"lastChangedAt,omitempty"`
+	LastChangedFrom  string              `dynamodbav:"lastChangedFrom"  json:"lastChangedFrom,omitempty"`
+	LastChangeReason string              `dynamodbav:"lastChangeReason" json:"lastChangeReason,omitempty"`
 }

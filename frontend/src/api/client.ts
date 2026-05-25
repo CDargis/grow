@@ -1,6 +1,6 @@
 import imageCompression from 'browser-image-compression'
 import type {
-  Plant, Environment, Log, Milestone, MilestoneHistory, MilestoneType, PlantObservation,
+  Plant, Environment, Log, Milestone, MilestoneType, PlantObservation,
   CreatePlantRequest, UpdatePlantDetailsRequest, CreateEnvironmentRequest, CreateLogRequest,
 } from '@/types'
 
@@ -56,8 +56,7 @@ export const api = {
   },
 
   milestones: {
-    listForPlant:  (plantId: string) => request<Milestone[]>(`/plants/${plantId}/milestones`),
-    listHistory:   (plantId: string) => request<MilestoneHistory[]>(`/plants/${plantId}/milestones/history`),
+    listForPlant: (plantId: string) => request<Milestone[]>(`/plants/${plantId}/milestones`),
     confirm: (plantId: string, milestoneType: MilestoneType, confirmedDate: string) =>
       request<void>(`/plants/${plantId}/milestones/${milestoneType}`, {
         method: 'PATCH', body: JSON.stringify({ action: 'confirm', confirmedDate }),

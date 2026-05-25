@@ -41,11 +41,7 @@ func main() {
 		plants: store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
 		envs:   store.NewEnvironmentStore(clients.DDB, os.Getenv("ENVIRONMENTS_TABLE")),
 		logs:   store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI")),
-		milestones: store.NewMilestoneStore(
-			clients.DDB,
-			os.Getenv("MILESTONES_TABLE"),
-			os.Getenv("MILESTONES_HISTORY_TABLE"),
-		),
+		milestones: store.NewMilestoneStore(clients.DDB, os.Getenv("MILESTONES_TABLE")),
 		observations: store.NewObservationStore(clients.DDB, os.Getenv("OBSERVATIONS_TABLE")),
 		s3:           clients.S3,
 		presign:      s3.NewPresignClient(clients.S3),
@@ -86,7 +82,6 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/media/url",                 a.presignDownload)
 
 	mux.HandleFunc("GET /api/plants/{plantId}/milestones",                     a.listMilestones)
-	mux.HandleFunc("GET /api/plants/{plantId}/milestones/history",             a.listMilestoneHistory)
 	mux.HandleFunc("PATCH /api/plants/{plantId}/milestones/{milestoneType}",   a.updateMilestone)
 	mux.HandleFunc("GET /api/plants/{plantId}/observations",                   a.listObservations)
 	mux.HandleFunc("PATCH /api/plants/{plantId}/observations/{observationId}", a.updateObservation)
@@ -434,15 +429,6 @@ func (a *app) listMilestones(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, milestones)
-}
-
-func (a *app) listMilestoneHistory(w http.ResponseWriter, r *http.Request) {
-	history, err := a.milestones.ListHistoryForPlant(r.Context(), r.PathValue("plantId"))
-	if err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
-	}
-	jsonOK(w, history)
 }
 
 func (a *app) updateMilestone(w http.ResponseWriter, r *http.Request) {
