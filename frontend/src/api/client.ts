@@ -68,11 +68,7 @@ export const api = {
   },
 
   observations: {
-    listForPlant: (plantId: string)                                         => request<PlantObservation[]>(`/plants/${plantId}/observations`),
-    markActioned: (plantId: string, observationId: string, actionNote = '') =>
-      request<void>(`/plants/${plantId}/observations/${observationId}`, {
-        method: 'PATCH', body: JSON.stringify({ actionNote }),
-      }),
+    listForPlant: (plantId: string) => request<PlantObservation[]>(`/plants/${plantId}/observations`),
   },
 
   media: {

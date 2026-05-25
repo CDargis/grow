@@ -35,9 +35,6 @@ export interface PlantObservation {
   observedAt: string
   category: ObservationCategory
   text: string
-  requiresAction: boolean
-  actionedAt?: string
-  actionNote?: string
   sourceLogIds?: string[]
 }
 

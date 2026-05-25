@@ -75,10 +75,9 @@ type milestonePredict struct {
 }
 
 type observationPredict struct {
-	Category       string   `json:"category"`
-	Text           string   `json:"text"`
-	RequiresAction bool     `json:"requires_action"`
-	SourceLogIds   []string `json:"source_log_ids,omitempty"`
+	Category     string   `json:"category"`
+	Text         string   `json:"text"`
+	SourceLogIds []string `json:"source_log_ids,omitempty"`
 }
 
 type recalResponse struct {
@@ -104,7 +103,6 @@ Respond with ONLY valid JSON (no markdown fences) matching this exact schema:
     {
       "category": "health|growth|pest|nutrient|general",
       "text": "brief observation (1-2 sentences)",
-      "requires_action": false,
       "source_log_ids": ["logId1", "logId2"]
     }
   ]
@@ -439,16 +437,15 @@ func (a *app) handle(ctx context.Context) error {
 		}
 
 
-		// Replace observations: drop un-actioned ones, write fresh set
-		if err := a.observations.DeleteUnactioned(ctx, plant.PlantID); err != nil {
-			log.Printf("warn: delete unactioned observations %s: %v", plant.PlantID, err)
+		// Replace observations: wipe all, write fresh set
+		if err := a.observations.DeleteAll(ctx, plant.PlantID); err != nil {
+			log.Printf("warn: delete observations %s: %v", plant.PlantID, err)
 		}
 		for _, op := range result.Observations {
 			obs := model.PlantObservation{
-				Category:       model.ObservationCategory(op.Category),
-				Text:           op.Text,
-				RequiresAction: op.RequiresAction,
-				SourceLogIds:   op.SourceLogIds,
+				Category:     model.ObservationCategory(op.Category),
+				Text:         op.Text,
+				SourceLogIds: op.SourceLogIds,
 			}
 			if _, err := a.observations.Create(ctx, plant.PlantID, obs); err != nil {
 				log.Printf("warn: create observation %s: %v", plant.PlantID, err)

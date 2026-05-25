@@ -11,13 +11,10 @@ const (
 )
 
 type PlantObservation struct {
-	PlantID        string              `dynamodbav:"plantId"        json:"plantId"`
-	ObservationID  string              `dynamodbav:"observationId"  json:"observationId"`
-	ObservedAt     string              `dynamodbav:"observedAt"     json:"observedAt"`
-	Category       ObservationCategory `dynamodbav:"category"       json:"category"`
-	Text           string              `dynamodbav:"text"           json:"text"`
-	RequiresAction bool                `dynamodbav:"requiresAction" json:"requiresAction"`
-	ActionedAt     string              `dynamodbav:"actionedAt"     json:"actionedAt,omitempty"`
-	ActionNote     string              `dynamodbav:"actionNote"     json:"actionNote,omitempty"`
-	SourceLogIds   []string            `dynamodbav:"sourceLogIds"   json:"sourceLogIds,omitempty"`
+	PlantID       string              `dynamodbav:"plantId"       json:"plantId"`
+	ObservationID string              `dynamodbav:"observationId" json:"observationId"`
+	ObservedAt    string              `dynamodbav:"observedAt"    json:"observedAt"`
+	Category      ObservationCategory `dynamodbav:"category"      json:"category"`
+	Text          string              `dynamodbav:"text"          json:"text"`
+	SourceLogIds  []string            `dynamodbav:"sourceLogIds"  json:"sourceLogIds,omitempty"`
 }

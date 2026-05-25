@@ -83,8 +83,7 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/plants/{plantId}/milestones",                     a.listMilestones)
 	mux.HandleFunc("PATCH /api/plants/{plantId}/milestones/{milestoneType}",   a.updateMilestone)
-	mux.HandleFunc("GET /api/plants/{plantId}/observations",                   a.listObservations)
-	mux.HandleFunc("PATCH /api/plants/{plantId}/observations/{observationId}", a.updateObservation)
+	mux.HandleFunc("GET /api/plants/{plantId}/observations", a.listObservations)
 }
 
 // ── Plants ───────────────────────────────────────────────────────────────────
@@ -476,25 +475,6 @@ func (a *app) listObservations(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, obs)
 }
 
-func (a *app) updateObservation(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		ActionNote string `json:"actionNote"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpError(w, err, http.StatusBadRequest)
-		return
-	}
-	if err := a.observations.MarkActioned(
-		r.Context(),
-		r.PathValue("plantId"),
-		r.PathValue("observationId"),
-		req.ActionNote,
-	); err != nil {
-		httpError(w, err, http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
