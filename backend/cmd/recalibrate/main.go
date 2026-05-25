@@ -75,9 +75,10 @@ type milestonePredict struct {
 }
 
 type observationPredict struct {
-	Category       string `json:"category"`
-	Text           string `json:"text"`
-	RequiresAction bool   `json:"requires_action"`
+	Category       string   `json:"category"`
+	Text           string   `json:"text"`
+	RequiresAction bool     `json:"requires_action"`
+	SourceLogIds   []string `json:"source_log_ids,omitempty"`
 }
 
 type recalResponse struct {
@@ -103,7 +104,8 @@ Respond with ONLY valid JSON (no markdown fences) matching this exact schema:
     {
       "category": "health|growth|pest|nutrient|general",
       "text": "brief observation (1-2 sentences)",
-      "requires_action": false
+      "requires_action": false,
+      "source_log_ids": ["logId1", "logId2"]
     }
   ]
 }
@@ -130,6 +132,7 @@ Rules:
 - For photoperiods: include flip_to_flower if still in veg or seedling.
 - Only predict leaf sets if the plant is currently in germination or seedling phase.
 - Keep observations sparse — only note something if the log data provides a meaningful signal.
+- Always include source_log_ids listing the specific log IDs your observation is based on.
 - Be conservative with confidence; prefer low/medium over false high confidence.
 - If a photo is provided, use it as the PRIMARY signal for current growth stage. Override text-based estimates if the image clearly shows a different stage. Don't predict milestones the photo shows have already passed.
 - For existing predicted milestones: omit them entirely if you agree with the current date. Only include them if you are changing the date or believe they have already occurred.`
@@ -230,7 +233,7 @@ func min(a, b int) int {
 // ── Prompt builder ────────────────────────────────────────────────────────────
 
 // buildPrompt returns the text prompt and the S3 key of the most recent photo log (if any).
-func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Milestone, now time.Time) (string, string) {
+func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Milestone, existingObs []model.PlantObservation, now time.Time) (string, string) {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Plant: %s\n", plant.Name))
 	sb.WriteString(fmt.Sprintf("Strain: %s\n", plant.Strain))
@@ -290,28 +293,28 @@ func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Mileston
 			var d model.WateringData
 			if err := json.Unmarshal(l.Data, &d); err == nil {
 				if d.PH != 0 {
-					sb.WriteString(fmt.Sprintf("  %s: watering pH=%.1f\n", l.Date, d.PH))
+					sb.WriteString(fmt.Sprintf("  [%s] %s: watering pH=%.1f\n", l.LogID, l.Date, d.PH))
 				} else {
-					sb.WriteString(fmt.Sprintf("  %s: watering\n", l.Date))
+					sb.WriteString(fmt.Sprintf("  [%s] %s: watering\n", l.LogID, l.Date))
 				}
 				careCount++
 			}
 		case model.LogFeeding:
 			var d model.FeedingData
 			if err := json.Unmarshal(l.Data, &d); err == nil {
-				sb.WriteString(fmt.Sprintf("  %s: feeding (pH=%.1f)\n", l.Date, d.PH))
+				sb.WriteString(fmt.Sprintf("  [%s] %s: feeding (pH=%.1f)\n", l.LogID, l.Date, d.PH))
 				careCount++
 			}
 		case model.LogHeight:
 			var d model.HeightData
 			if err := json.Unmarshal(l.Data, &d); err == nil {
-				sb.WriteString(fmt.Sprintf("  %s: height %.0f%s\n", l.Date, d.Height, d.Unit))
+				sb.WriteString(fmt.Sprintf("  [%s] %s: height %.0f%s\n", l.LogID, l.Date, d.Height, d.Unit))
 				careCount++
 			}
 		case model.LogTransplant:
 			var d model.TransplantData
 			if err := json.Unmarshal(l.Data, &d); err == nil {
-				sb.WriteString(fmt.Sprintf("  %s: transplant → %s\n", l.Date, d.PotSize))
+				sb.WriteString(fmt.Sprintf("  [%s] %s: transplant → %s\n", l.LogID, l.Date, d.PotSize))
 				careCount++
 			}
 		case model.LogNote:
@@ -321,7 +324,7 @@ func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Mileston
 				if len(text) > 80 {
 					text = text[:80] + "…"
 				}
-				sb.WriteString(fmt.Sprintf("  %s: note: %s\n", l.Date, text))
+				sb.WriteString(fmt.Sprintf("  [%s] %s: note: %s\n", l.LogID, l.Date, text))
 				careCount++
 			}
 		}
@@ -347,6 +350,23 @@ func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Mileston
 		sb.WriteString("\nFor each existing milestone above: only include it in your response if your estimate has changed or you believe it has already occurred.\n")
 		sb.WriteString("If you agree with the current predicted date, omit it entirely — no need to repeat it.\n")
 		sb.WriteString("If you believe one has already occurred, include it with your best estimate of when it happened and confidence=high.\n")
+	}
+
+	activeObs := make([]model.PlantObservation, 0)
+	for _, o := range existingObs {
+		if o.ActionedAt == "" {
+			activeObs = append(activeObs, o)
+		}
+	}
+	if len(activeObs) > 0 {
+		sb.WriteString("\nExisting observations (do not repeat these unless something has materially changed):\n")
+		for _, o := range activeObs {
+			sourceStr := ""
+			if len(o.SourceLogIds) > 0 {
+				sourceStr = fmt.Sprintf(" (based on logs: %s)", strings.Join(o.SourceLogIds, ", "))
+			}
+			sb.WriteString(fmt.Sprintf("  - [%s] %s%s\n", o.Category, o.Text, sourceStr))
+		}
 	}
 
 	return sb.String(), latestPhotoKey
@@ -386,7 +406,13 @@ func (a *app) handle(ctx context.Context) error {
 			existingByType[m.MilestoneType] = m
 		}
 
-		prompt, photoKey := buildPrompt(&plant, logs, existing, now)
+		existingObs, err := a.observations.ListForPlant(ctx, plant.PlantID)
+		if err != nil {
+			log.Printf("warn: get observations for %s: %v", plant.PlantID, err)
+			continue
+		}
+
+		prompt, photoKey := buildPrompt(&plant, logs, existing, existingObs, now)
 		result, err := a.callClaude(ctx, prompt, photoKey)
 		if err != nil {
 			log.Printf("warn: claude for %s: %v", plant.PlantID, err)
@@ -441,11 +467,11 @@ func (a *app) handle(ctx context.Context) error {
 			log.Printf("warn: delete unactioned observations %s: %v", plant.PlantID, err)
 		}
 		for _, op := range result.Observations {
-			cat := model.ObservationCategory(op.Category)
 			obs := model.PlantObservation{
-				Category:       cat,
+				Category:       model.ObservationCategory(op.Category),
 				Text:           op.Text,
 				RequiresAction: op.RequiresAction,
+				SourceLogIds:   op.SourceLogIds,
 			}
 			if _, err := a.observations.Create(ctx, plant.PlantID, obs); err != nil {
 				log.Printf("warn: create observation %s: %v", plant.PlantID, err)

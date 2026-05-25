@@ -38,6 +38,7 @@ export interface PlantObservation {
   requiresAction: boolean
   actionedAt?: string
   actionNote?: string
+  sourceLogIds?: string[]
 }
 
 export type EnvironmentType =

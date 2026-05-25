@@ -19,4 +19,5 @@ type PlantObservation struct {
 	RequiresAction bool                `dynamodbav:"requiresAction" json:"requiresAction"`
 	ActionedAt     string              `dynamodbav:"actionedAt"     json:"actionedAt,omitempty"`
 	ActionNote     string              `dynamodbav:"actionNote"     json:"actionNote,omitempty"`
+	SourceLogIds   []string            `dynamodbav:"sourceLogIds"   json:"sourceLogIds,omitempty"`
 }
