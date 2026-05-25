@@ -233,7 +233,7 @@ func min(a, b int) int {
 // ── Prompt builder ────────────────────────────────────────────────────────────
 
 // buildPrompt returns the text prompt and the S3 key of the most recent photo log (if any).
-func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Milestone, existingObs []model.PlantObservation, now time.Time) (string, string) {
+func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Milestone, now time.Time) (string, string) {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Plant: %s\n", plant.Name))
 	sb.WriteString(fmt.Sprintf("Strain: %s\n", plant.Strain))
@@ -352,23 +352,6 @@ func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Mileston
 		sb.WriteString("If you believe one has already occurred, include it with your best estimate of when it happened and confidence=high.\n")
 	}
 
-	activeObs := make([]model.PlantObservation, 0)
-	for _, o := range existingObs {
-		if o.ActionedAt == "" {
-			activeObs = append(activeObs, o)
-		}
-	}
-	if len(activeObs) > 0 {
-		sb.WriteString("\nExisting observations (do not repeat these unless something has materially changed):\n")
-		for _, o := range activeObs {
-			sourceStr := ""
-			if len(o.SourceLogIds) > 0 {
-				sourceStr = fmt.Sprintf(" (based on logs: %s)", strings.Join(o.SourceLogIds, ", "))
-			}
-			sb.WriteString(fmt.Sprintf("  - [%s] %s%s\n", o.Category, o.Text, sourceStr))
-		}
-	}
-
 	return sb.String(), latestPhotoKey
 }
 
@@ -406,13 +389,7 @@ func (a *app) handle(ctx context.Context) error {
 			existingByType[m.MilestoneType] = m
 		}
 
-		existingObs, err := a.observations.ListForPlant(ctx, plant.PlantID)
-		if err != nil {
-			log.Printf("warn: get observations for %s: %v", plant.PlantID, err)
-			continue
-		}
-
-		prompt, photoKey := buildPrompt(&plant, logs, existing, existingObs, now)
+		prompt, photoKey := buildPrompt(&plant, logs, existing, now)
 		result, err := a.callClaude(ctx, prompt, photoKey)
 		if err != nil {
 			log.Printf("warn: claude for %s: %v", plant.PlantID, err)
