@@ -156,6 +156,19 @@ func (a *app) fetchImageBase64(ctx context.Context, key string) (data, mediaType
 }
 
 func (a *app) callClaude(ctx context.Context, prompt, photoKey string) (*recalResponse, error) {
+	var lastErr error
+	for attempt := 0; attempt < 2; attempt++ {
+		result, err := a.doCallClaude(ctx, prompt, photoKey)
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+		log.Printf("warn: claude attempt %d failed: %v", attempt+1, err)
+	}
+	return nil, lastErr
+}
+
+func (a *app) doCallClaude(ctx context.Context, prompt, photoKey string) (*recalResponse, error) {
 	var content interface{}
 	if photoKey != "" && a.s3 != nil {
 		imgData, mediaType, err := a.fetchImageBase64(ctx, photoKey)
@@ -349,6 +362,8 @@ func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Mileston
 		sb.WriteString("If you agree with the current predicted date, omit it entirely — no need to repeat it.\n")
 		sb.WriteString("If you believe one has already occurred, include it with your best estimate of when it happened and confidence=high.\n")
 	}
+
+	sb.WriteString("\nRespond with JSON only, starting with {")
 
 	return sb.String(), latestPhotoKey
 }
