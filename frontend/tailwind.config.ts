@@ -6,20 +6,20 @@ export default {
     extend: {
       colors: {
         // Backgrounds
-        base:    '#080808',
-        surface: '#121212',
-        raised:  '#1A1A1A',
-        border:  '#2A2A2A',
+        base:    '#060C0A',
+        surface: '#0B1510',
+        raised:  '#111E17',
+        border:  '#1A2C24',
         // Greens
-        forest:  '#1E4620',
-        pine:    '#2D6A31',
-        fern:    '#4A9E50',
-        lime:    '#7CC96E',
-        mint:    '#A8E6A0',
+        forest:  '#0E3320',
+        pine:    '#1D6040',
+        fern:    '#3DC47A',
+        lime:    '#6EDFA0',
+        mint:    '#AAEDC8',
         // Text
-        muted:   '#666666',
-        dim:     '#999999',
-        primary: '#E8E8E8',
+        muted:   '#547066',
+        dim:     '#7AA893',
+        primary: '#E4EDE8',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
