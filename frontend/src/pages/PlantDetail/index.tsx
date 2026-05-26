@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, Flag, CheckCircle2, Sparkles } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, Flag, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
@@ -545,20 +545,51 @@ function LogEntry({ log, envMap, onDelete, onEdit }: { log: Log; envMap: Map<str
 
 // ── Observation components ────────────────────────────────────────────────────
 
-function ObservationsSection({ observations }: { observations: PlantObservation[] }) {
+function ObservationsSection({ observations, plantId, lastCalibratedAt }: {
+  observations: PlantObservation[]
+  plantId: string
+  lastCalibratedAt?: string
+}) {
+  const qc = useQueryClient()
   const [expanded, setExpanded] = useState(false)
-  if (observations.length === 0) return null
+
+  const calibrate = useMutation({
+    mutationFn: () => api.plants.calibrate(plantId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['plant', plantId] }),
+  })
+
+  if (observations.length === 0 && !lastCalibratedAt) return null
+
   return (
     <div className="border-b border-border">
-      <button
-        onClick={() => setExpanded(e => !e)}
-        className="flex items-center gap-2 w-full px-4 py-2.5 text-left"
-      >
-        <Sparkles size={13} className="text-muted" />
-        <span className="text-xs text-muted flex-1">AI Notes</span>
-        {expanded ? <ChevronUp size={12} className="text-muted" /> : <ChevronDown size={12} className="text-muted" />}
-      </button>
-      {expanded && (
+      <div className="flex items-center gap-2 px-4 py-2.5">
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="flex items-center gap-2 flex-1 text-left min-w-0"
+        >
+          <Sparkles size={13} className="text-muted flex-shrink-0" />
+          <span className="text-xs text-muted">AI Notes</span>
+          {lastCalibratedAt && (
+            <span className="text-[10px] text-muted/50 truncate">
+              · {new Date(lastCalibratedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => calibrate.mutate()}
+          disabled={calibrate.isPending}
+          className="text-muted/50 active:text-primary p-0.5 flex-shrink-0 disabled:opacity-40"
+          title="Run calibration"
+        >
+          <RefreshCw size={12} className={calibrate.isPending ? 'animate-spin' : ''} />
+        </button>
+        {observations.length > 0 && (
+          <button onClick={() => setExpanded(e => !e)} className="text-muted flex-shrink-0">
+            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
+        )}
+      </div>
+      {expanded && observations.length > 0 && (
         <div className="px-4 pb-3 space-y-2">
           {observations.map(obs => (
             <div key={obs.observationId} className="flex items-start gap-2.5 rounded-xl p-2.5 bg-raised">
@@ -872,7 +903,7 @@ export function PlantDetailPage() {
         <ChevronRight size={16} className="text-muted" />
       </button>
 
-      <ObservationsSection observations={observations} />
+      <ObservationsSection observations={observations} plantId={plant.plantId} lastCalibratedAt={plant.lastCalibratedAt} />
 
       {/* Journal view: date strip + single-day logs */}
       {view === 'journal' && (

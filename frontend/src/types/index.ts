@@ -60,6 +60,7 @@ export interface Plant {
   avatarKey?: string
   environmentId?: string
   archivedAt?: string
+  lastCalibratedAt?: string
   createdAt: string
 }
 

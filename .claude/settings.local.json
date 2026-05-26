@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem *)",
+      "Bash(go mod *)",
+      "Bash(npm install *)",
+      "Bash(aws route53 list-resource-record-sets *)",
+      "Bash(curl -I -s https://grow.chrisdargis.com)",
+      "Bash(curl -v --max-time 10 https://grow.chrisdargis.com)",
+      "Bash(npx tsc *)",
+      "Bash(go get *)"
+    ]
+  }
+}

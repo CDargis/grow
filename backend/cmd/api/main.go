@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"github.com/cdargis/grow/internal/model"
 	"github.com/cdargis/grow/internal/store"
@@ -19,15 +20,17 @@ import (
 )
 
 type app struct {
-	plants       *store.PlantStore
-	envs         *store.EnvironmentStore
-	logs         *store.LogStore
-	milestones   *store.MilestoneStore
-	observations *store.ObservationStore
-	s3           *s3.Client
-	presign      *s3.PresignClient
-	mediaBkt     string
-	userID       string
+	plants              *store.PlantStore
+	envs                *store.EnvironmentStore
+	logs                *store.LogStore
+	milestones          *store.MilestoneStore
+	observations        *store.ObservationStore
+	s3                  *s3.Client
+	presign             *s3.PresignClient
+	sqsClient           *sqs.Client
+	mediaBkt            string
+	recalibrateQueueURL string
+	userID              string
 }
 
 func main() {
@@ -38,15 +41,17 @@ func main() {
 	}
 
 	a := &app{
-		plants: store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
-		envs:   store.NewEnvironmentStore(clients.DDB, os.Getenv("ENVIRONMENTS_TABLE")),
-		logs:   store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI")),
-		milestones: store.NewMilestoneStore(clients.DDB, os.Getenv("MILESTONES_TABLE")),
+		plants:       store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
+		envs:         store.NewEnvironmentStore(clients.DDB, os.Getenv("ENVIRONMENTS_TABLE")),
+		logs:         store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI")),
+		milestones:   store.NewMilestoneStore(clients.DDB, os.Getenv("MILESTONES_TABLE")),
 		observations: store.NewObservationStore(clients.DDB, os.Getenv("OBSERVATIONS_TABLE")),
 		s3:           clients.S3,
 		presign:      s3.NewPresignClient(clients.S3),
-		mediaBkt:     os.Getenv("MEDIA_BUCKET"),
-		userID:       getEnvOrDefault("USER_ID", "default"),
+		sqsClient:           clients.SQS,
+		mediaBkt:            os.Getenv("MEDIA_BUCKET"),
+		recalibrateQueueURL: os.Getenv("RECALIBRATE_QUEUE_URL"),
+		userID:              getEnvOrDefault("USER_ID", "default"),
 	}
 
 	mux := http.NewServeMux()
@@ -83,7 +88,8 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/plants/{plantId}/milestones",                     a.listMilestones)
 	mux.HandleFunc("PATCH /api/plants/{plantId}/milestones/{milestoneType}",   a.updateMilestone)
-	mux.HandleFunc("GET /api/plants/{plantId}/observations", a.listObservations)
+	mux.HandleFunc("GET /api/plants/{plantId}/observations",                   a.listObservations)
+	mux.HandleFunc("POST /api/plants/{plantId}/calibrate",                     a.calibratePlant)
 }
 
 // ── Plants ───────────────────────────────────────────────────────────────────
@@ -475,6 +481,21 @@ func (a *app) listObservations(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, obs)
 }
 
+
+// ── Calibration ───────────────────────────────────────────────────────────────
+
+func (a *app) calibratePlant(w http.ResponseWriter, r *http.Request) {
+	plantID := r.PathValue("plantId")
+	msgBody, _ := json.Marshal(map[string]string{"plantId": plantID})
+	if _, err := a.sqsClient.SendMessage(r.Context(), &sqs.SendMessageInput{
+		QueueUrl:    aws.String(a.recalibrateQueueURL),
+		MessageBody: aws.String(string(msgBody)),
+	}); err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

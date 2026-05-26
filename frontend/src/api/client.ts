@@ -35,6 +35,8 @@ export const api = {
       request<void>(`/plants/${id}/phase`,  { method: 'PUT', body: JSON.stringify({ phase, ...(date ? { date } : {}), ...(loggedAt ? { loggedAt } : {}) }) }),
     updateAvatar: (id: string, avatarKey: string) =>
       request<void>(`/plants/${id}/avatar`, { method: 'PUT', body: JSON.stringify({ avatarKey }) }),
+    calibrate: (id: string) =>
+      request<void>(`/plants/${id}/calibrate`, { method: 'POST', body: '{}' }),
   },
 
   environments: {

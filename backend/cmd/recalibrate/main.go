@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -368,107 +369,139 @@ func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Mileston
 	return sb.String(), latestPhotoKey
 }
 
-// ── Handler ───────────────────────────────────────────────────────────────────
+// ── Per-plant processing ──────────────────────────────────────────────────────
 
-func (a *app) handle(ctx context.Context) error {
-	plants, err := a.plants.List(ctx, a.userID)
+func (a *app) processPlant(ctx context.Context, plant model.Plant, now time.Time, nowStr string) {
+	logs, err := a.logs.ListForPlant(ctx, plant.PlantID)
 	if err != nil {
-		return fmt.Errorf("list plants: %w", err)
+		log.Printf("warn: get logs for %s: %v", plant.PlantID, err)
+		return
 	}
 
+	existing, err := a.milestones.ListForPlant(ctx, plant.PlantID)
+	if err != nil {
+		log.Printf("warn: get milestones for %s: %v", plant.PlantID, err)
+		return
+	}
+
+	existingByType := make(map[model.MilestoneType]model.Milestone, len(existing))
+	for _, m := range existing {
+		existingByType[m.MilestoneType] = m
+	}
+
+	prompt, photoKey := buildPrompt(&plant, logs, existing, now)
+	result, err := a.callClaude(ctx, prompt, photoKey)
+	if err != nil {
+		log.Printf("warn: claude for %s: %v", plant.PlantID, err)
+		return
+	}
+
+	for _, mp := range result.Milestones {
+		mt := model.MilestoneType(mp.Type)
+
+		if ex, found := existingByType[mt]; found {
+			if ex.Status == model.MilestoneStatusConfirmed || ex.Status == model.MilestoneStatusSkipped {
+				continue
+			}
+		}
+
+		confidence := model.MilestoneConfidence(mp.Confidence)
+		if confidence != model.ConfidenceLow && confidence != model.ConfidenceMedium && confidence != model.ConfidenceHigh {
+			confidence = model.ConfidenceLow
+		}
+
+		m := model.Milestone{
+			PlantID:       plant.PlantID,
+			MilestoneType: mt,
+			PredictedDate: mp.PredictedDate,
+			Confidence:    confidence,
+			Status:        model.MilestoneStatusPredicted,
+			Notes:         mp.Notes,
+		}
+
+		if ex, found := existingByType[mt]; found {
+			if ex.PredictedDate != mp.PredictedDate {
+				m.LastChangedAt    = nowStr
+				m.LastChangedFrom  = ex.PredictedDate
+				m.LastChangeReason = mp.ChangeReason
+			} else {
+				m.LastChangedAt    = ex.LastChangedAt
+				m.LastChangedFrom  = ex.LastChangedFrom
+				m.LastChangeReason = ex.LastChangeReason
+			}
+		}
+
+		if err := a.milestones.Upsert(ctx, m); err != nil {
+			log.Printf("warn: upsert milestone %s/%s: %v", plant.PlantID, mp.Type, err)
+		}
+	}
+
+	if err := a.observations.DeleteAll(ctx, plant.PlantID); err != nil {
+		log.Printf("warn: delete observations %s: %v", plant.PlantID, err)
+	}
+	for _, op := range result.Observations {
+		obs := model.PlantObservation{
+			Category:     model.ObservationCategory(op.Category),
+			Text:         op.Text,
+			SourceLogIds: op.SourceLogIds,
+		}
+		if _, err := a.observations.Create(ctx, plant.PlantID, obs); err != nil {
+			log.Printf("warn: create observation %s: %v", plant.PlantID, err)
+		}
+	}
+
+	if err := a.plants.UpdateLastCalibratedAt(ctx, plant.PlantID, nowStr); err != nil {
+		log.Printf("warn: update lastCalibratedAt for %s: %v", plant.PlantID, err)
+	}
+
+	log.Printf("recalibrated %s (%s): %d milestones, %d observations",
+		plant.Name, plant.PlantID, len(result.Milestones), len(result.Observations))
+}
+
+// ── Handler ───────────────────────────────────────────────────────────────────
+
+func (a *app) handle(ctx context.Context, event events.SQSEvent) error {
 	now := time.Now().UTC()
 	nowStr := now.Format(time.RFC3339)
 
-	for _, plant := range plants {
-		if plant.Phase == model.PhaseArchived || plant.Phase == model.PhaseDead {
-			continue
+	// Collect target plantIDs from message bodies; empty = process all
+	var targetPlantIDs []string
+	for _, record := range event.Records {
+		var msg struct {
+			PlantID string `json:"plantId"`
 		}
+		if err := json.Unmarshal([]byte(record.Body), &msg); err == nil && msg.PlantID != "" {
+			targetPlantIDs = append(targetPlantIDs, msg.PlantID)
+		}
+	}
 
-		logs, err := a.logs.ListForPlant(ctx, plant.PlantID)
+	if len(targetPlantIDs) > 0 {
+		for _, pid := range targetPlantIDs {
+			plant, err := a.plants.Get(ctx, pid)
+			if err != nil {
+				log.Printf("warn: get plant %s: %v", pid, err)
+				continue
+			}
+			if plant == nil {
+				log.Printf("warn: plant not found: %s", pid)
+				continue
+			}
+			if plant.Phase == model.PhaseArchived || plant.Phase == model.PhaseDead {
+				continue
+			}
+			a.processPlant(ctx, *plant, now, nowStr)
+		}
+	} else {
+		plants, err := a.plants.List(ctx, a.userID)
 		if err != nil {
-			log.Printf("warn: get logs for %s: %v", plant.PlantID, err)
-			continue
+			return fmt.Errorf("list plants: %w", err)
 		}
-
-		existing, err := a.milestones.ListForPlant(ctx, plant.PlantID)
-		if err != nil {
-			log.Printf("warn: get milestones for %s: %v", plant.PlantID, err)
-			continue
+		for _, plant := range plants {
+			if plant.Phase == model.PhaseArchived || plant.Phase == model.PhaseDead {
+				continue
+			}
+			a.processPlant(ctx, plant, now, nowStr)
 		}
-
-		// Index existing milestones by type for quick lookup
-		existingByType := make(map[model.MilestoneType]model.Milestone, len(existing))
-		for _, m := range existing {
-			existingByType[m.MilestoneType] = m
-		}
-
-		prompt, photoKey := buildPrompt(&plant, logs, existing, now)
-		result, err := a.callClaude(ctx, prompt, photoKey)
-		if err != nil {
-			log.Printf("warn: claude for %s: %v", plant.PlantID, err)
-			continue
-		}
-
-		// Upsert milestones — skip any already confirmed or skipped
-		for _, mp := range result.Milestones {
-			mt := model.MilestoneType(mp.Type)
-
-			if ex, found := existingByType[mt]; found {
-				if ex.Status == model.MilestoneStatusConfirmed || ex.Status == model.MilestoneStatusSkipped {
-					continue
-				}
-			}
-
-			confidence := model.MilestoneConfidence(mp.Confidence)
-			if confidence != model.ConfidenceLow && confidence != model.ConfidenceMedium && confidence != model.ConfidenceHigh {
-				confidence = model.ConfidenceLow
-			}
-
-			m := model.Milestone{
-				PlantID:       plant.PlantID,
-				MilestoneType: mt,
-				PredictedDate: mp.PredictedDate,
-				Confidence:    confidence,
-				Status:        model.MilestoneStatusPredicted,
-				Notes:         mp.Notes,
-			}
-
-			// Carry forward existing last-change fields; overwrite only if date actually changed
-			if ex, found := existingByType[mt]; found {
-				if ex.PredictedDate != mp.PredictedDate {
-					m.LastChangedAt   = nowStr
-					m.LastChangedFrom = ex.PredictedDate
-					m.LastChangeReason = mp.ChangeReason
-				} else {
-					m.LastChangedAt   = ex.LastChangedAt
-					m.LastChangedFrom = ex.LastChangedFrom
-					m.LastChangeReason = ex.LastChangeReason
-				}
-			}
-
-			if err := a.milestones.Upsert(ctx, m); err != nil {
-				log.Printf("warn: upsert milestone %s/%s: %v", plant.PlantID, mp.Type, err)
-			}
-		}
-
-
-		// Replace observations: wipe all, write fresh set
-		if err := a.observations.DeleteAll(ctx, plant.PlantID); err != nil {
-			log.Printf("warn: delete observations %s: %v", plant.PlantID, err)
-		}
-		for _, op := range result.Observations {
-			obs := model.PlantObservation{
-				Category:     model.ObservationCategory(op.Category),
-				Text:         op.Text,
-				SourceLogIds: op.SourceLogIds,
-			}
-			if _, err := a.observations.Create(ctx, plant.PlantID, obs); err != nil {
-				log.Printf("warn: create observation %s: %v", plant.PlantID, err)
-			}
-		}
-
-		log.Printf("recalibrated %s (%s): %d milestones, %d observations",
-			plant.Name, plant.PlantID, len(result.Milestones), len(result.Observations))
 	}
 
 	return nil
@@ -482,9 +515,9 @@ func main() {
 	}
 
 	a := &app{
-		plants: store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
-		logs:   store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI")),
-		milestones: store.NewMilestoneStore(clients.DDB, os.Getenv("MILESTONES_TABLE")),
+		plants:       store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
+		logs:         store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI")),
+		milestones:   store.NewMilestoneStore(clients.DDB, os.Getenv("MILESTONES_TABLE")),
 		observations: store.NewObservationStore(clients.DDB, os.Getenv("OBSERVATIONS_TABLE")),
 		s3:           clients.S3,
 		mediaBkt:     os.Getenv("MEDIA_BUCKET"),

@@ -7,6 +7,8 @@ using DynamoAttribute = Amazon.CDK.AWS.DynamoDB.Attribute;
 using Amazon.CDK.AWS.Events;
 using Amazon.CDK.AWS.Events.Targets;
 using EventsLambdaTarget = Amazon.CDK.AWS.Events.Targets.LambdaFunction;
+using SqsQueueTarget     = Amazon.CDK.AWS.Events.Targets.SqsQueue;
+using Amazon.CDK.AWS.SQS;
 using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
 using LambdaFunction      = Amazon.CDK.AWS.Lambda.Function;
@@ -203,17 +205,39 @@ public class GrowStack : Stack
             }
         });
 
-        plantsTable.GrantReadData(recalibrateFunction);
+        plantsTable.GrantReadWriteData(recalibrateFunction);
         logsTable.GrantReadData(recalibrateFunction);
         milestonesTable.GrantReadWriteData(recalibrateFunction);
         observationsTable.GrantReadWriteData(recalibrateFunction);
         mediaBucket.GrantRead(recalibrateFunction);
 
+        // ── SQS Recalibrate Queue ─────────────────────────────────────────────
+
+        Queue recalibrateQueue = new Queue(this, "RecalibrateQueue", new QueueProps
+        {
+            QueueName         = "grow-recalibrate-queue",
+            VisibilityTimeout = Duration.Minutes(6),
+            RetentionPeriod   = Duration.Days(1),
+        });
+
+        // EventBridge cron → SQS (fires daily; empty body = process all plants)
         Rule recalSchedule = new Rule(this, "RecalibrationSchedule", new RuleProps
         {
             Schedule = Schedule.Cron(new CronOptions { Hour = "14", Minute = "0" })
         });
-        recalSchedule.AddTarget(new EventsLambdaTarget(recalibrateFunction));
+        recalSchedule.AddTarget(new SqsQueueTarget(recalibrateQueue));
+
+        // SQS → recalibrate Lambda (batch size 1 so each message = one invocation)
+        recalibrateFunction.AddEventSourceMapping("SqsSource", new EventSourceMappingOptions
+        {
+            EventSourceArn = recalibrateQueue.QueueArn,
+            BatchSize      = 1,
+        });
+        recalibrateQueue.GrantConsumeMessages(recalibrateFunction);
+
+        // API Lambda can send messages to kick off per-plant calibration
+        recalibrateQueue.GrantSendMessages(apiFunction);
+        apiFunction.AddEnvironment("RECALIBRATE_QUEUE_URL", recalibrateQueue.QueueUrl);
 
         // ── API Gateway ───────────────────────────────────────────────────
 
