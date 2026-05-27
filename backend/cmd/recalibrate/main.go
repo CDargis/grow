@@ -125,8 +125,9 @@ Valid milestone types and typical timing from sprout/germination:
 - cure_ready          — properly cured, burping complete (~2-6 weeks after jarring)
 
 Rules:
-- Only predict milestones that are STILL IN THE FUTURE based on today's date and current phase.
-- Skip milestones that have clearly already passed (e.g., don't predict leaf_set_1 if the plant is already in veg).
+- Include ALL milestones relevant to the plant's current phase, whether they are upcoming OR have already passed.
+- For milestones that appear to have already occurred (based on phase timing, photo evidence, or elapsed days), include them with your best estimated past date and confidence=high.
+- Only skip milestones from phases the plant has clearly grown beyond (e.g., skip leaf sets entirely if the plant is already in veg or later).
 - For autoflowers: skip flip_to_flower entirely. Adjust harvest timing (~70-100 days from sprout).
 - For photoperiods: include flip_to_flower if still in veg or seedling.
 - Only predict leaf sets if the plant is currently in germination or seedling phase.
