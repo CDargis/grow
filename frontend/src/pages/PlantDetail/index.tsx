@@ -123,8 +123,8 @@ const MILESTONE_LABELS: Record<MilestoneType, string> = {
 
 // Which historical phases each milestone is shown in (active phase shows all)
 const MILESTONE_PHASES: Record<MilestoneType, PlantPhase[]> = {
-  cotyledons_off: ['germination', 'seedling'],
-  leaf_set_1:     ['germination', 'seedling'],
+  cotyledons_off: ['seedling'],
+  leaf_set_1:     ['seedling'],
   leaf_set_2:     ['seedling'],
   leaf_set_3:     ['seedling'],
   leaf_set_4:     ['seedling'],
@@ -293,9 +293,11 @@ function MilestoneEntry({ milestone, onConfirm, onSkip }: {
   onConfirm: (type: MilestoneType, date: string) => void
   onSkip: (type: MilestoneType) => void
 }) {
-  const today     = todayDate()
-  const isPastDue = milestone.predictedDate <= today
-  const canAct    = milestone.status === 'predicted' && isPastDue
+  const today      = todayDate()
+  const isPastDue  = (milestone.predictedDate ?? '') <= today
+  const canAct     = milestone.status === 'predicted' && isPastDue
+  const [picking, setPicking] = useState(false)
+  const [pickDate, setPickDate] = useState(today)
 
   if (milestone.status === 'skipped') return null
 
@@ -303,8 +305,13 @@ function MilestoneEntry({ milestone, onConfirm, onSkip }: {
   const colorCls    = CONFIDENCE_COLORS[milestone.confidence] ?? CONFIDENCE_COLORS.low
   const isConfirmed = milestone.status === 'confirmed'
 
+  function handleConfirm() {
+    onConfirm(milestone.milestoneType, pickDate)
+    setPicking(false)
+  }
+
   return (
-    <div className={`py-2 border-b border-border/40 last:border-0 ${isConfirmed ? 'opacity-60' : ''}`}>
+    <div className={`py-2 border-b border-border/40 last:border-0 ${isConfirmed ? 'opacity-70' : ''}`}>
       <div className="flex items-start gap-2">
         <div className="flex-shrink-0 mt-0.5">
           {isConfirmed
@@ -315,18 +322,20 @@ function MilestoneEntry({ milestone, onConfirm, onSkip }: {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-primary">{label}</span>
-            <span className={`text-[10px] border rounded px-1 py-px flex-shrink-0 ${colorCls}`}>
-              {milestone.confidence}
-            </span>
+            {!isConfirmed && (
+              <span className={`text-[10px] border rounded px-1 py-px flex-shrink-0 ${colorCls}`}>
+                {milestone.confidence}
+              </span>
+            )}
           </div>
           <p className="text-[11px] text-dim mt-0.5">
             {isConfirmed
               ? `Confirmed ${new Date(milestone.confirmedDate! + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}`
-              : formatMilestoneDate(milestone.predictedDate)
+              : formatMilestoneDate(milestone.predictedDate ?? '')
             }
             {milestone.notes && !isConfirmed && <span className="ml-1 text-muted">· {milestone.notes}</span>}
           </p>
-          {milestone.lastChangedAt && milestone.lastChangedFrom && (
+          {milestone.lastChangedAt && milestone.lastChangedFrom && !isConfirmed && (
             <p className="text-[10px] text-muted mt-0.5">
               ↻ changed from {new Date(milestone.lastChangedFrom + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
               {' on '}
@@ -334,19 +343,42 @@ function MilestoneEntry({ milestone, onConfirm, onSkip }: {
               {milestone.lastChangeReason && <span className="italic"> · {milestone.lastChangeReason}</span>}
             </p>
           )}
-          {canAct && (
+          {canAct && !picking && (
             <div className="flex gap-2 mt-1.5">
               <button
-                onClick={() => onConfirm(milestone.milestoneType, today)}
+                onClick={() => { setPickDate(today); setPicking(true) }}
                 className="text-[10px] px-2 py-0.5 rounded bg-fern/20 text-fern border border-fern/30 active:opacity-70"
               >
-                Confirm today
+                Confirm
               </button>
               <button
                 onClick={() => onSkip(milestone.milestoneType)}
                 className="text-[10px] px-2 py-0.5 rounded bg-raised text-muted border border-border active:opacity-70"
               >
                 Skip
+              </button>
+            </div>
+          )}
+          {picking && (
+            <div className="flex items-center gap-2 mt-1.5">
+              <input
+                type="date"
+                value={pickDate}
+                max={today}
+                onChange={e => setPickDate(e.target.value)}
+                className="text-[11px] bg-surface border border-border rounded px-2 py-0.5 text-primary"
+              />
+              <button
+                onClick={handleConfirm}
+                className="text-[10px] px-2 py-0.5 rounded bg-fern/20 text-fern border border-fern/30 active:opacity-70"
+              >
+                Done
+              </button>
+              <button
+                onClick={() => setPicking(false)}
+                className="text-[10px] text-muted active:opacity-70"
+              >
+                Cancel
               </button>
             </div>
           )}
@@ -381,7 +413,7 @@ function PhasePeriodSection({ period, isLast, envMap, milestones, onDelete, onEd
           : MILESTONE_PHASES[m.milestoneType]?.includes(period.phase)
       )
     )
-    .sort((a, b) => a.predictedDate.localeCompare(b.predictedDate))
+    .sort((a, b) => (a.predictedDate ?? '').localeCompare(b.predictedDate ?? ''))
 
   const hasContent = period.logs.length > 0 || phaseMilestones.length > 0
 
