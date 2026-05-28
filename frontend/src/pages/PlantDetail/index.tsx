@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, Flag, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
@@ -121,7 +121,9 @@ const MILESTONE_LABELS: Record<MilestoneType, string> = {
   cure_ready:     'Cure Ready',
 }
 
-// Which historical phases each milestone is shown in (active phase shows all)
+const PHASE_ORDER: PlantPhase[] = ['germination', 'seedling', 'veg', 'flower', 'harvest', 'drying', 'curing']
+
+// Which phases each milestone is relevant to
 const MILESTONE_PHASES: Record<MilestoneType, PlantPhase[]> = {
   cotyledons_off: ['seedling'],
   leaf_set_1:     ['seedling'],
@@ -316,7 +318,7 @@ function MilestoneEntry({ milestone, onConfirm, onSkip }: {
         <div className="flex-shrink-0 mt-0.5">
           {isConfirmed
             ? <CheckCircle2 size={14} className="text-fern" />
-            : <Flag size={14} className={isPastDue ? 'text-amber-400' : 'text-muted'} />
+            : <Sparkles size={14} className={isPastDue ? 'text-amber-400' : 'text-violet-400/70'} />
           }
         </div>
         <div className="flex-1 min-w-0">
@@ -404,15 +406,15 @@ function PhasePeriodSection({ period, isLast, envMap, milestones, onDelete, onEd
   const [expanded, setExpanded] = useState(ongoing)
   const color = PHASE_HEX[period.phase] ?? '#666'
 
-  // Active phase shows all milestones; completed phases only show their own
+  // Active phase: show predicted + confirmed milestones belonging to this phase
+  // Completed phases: show only confirmed milestones belonging to this phase
   const phaseMilestones = milestones
-    .filter(m =>
-      m.status !== 'skipped' && (
-        ongoing
-          ? true
-          : MILESTONE_PHASES[m.milestoneType]?.includes(period.phase)
-      )
-    )
+    .filter(m => {
+      if (m.status === 'skipped') return false
+      if (!MILESTONE_PHASES[m.milestoneType]?.includes(period.phase)) return false
+      if (!ongoing && m.status === 'predicted') return false
+      return true
+    })
     .sort((a, b) => (a.predictedDate ?? '').localeCompare(b.predictedDate ?? ''))
 
   const hasContent = period.logs.length > 0 || phaseMilestones.length > 0
@@ -465,14 +467,22 @@ function PhasePeriodSection({ period, isLast, envMap, milestones, onDelete, onEd
 
         {expanded && (
           <div className="mt-2 border-t border-border/30">
-            {phaseMilestones.map(m => (
-              <MilestoneEntry
-                key={m.milestoneType}
-                milestone={m}
-                onConfirm={onConfirmMilestone}
-                onSkip={onSkipMilestone}
-              />
-            ))}
+            {phaseMilestones.length > 0 && (
+              <>
+                <div className="flex items-center gap-1.5 pt-2 pb-0.5">
+                  <Sparkles size={11} className="text-violet-400" />
+                  <span className="text-[10px] font-medium text-violet-400 uppercase tracking-wide">AI Predictions</span>
+                </div>
+                {phaseMilestones.map(m => (
+                  <MilestoneEntry
+                    key={m.milestoneType}
+                    milestone={m}
+                    onConfirm={onConfirmMilestone}
+                    onSkip={onSkipMilestone}
+                  />
+                ))}
+              </>
+            )}
             {!hasContent ? (
               <p className="text-xs text-muted py-2">No activity logged this phase.</p>
             ) : (
@@ -480,6 +490,69 @@ function PhasePeriodSection({ period, isLast, envMap, milestones, onDelete, onEd
                 <PhaseLogEntry key={log.logId} log={log} color={color} envMap={envMap} onDelete={onDelete} onEdit={onEdit} />
               ))
             )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Upcoming phase section (future phases with AI-predicted milestones) ───────
+
+function UpcomingPhaseSection({ phase, milestones, isLast, onConfirmMilestone, onSkipMilestone }: {
+  phase: PlantPhase
+  milestones: Milestone[]
+  isLast: boolean
+  onConfirmMilestone: (type: MilestoneType, date: string) => void
+  onSkipMilestone: (type: MilestoneType) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const color = PHASE_HEX[phase] ?? '#666'
+
+  return (
+    <div className="relative flex items-start gap-3">
+      <div className="flex flex-col items-center flex-shrink-0 w-3">
+        <div
+          className="w-3 h-3 rounded-full flex-shrink-0 mt-[5px] z-10 relative opacity-35"
+          style={{ backgroundColor: color }}
+        />
+        {!isLast && (
+          <div
+            className="w-0.5 flex-1 min-h-[20px] mt-1"
+            style={{ backgroundColor: color, opacity: 0.12 }}
+          />
+        )}
+      </div>
+      <div className="flex-1 min-w-0 pb-4">
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="flex items-center justify-between w-full text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-sm capitalize opacity-40" style={{ color }}>{phase}</span>
+            <span className="text-[9px] text-muted border border-border rounded px-1 py-px uppercase tracking-wide">upcoming</span>
+            {!expanded && (
+              <span className="text-[9px] text-violet-400 border border-violet-400/30 rounded px-1 py-px">
+                {milestones.length} predicted
+              </span>
+            )}
+          </div>
+          {expanded ? <ChevronUp size={12} className="text-muted" /> : <ChevronDown size={12} className="text-muted" />}
+        </button>
+        {expanded && (
+          <div className="mt-2 border-t border-border/30">
+            <div className="flex items-center gap-1.5 pt-2 pb-0.5">
+              <Sparkles size={11} className="text-violet-400" />
+              <span className="text-[10px] font-medium text-violet-400 uppercase tracking-wide">AI Predictions</span>
+            </div>
+            {milestones.map(m => (
+              <MilestoneEntry
+                key={m.milestoneType}
+                milestone={m}
+                onConfirm={onConfirmMilestone}
+                onSkip={onSkipMilestone}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -500,17 +573,49 @@ function TimelineView({ plant, logs, envMap, milestones, onDelete, onEdit, onCon
   onSkipMilestone: (type: MilestoneType) => void
 }) {
   const periods = buildPhasePeriods(plant, logs)
+  const currentPhaseIdx = PHASE_ORDER.indexOf(plant.phase)
+
+  // Build upcoming sections: each predicted milestone assigned to its earliest future phase
+  const upcomingSections = PHASE_ORDER
+    .slice(currentPhaseIdx + 1)
+    .map(phase => ({
+      phase,
+      milestones: milestones
+        .filter(m => {
+          if (m.status !== 'predicted') return false
+          // Already shown in the active phase section
+          if (MILESTONE_PHASES[m.milestoneType]?.includes(plant.phase)) return false
+          // Assign to the first future phase this milestone belongs to
+          const firstFuturePhase = PHASE_ORDER
+            .slice(currentPhaseIdx + 1)
+            .find(p => MILESTONE_PHASES[m.milestoneType]?.includes(p))
+          return firstFuturePhase === phase
+        })
+        .sort((a, b) => (a.predictedDate ?? '').localeCompare(b.predictedDate ?? '')),
+    }))
+    .filter(s => s.milestones.length > 0)
+
   return (
     <div className="pt-2">
       {periods.map((period, idx) => (
         <PhasePeriodSection
           key={period.phase + period.startDate}
           period={period}
-          isLast={idx === periods.length - 1}
+          isLast={idx === periods.length - 1 && upcomingSections.length === 0}
           envMap={envMap}
           milestones={milestones}
           onDelete={onDelete}
           onEdit={onEdit}
+          onConfirmMilestone={onConfirmMilestone}
+          onSkipMilestone={onSkipMilestone}
+        />
+      ))}
+      {upcomingSections.map((s, idx) => (
+        <UpcomingPhaseSection
+          key={s.phase}
+          phase={s.phase}
+          milestones={s.milestones}
+          isLast={idx === upcomingSections.length - 1}
           onConfirmMilestone={onConfirmMilestone}
           onSkipMilestone={onSkipMilestone}
         />
@@ -583,7 +688,14 @@ function ObservationsSection({ observations, plantId, lastCalibratedAt }: {
   lastCalibratedAt?: string
 }) {
   const qc = useQueryClient()
+  // Auto-expand when lastCalibratedAt changes (new sync). Stays collapsed once user collapses it.
+  const seenCalibrationRef = useRef<string | undefined>(undefined)
   const [expanded, setExpanded] = useState(false)
+
+  if (lastCalibratedAt && lastCalibratedAt !== seenCalibrationRef.current) {
+    seenCalibrationRef.current = lastCalibratedAt
+    if (!expanded) setExpanded(true)
+  }
 
   const calibrate = useMutation({
     mutationFn: () => api.plants.calibrate(plantId),
@@ -599,8 +711,8 @@ function ObservationsSection({ observations, plantId, lastCalibratedAt }: {
           onClick={() => setExpanded(e => !e)}
           className="flex items-center gap-2 flex-1 text-left min-w-0"
         >
-          <Sparkles size={13} className="text-muted flex-shrink-0" />
-          <span className="text-xs text-muted">AI Notes</span>
+          <Sparkles size={13} className="text-violet-400 flex-shrink-0" />
+          <span className="text-xs font-medium text-primary">AI Notes</span>
           {lastCalibratedAt && (
             <span className="text-[10px] text-muted/50 truncate">
               · {new Date(lastCalibratedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -625,7 +737,7 @@ function ObservationsSection({ observations, plantId, lastCalibratedAt }: {
         <div className="px-4 pb-3 space-y-2">
           {observations.map(obs => (
             <div key={obs.observationId} className="flex items-start gap-2.5 rounded-xl p-2.5 bg-raised">
-              <Sparkles size={13} className="text-muted/50 flex-shrink-0 mt-0.5" />
+              <Sparkles size={13} className="text-violet-400/60 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-primary leading-snug">{obs.text}</p>
                 <p className="text-[10px] text-muted/60 mt-0.5">
