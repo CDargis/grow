@@ -595,31 +595,47 @@ function TimelineView({ plant, logs, envMap, milestones, onDelete, onEdit, onCon
     }))
     .filter(s => s.milestones.length > 0)
 
+  // periods is newest-first (reversed). Interleave: live phase → upcoming → past phases.
+  type Section =
+    | { kind: 'period'; period: PhasePeriod }
+    | { kind: 'upcoming'; phase: PlantPhase; milestones: Milestone[] }
+
+  const sections: Section[] = [
+    ...periods.slice(0, 1).map(p => ({ kind: 'period' as const, period: p })),
+    ...upcomingSections.map(s => ({ kind: 'upcoming' as const, phase: s.phase, milestones: s.milestones })),
+    ...periods.slice(1).map(p => ({ kind: 'period' as const, period: p })),
+  ]
+
   return (
     <div className="pt-2">
-      {periods.map((period, idx) => (
-        <PhasePeriodSection
-          key={period.phase + period.startDate}
-          period={period}
-          isLast={idx === periods.length - 1 && upcomingSections.length === 0}
-          envMap={envMap}
-          milestones={milestones}
-          onDelete={onDelete}
-          onEdit={onEdit}
-          onConfirmMilestone={onConfirmMilestone}
-          onSkipMilestone={onSkipMilestone}
-        />
-      ))}
-      {upcomingSections.map((s, idx) => (
-        <UpcomingPhaseSection
-          key={s.phase}
-          phase={s.phase}
-          milestones={s.milestones}
-          isLast={idx === upcomingSections.length - 1}
-          onConfirmMilestone={onConfirmMilestone}
-          onSkipMilestone={onSkipMilestone}
-        />
-      ))}
+      {sections.map((section, idx) => {
+        const isLast = idx === sections.length - 1
+        if (section.kind === 'period') {
+          return (
+            <PhasePeriodSection
+              key={section.period.phase + section.period.startDate}
+              period={section.period}
+              isLast={isLast}
+              envMap={envMap}
+              milestones={milestones}
+              onDelete={onDelete}
+              onEdit={onEdit}
+              onConfirmMilestone={onConfirmMilestone}
+              onSkipMilestone={onSkipMilestone}
+            />
+          )
+        }
+        return (
+          <UpcomingPhaseSection
+            key={section.phase}
+            phase={section.phase}
+            milestones={section.milestones}
+            isLast={isLast}
+            onConfirmMilestone={onConfirmMilestone}
+            onSkipMilestone={onSkipMilestone}
+          />
+        )
+      })}
     </div>
   )
 }
