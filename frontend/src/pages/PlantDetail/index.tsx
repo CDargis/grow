@@ -207,7 +207,7 @@ function buildPhasePeriods(plant: Plant, logs: Log[]): PhasePeriod[] {
   }
 
   for (const p of periods) {
-    p.logs.sort((a, b) => b.date.localeCompare(a.date) || b.loggedAt.localeCompare(a.loggedAt))
+    p.logs.sort((a, b) => a.date.localeCompare(b.date) || a.loggedAt.localeCompare(b.loggedAt))
   }
 
   return periods
@@ -599,9 +599,10 @@ function TimelineView({ plant, logs, envMap, milestones, onDelete, onEdit, onCon
     | { kind: 'period'; period: PhasePeriod }
     | { kind: 'upcoming'; phase: PlantPhase; milestones: Milestone[] }
 
+  // Reverse-chronological: furthest future at top, active below upcoming, oldest past at bottom
   const sections: Section[] = [
-    ...periods.map(p => ({ kind: 'period' as const, period: p })),
-    ...upcomingSections.map(s => ({ kind: 'upcoming' as const, phase: s.phase, milestones: s.milestones })),
+    ...[...upcomingSections].reverse().map(s => ({ kind: 'upcoming' as const, phase: s.phase, milestones: s.milestones })),
+    ...[...periods].reverse().map(p => ({ kind: 'period' as const, period: p })),
   ]
 
   return (
