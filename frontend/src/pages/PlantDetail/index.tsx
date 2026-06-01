@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, CheckCircle2, Bot, RefreshCw } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
@@ -264,7 +264,7 @@ function PhaseLogEntry({ log, color, envMap, onDelete, onEdit }: {
               </button>
             </div>
           </div>
-          {summary && <p className="text-[11px] text-dim mt-0.5 truncate">{summary}</p>}
+          {summary && <p className="text-[11px] text-dim mt-0.5 break-words">{summary}</p>}
           {photoKey && (
             <button onClick={() => setLightbox(true)} className="mt-1.5 w-16 h-16 rounded-lg overflow-hidden block active:opacity-80">
               <MediaImage photoKey={photoKey} alt="photo" className="w-full h-full object-cover" />
@@ -318,7 +318,7 @@ function MilestoneEntry({ milestone, onConfirm, onSkip }: {
         <div className="flex-shrink-0 mt-0.5">
           {isConfirmed
             ? <CheckCircle2 size={14} className="text-fern" />
-            : <Sparkles size={14} className={isPastDue ? 'text-amber-400' : 'text-violet-400/70'} />
+            : <Bot size={14} className={isPastDue ? 'text-amber-400' : 'text-violet-400/70'} />
           }
         </div>
         <div className="flex-1 min-w-0">
@@ -470,7 +470,7 @@ function PhasePeriodSection({ period, isLast, envMap, milestones, onDelete, onEd
             {phaseMilestones.length > 0 && (
               <>
                 <div className="flex items-center gap-1.5 pt-2 pb-0.5">
-                  <Sparkles size={11} className="text-violet-400" />
+                  <Bot size={11} className="text-violet-400" />
                   <span className="text-[10px] font-medium text-violet-400 uppercase tracking-wide">AI Predictions</span>
                 </div>
                 {phaseMilestones.map(m => (
@@ -542,7 +542,7 @@ function UpcomingPhaseSection({ phase, milestones, isLast, onConfirmMilestone, o
         {expanded && (
           <div className="mt-2 border-t border-border/30">
             <div className="flex items-center gap-1.5 pt-2 pb-0.5">
-              <Sparkles size={11} className="text-violet-400" />
+              <Bot size={11} className="text-violet-400" />
               <span className="text-[10px] font-medium text-violet-400 uppercase tracking-wide">AI Predictions</span>
             </div>
             {milestones.map(m => (
@@ -668,7 +668,7 @@ function LogEntry({ log, envMap, onDelete, onEdit }: { log: Log; envMap: Map<str
               </button>
             </div>
           </div>
-          {summary && <p className="text-xs text-dim mt-0.5 truncate">{summary}</p>}
+          {summary && <p className="text-xs text-dim mt-0.5 break-words">{summary}</p>}
           {photoKey && (
             <button onClick={() => setLightbox(true)} className="mt-2 w-28 h-28 rounded-lg overflow-hidden block active:opacity-80">
               <MediaImage photoKey={photoKey} alt="photo log" className="w-full h-full object-cover" />
@@ -726,7 +726,7 @@ function ObservationsSection({ observations, plantId, lastCalibratedAt }: {
           onClick={() => setExpanded(e => !e)}
           className="flex items-center gap-2 flex-1 text-left min-w-0"
         >
-          <Sparkles size={13} className="text-violet-400 flex-shrink-0" />
+          <Bot size={13} className="text-violet-400 flex-shrink-0" />
           <span className="text-xs font-medium text-primary">AI Notes</span>
           {lastCalibratedAt && (
             <span className="text-[10px] text-muted/50 truncate">
@@ -752,7 +752,7 @@ function ObservationsSection({ observations, plantId, lastCalibratedAt }: {
         <div className="px-4 pb-3 space-y-2">
           {observations.map(obs => (
             <div key={obs.observationId} className="flex items-start gap-2.5 rounded-xl p-2.5 bg-raised">
-              <Sparkles size={13} className="text-violet-400/60 flex-shrink-0 mt-0.5" />
+              <Bot size={13} className="text-violet-400/60 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-primary leading-snug">{obs.text}</p>
                 <p className="text-[10px] text-muted/60 mt-0.5">
