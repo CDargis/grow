@@ -16,7 +16,7 @@ const LOG_ICONS: Record<LogType, React.ReactNode> = {
   watering:           <Droplets size={16} />,
   feeding:            <Zap size={16} />,
   training:           <Scissors size={16} />,
-  trimming:           <Scissors size={16} />,
+  sprout:             <span className="text-xs">🌱</span>,
   transplant:         <span className="text-xs">🪴</span>,
   height:             <Ruler size={16} />,
   note:               <MessageSquare size={16} />,
@@ -50,6 +50,7 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
       if (d.toSchedule) return `Set to ${d.toSchedule}`
       return null
     }
+    case 'sprout':   return 'Sprouted'
     case 'note':     return (log.data as any).text
     case 'height':   { const d = log.data as any; return `${d.height} ${d.unit}` }
     case 'watering': {
@@ -932,12 +933,7 @@ export function PlantDetailPage() {
     return [...dates, base].reduce((min, d) => d < min ? d : min)
   })()
 
-  const sproutDate = (() => {
-    if (!logs) return undefined
-    const matches = logs.filter(l => l.logType === 'note' && /sprout/i.test((l.data as any).text ?? ''))
-    if (matches.length === 0) return undefined
-    return matches.reduce((min, l) => l.date < min ? l.date : min, matches[0].date)
-  })()
+  const sproutDate = logs?.find(l => l.logType === 'sprout')?.date
   const journalLogs = logs?.filter((l: Log) => l.date === journalDate) ?? []
 
   function toggleView() {

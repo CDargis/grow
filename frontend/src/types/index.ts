@@ -43,7 +43,7 @@ export type EnvironmentType =
   | 'room' | 'greenhouse' | 'other'
 
 export type LogType =
-  | 'watering' | 'feeding' | 'training' | 'trimming'
+  | 'watering' | 'feeding' | 'training' | 'sprout'
   | 'transplant' | 'height' | 'note' | 'photo' | 'phase_change'
   | 'environment_change' | 'lighting_change'
 
@@ -89,7 +89,7 @@ export interface Log {
 export interface WateringData  { amount?: number; unit: 'ml' | 'l' | 'oz' | 'gal'; ph?: number; runoff?: number; note?: string }
 export interface FeedingData   { nutrients: Array<{ name: string; amount: number; unit: string }>; ph?: number; totalVol?: number }
 export interface TrainingData  { method: string; notes?: string }
-export interface TrimmingData  { notes?: string }
+export interface SproutData    { }
 export interface TransplantData { potSize: string; medium?: string }
 export interface HeightData    { height: number; unit: 'cm' | 'in' }
 export interface NoteData      { text: string }
@@ -99,7 +99,7 @@ export interface EnvironmentChangeData { fromEnvironmentId?: string; toEnvironme
 export interface LightingChangeData    { fromSchedule?: string; toSchedule?: string }
 
 export type LogData =
-  | WateringData | FeedingData | TrainingData | TrimmingData
+  | WateringData | FeedingData | TrainingData | SproutData
   | TransplantData | HeightData | NoteData | PhotoData | PhaseChangeData
   | EnvironmentChangeData | LightingChangeData
 
