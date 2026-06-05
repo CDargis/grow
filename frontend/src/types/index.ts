@@ -86,7 +86,7 @@ export interface Log {
   data: LogData
 }
 
-export interface WateringData  { amount?: number; unit: 'ml' | 'l' | 'oz' | 'gal'; ph?: number; runoff?: number }
+export interface WateringData  { amount?: number; unit: 'ml' | 'l' | 'oz' | 'gal'; ph?: number; runoff?: number; note?: string }
 export interface FeedingData   { nutrients: Array<{ name: string; amount: number; unit: string }>; ph?: number; totalVol?: number }
 export interface TrainingData  { method: string; notes?: string }
 export interface TrimmingData  { notes?: string }

@@ -78,6 +78,7 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
   const [unit, setUnit]      = useState<WateringData['unit']>(init?.unit ?? 'ml')
   const [ph, setPh]          = useState(init?.ph?.toString() ?? '')
   const [runoff, setRunoff]  = useState(init?.runoff?.toString() ?? '')
+  const [note, setNote]      = useState(init?.note ?? '')
 
   const body = {
     logType: 'watering' as const,
@@ -88,6 +89,7 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
       unit,
       ...(ph     ? { ph: Number(ph) }         : {}),
       ...(runoff ? { runoff: Number(runoff) }  : {}),
+      ...(note   ? { note }                   : {}),
     } as WateringData,
   }
 
@@ -132,6 +134,17 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
           <label className={labelCls}>Runoff pH</label>
           <input type="number" step="0.1" className={inputCls} placeholder="6.5" value={runoff} onChange={e => setRunoff(e.target.value)} />
         </div>
+      </div>
+
+      <div>
+        <label className={labelCls}>Note</label>
+        <textarea
+          className={`${inputCls} resize-none`}
+          rows={2}
+          placeholder="Any observations…"
+          value={note}
+          onChange={e => setNote(e.target.value)}
+        />
       </div>
 
       {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}

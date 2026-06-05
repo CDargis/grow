@@ -54,10 +54,11 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
     case 'height':   { const d = log.data as any; return `${d.height} ${d.unit}` }
     case 'watering': {
       const d = log.data as any
-      const vol = d.amount != null ? `${d.amount} ${d.unit}` : d.unit
-      const ph  = d.ph != null ? ` · pH ${d.ph}` : ''
+      const vol    = d.amount != null ? `${d.amount} ${d.unit}` : d.unit
+      const ph     = d.ph     != null ? ` · pH ${d.ph}`         : ''
       const runoff = d.runoff != null ? ` · runoff ${d.runoff}` : ''
-      return `${vol}${ph}${runoff}`
+      const note   = d.note   ? ` · ${d.note}`                  : ''
+      return `${vol}${ph}${runoff}${note}`
     }
     case 'height':     { const d = log.data as any; return `${d.height} ${d.unit}` }
     case 'transplant': { const d = log.data as any; return d.medium ? `${d.potSize} · ${d.medium}` : d.potSize }
@@ -930,6 +931,13 @@ export function PlantDetailPage() {
     const dates = logs.filter(l => l.logType === 'phase_change').map(l => l.date)
     return [...dates, base].reduce((min, d) => d < min ? d : min)
   })()
+
+  const sproutDate = (() => {
+    if (!logs) return undefined
+    const matches = logs.filter(l => l.logType === 'note' && /sprout/i.test((l.data as any).text ?? ''))
+    if (matches.length === 0) return undefined
+    return matches.reduce((min, l) => l.date < min ? l.date : min, matches[0].date)
+  })()
   const journalLogs = logs?.filter((l: Log) => l.date === journalDate) ?? []
 
   function toggleView() {
@@ -1001,8 +1009,11 @@ export function PlantDetailPage() {
               <div className="min-w-0">
                 <h1 className="font-bold text-xl text-white leading-tight truncate">{plant.name}</h1>
                 <p className="text-sm text-white/70 truncate">{plant.strain}</p>
-                <p className="text-xs text-white/50 mt-0.5 truncate">
-                  {elapsed(plant.phaseStartDate)} in {plant.phase} · {elapsed(plantStartDate)} old
+                <p className="text-xs mt-0.5">
+                  <span style={{ color: PHASE_HEX[plant.phase] }}>{elapsed(plant.phaseStartDate)} in {plant.phase}</span>
+                  {sproutDate && <><span className="text-white/30"> · </span><span className="text-amber-300">{elapsed(sproutDate)} from sprout</span></>}
+                  <span className="text-white/30"> · </span>
+                  <span className="text-white/40">{elapsed(plantStartDate)} old</span>
                 </p>
               </div>
               <span className="text-xs text-fern capitalize font-semibold flex-shrink-0 mb-0.5">{plant.phase}</span>
@@ -1035,8 +1046,11 @@ export function PlantDetailPage() {
           <div className="flex-1 min-w-0">
             <h1 className="font-semibold text-primary">{plant.name}</h1>
             <p className="text-xs text-dim truncate">{plant.strain}</p>
-            <p className="text-xs text-muted truncate">
-              {elapsed(plant.phaseStartDate)} in {plant.phase} · {elapsed(plantStartDate)} old
+            <p className="text-xs">
+              <span style={{ color: PHASE_HEX[plant.phase] }}>{elapsed(plant.phaseStartDate)} in {plant.phase}</span>
+              {sproutDate && <><span className="text-muted"> · </span><span className="text-amber-400">{elapsed(sproutDate)} from sprout</span></>}
+              <span className="text-muted"> · </span>
+              <span className="text-muted">{elapsed(plantStartDate)} old</span>
             </p>
           </div>
           <span className="text-xs text-fern capitalize font-medium flex-shrink-0">{plant.phase}</span>
