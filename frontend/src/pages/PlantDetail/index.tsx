@@ -1005,12 +1005,11 @@ export function PlantDetailPage() {
               <div className="min-w-0">
                 <h1 className="font-bold text-xl text-white leading-tight truncate">{plant.name}</h1>
                 <p className="text-sm text-white/70 truncate">{plant.strain}</p>
-                <p className="text-xs mt-0.5">
-                  <span style={{ color: PHASE_HEX[plant.phase] }}>{elapsed(plant.phaseStartDate)} in {plant.phase}</span>
-                  {sproutDate && <><span className="text-white/30"> · </span><span className="text-amber-300">{elapsed(sproutDate)} from sprout</span></>}
-                  <span className="text-white/30"> · </span>
-                  <span className="text-white/40">{elapsed(plantStartDate)} old</span>
-                </p>
+                <div className="flex flex-col gap-px mt-0.5">
+                  <span className="text-xs" style={{ color: PHASE_HEX[plant.phase] }}>{elapsed(plant.phaseStartDate)} in {plant.phase}</span>
+                  {sproutDate && <span className="text-xs text-amber-300">{elapsed(sproutDate)} from sprout</span>}
+                  <span className="text-xs text-white/40">{elapsed(plantStartDate)} old</span>
+                </div>
               </div>
               <span className="text-xs text-fern capitalize font-semibold flex-shrink-0 mb-0.5">{plant.phase}</span>
             </div>
@@ -1042,12 +1041,11 @@ export function PlantDetailPage() {
           <div className="flex-1 min-w-0">
             <h1 className="font-semibold text-primary">{plant.name}</h1>
             <p className="text-xs text-dim truncate">{plant.strain}</p>
-            <p className="text-xs">
-              <span style={{ color: PHASE_HEX[plant.phase] }}>{elapsed(plant.phaseStartDate)} in {plant.phase}</span>
-              {sproutDate && <><span className="text-muted"> · </span><span className="text-amber-400">{elapsed(sproutDate)} from sprout</span></>}
-              <span className="text-muted"> · </span>
-              <span className="text-muted">{elapsed(plantStartDate)} old</span>
-            </p>
+            <div className="flex flex-col gap-px">
+              <span className="text-xs" style={{ color: PHASE_HEX[plant.phase] }}>{elapsed(plant.phaseStartDate)} in {plant.phase}</span>
+              {sproutDate && <span className="text-xs text-amber-400">{elapsed(sproutDate)} from sprout</span>}
+              <span className="text-xs text-muted">{elapsed(plantStartDate)} old</span>
+            </div>
           </div>
           <span className="text-xs text-fern capitalize font-medium flex-shrink-0">{plant.phase}</span>
           <ViewToggle />
