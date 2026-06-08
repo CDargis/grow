@@ -45,7 +45,7 @@ export type EnvironmentType =
 export type LogType =
   | 'watering' | 'feeding' | 'training' | 'sprout'
   | 'transplant' | 'height' | 'note' | 'photo' | 'phase_change'
-  | 'environment_change' | 'lighting_change'
+  | 'environment_change' | 'lighting_change' | 'vpd_change'
 
 export interface Plant {
   plantId: string
@@ -72,6 +72,7 @@ export interface Environment {
   lightSchedule?: string
   targetTempF?: number
   targetHumidity?: number
+  targetVpd?: number
   photoKey?: string
   createdAt: string
 }
@@ -97,6 +98,7 @@ export interface PhotoData     { photoKey: string; caption?: string }
 export interface PhaseChangeData       { fromPhase: PlantPhase; toPhase: PlantPhase }
 export interface EnvironmentChangeData { fromEnvironmentId?: string; toEnvironmentId?: string }
 export interface LightingChangeData    { fromSchedule?: string; toSchedule?: string }
+export interface VpdChangeData         { fromVpd?: number; toVpd?: number }
 
 export type LogData =
   | WateringData | FeedingData | TrainingData | SproutData
@@ -144,5 +146,6 @@ export interface CreateEnvironmentRequest {
   lightSchedule?: string
   targetTempF?: number
   targetHumidity?: number
+  targetVpd?: number
   photoKey?: string
 }

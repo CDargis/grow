@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, CheckCircle2, Bot, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, CheckCircle2, Bot, RefreshCw, Gauge } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
@@ -24,6 +24,7 @@ const LOG_ICONS: Record<LogType, React.ReactNode> = {
   phase_change:       <span className="text-xs">🔄</span>,
   environment_change: <Wind size={16} />,
   lighting_change:    <Sun size={16} />,
+  vpd_change:         <Gauge size={16} />,
 }
 
 function envName(id: string | undefined, envMap: Map<string, string>): string {
@@ -48,6 +49,13 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
       const d = log.data as unknown as LightingChangeData
       if (d.fromSchedule && d.toSchedule) return `${d.fromSchedule} → ${d.toSchedule}`
       if (d.toSchedule) return `Set to ${d.toSchedule}`
+      return null
+    }
+    case 'vpd_change': {
+      const d = log.data as any
+      if (d.fromVpd != null && d.toVpd != null) return `${d.fromVpd} → ${d.toVpd} kPa`
+      if (d.toVpd   != null) return `Set to ${d.toVpd} kPa`
+      if (d.fromVpd != null) return `Target cleared (was ${d.fromVpd} kPa)`
       return null
     }
     case 'sprout':   return 'Sprouted'

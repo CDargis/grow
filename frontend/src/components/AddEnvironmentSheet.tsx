@@ -46,6 +46,7 @@ export function AddEnvironmentSheet({ open, onClose, environment }: Props) {
             lightSchedule:  environment.lightSchedule,
             targetTempF:    environment.targetTempF || undefined,
             targetHumidity: environment.targetHumidity || undefined,
+            targetVpd:      environment.targetVpd ?? undefined,
             photoKey:       environment.photoKey,
           }
         : emptyForm)
@@ -199,6 +200,18 @@ export function AddEnvironmentSheet({ open, onClose, environment }: Props) {
               onChange={e => setForm(f => ({ ...f, targetHumidity: e.target.value ? Number(e.target.value) : undefined }))}
             />
           </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>Target VPD (kPa)</label>
+          <input
+            type="number"
+            step="0.1"
+            className={inputCls}
+            placeholder="1.0"
+            value={form.targetVpd ?? ''}
+            onChange={e => setForm(f => ({ ...f, targetVpd: e.target.value ? Number(e.target.value) : undefined }))}
+          />
         </div>
 
         {mutation.isError && (

@@ -8,7 +8,7 @@ const (
 	LogWatering           LogType = "watering"
 	LogFeeding            LogType = "feeding"
 	LogTraining           LogType = "training"
-	LogTrimming           LogType = "trimming"
+	LogSprout             LogType = "sprout"
 	LogTransplant         LogType = "transplant"
 	LogHeight             LogType = "height"
 	LogNote               LogType = "note"
@@ -16,6 +16,7 @@ const (
 	LogPhaseChange        LogType = "phase_change"
 	LogEnvironmentChange  LogType = "environment_change"
 	LogLightingChange     LogType = "lighting_change"
+	LogVPDChange          LogType = "vpd_change"
 )
 
 type Log struct {
@@ -97,4 +98,9 @@ type EnvironmentChangeData struct {
 type LightingChangeData struct {
 	FromSchedule string `json:"fromSchedule,omitempty"`
 	ToSchedule   string `json:"toSchedule,omitempty"`
+}
+
+type VPDChangeData struct {
+	FromVPD *float64 `json:"fromVpd,omitempty"`
+	ToVPD   *float64 `json:"toVpd,omitempty"`
 }

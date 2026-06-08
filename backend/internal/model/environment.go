@@ -20,6 +20,7 @@ type Environment struct {
 	LightSchedule   string          `dynamodbav:"lightSchedule"   json:"lightSchedule,omitempty"`
 	TargetTempF     float64         `dynamodbav:"targetTempF"     json:"targetTempF,omitempty"`
 	TargetHumidity  float64         `dynamodbav:"targetHumidity"  json:"targetHumidity,omitempty"`
+	TargetVPD       *float64        `dynamodbav:"targetVpd"       json:"targetVpd,omitempty"`
 	PhotoKey        string          `dynamodbav:"photoKey"        json:"photoKey,omitempty"`
 	CreatedAt       string          `dynamodbav:"createdAt"       json:"createdAt"`
 }
@@ -30,6 +31,7 @@ type CreateEnvironmentRequest struct {
 	LightSchedule  string          `json:"lightSchedule,omitempty"`
 	TargetTempF    float64         `json:"targetTempF,omitempty"`
 	TargetHumidity float64         `json:"targetHumidity,omitempty"`
+	TargetVPD      *float64        `json:"targetVpd,omitempty"`
 	PhotoKey       string          `json:"photoKey,omitempty"`
 }
 

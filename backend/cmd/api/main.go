@@ -340,32 +340,52 @@ func (a *app) updateEnvironment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	envID := r.PathValue("envId")
-	oldSchedule, env, err := a.envs.Update(r.Context(), envID, req)
+	old, env, err := a.envs.Update(r.Context(), envID, req)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
 	}
-	if oldSchedule != env.LightSchedule {
+
+	lightChanged := old.LightSchedule != env.LightSchedule
+	vpdChanged   := (old.TargetVPD == nil) != (env.TargetVPD == nil) ||
+		(old.TargetVPD != nil && env.TargetVPD != nil && *old.TargetVPD != *env.TargetVPD)
+
+	if lightChanged || vpdChanged {
 		plants, err := a.plants.List(r.Context(), a.userID)
 		if err != nil {
-			log.Printf("warn: list plants for lighting change: %v", err)
+			log.Printf("warn: list plants for env change: %v", err)
 		} else {
-			now := time.Now().UTC()
-			date := now.Format("2006-01-02")
+			now     := time.Now().UTC()
+			date    := now.Format("2006-01-02")
 			loggedAt := now.Format(time.RFC3339)
-			data := model.LightingChangeData{FromSchedule: oldSchedule, ToSchedule: env.LightSchedule}
-			dataBytes, _ := json.Marshal(data)
+
+			var lightBytes, vpdBytes []byte
+			if lightChanged {
+				lightBytes, _ = json.Marshal(model.LightingChangeData{FromSchedule: old.LightSchedule, ToSchedule: env.LightSchedule})
+			}
+			if vpdChanged {
+				vpdBytes, _ = json.Marshal(model.VPDChangeData{FromVPD: old.TargetVPD, ToVPD: env.TargetVPD})
+			}
+
 			for _, p := range plants {
 				if p.EnvironmentID != envID {
 					continue
 				}
-				if _, err := a.logs.Create(r.Context(), p.PlantID, a.userID, model.CreateLogRequest{
-					LogType:  model.LogLightingChange,
-					Date:     date,
-					LoggedAt: loggedAt,
-					Data:     json.RawMessage(dataBytes),
-				}); err != nil {
-					log.Printf("warn: lighting_change log for plant %s: %v", p.PlantID, err)
+				if lightChanged {
+					if _, err := a.logs.Create(r.Context(), p.PlantID, a.userID, model.CreateLogRequest{
+						LogType: model.LogLightingChange, Date: date, LoggedAt: loggedAt,
+						Data: json.RawMessage(lightBytes),
+					}); err != nil {
+						log.Printf("warn: lighting_change log for plant %s: %v", p.PlantID, err)
+					}
+				}
+				if vpdChanged {
+					if _, err := a.logs.Create(r.Context(), p.PlantID, a.userID, model.CreateLogRequest{
+						LogType: model.LogVPDChange, Date: date, LoggedAt: loggedAt,
+						Data: json.RawMessage(vpdBytes),
+					}); err != nil {
+						log.Printf("warn: vpd_change log for plant %s: %v", p.PlantID, err)
+					}
 				}
 			}
 		}

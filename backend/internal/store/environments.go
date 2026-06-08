@@ -88,33 +88,39 @@ func (s *EnvironmentStore) Create(ctx context.Context, userID string, req model.
 	return &env, nil
 }
 
-// Update replaces an environment's fields and returns (oldLightSchedule, updated, error).
-func (s *EnvironmentStore) Update(ctx context.Context, environmentID string, req model.CreateEnvironmentRequest) (string, *model.Environment, error) {
+type OldEnvValues struct {
+	LightSchedule string
+	TargetVPD     *float64
+}
+
+// Update replaces an environment's fields and returns (old values, updated, error).
+func (s *EnvironmentStore) Update(ctx context.Context, environmentID string, req model.CreateEnvironmentRequest) (OldEnvValues, *model.Environment, error) {
 	existing, err := s.Get(ctx, environmentID)
 	if err != nil {
-		return "", nil, err
+		return OldEnvValues{}, nil, err
 	}
 	if existing == nil {
-		return "", nil, fmt.Errorf("environment not found: %s", environmentID)
+		return OldEnvValues{}, nil, fmt.Errorf("environment not found: %s", environmentID)
 	}
-	oldSchedule            := existing.LightSchedule
+	old := OldEnvValues{LightSchedule: existing.LightSchedule, TargetVPD: existing.TargetVPD}
 	existing.Name           = req.Name
 	existing.Type           = req.Type
 	existing.LightSchedule  = req.LightSchedule
 	existing.TargetTempF    = req.TargetTempF
 	existing.TargetHumidity = req.TargetHumidity
+	existing.TargetVPD      = req.TargetVPD
 	existing.PhotoKey       = req.PhotoKey
 	item, err := attributevalue.MarshalMap(existing)
 	if err != nil {
-		return "", nil, fmt.Errorf("marshal environment: %w", err)
+		return OldEnvValues{}, nil, fmt.Errorf("marshal environment: %w", err)
 	}
 	if _, err := s.ddb.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
 		Item:      item,
 	}); err != nil {
-		return "", nil, fmt.Errorf("update environment: %w", err)
+		return OldEnvValues{}, nil, fmt.Errorf("update environment: %w", err)
 	}
-	return oldSchedule, existing, nil
+	return old, existing, nil
 }
 
 func (s *EnvironmentStore) Delete(ctx context.Context, environmentID string) error {
