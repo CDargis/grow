@@ -83,8 +83,8 @@ function elapsed(dateStr: string): string {
   const weeks = Math.floor(days / 7)
   const rem   = days % 7
   const wLabel = `${weeks} ${weeks === 1 ? 'week' : 'weeks'}`
-  if (rem === 0) return wLabel
-  return `${wLabel} and ${rem} ${rem === 1 ? 'day' : 'days'}`
+  const base   = rem === 0 ? wLabel : `${wLabel} and ${rem} ${rem === 1 ? 'day' : 'days'}`
+  return `${base} (${days} days)`
 }
 
 function todayDate() {
