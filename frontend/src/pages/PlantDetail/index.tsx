@@ -217,7 +217,7 @@ function buildPhasePeriods(plant: Plant, logs: Log[]): PhasePeriod[] {
   }
 
   for (const p of periods) {
-    p.logs.sort((a, b) => a.date.localeCompare(b.date) || a.loggedAt.localeCompare(b.loggedAt))
+    p.logs.sort((a, b) => b.date.localeCompare(a.date) || b.loggedAt.localeCompare(a.loggedAt))
   }
 
   return periods
