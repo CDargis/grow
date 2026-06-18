@@ -403,39 +403,29 @@ function LogEntry({ log, envMap, onDelete, onEdit }: { log: Log; envMap: Map<str
 
 // ── Observation components ────────────────────────────────────────────────────
 
-function ObservationsSection({ observations, plantId, lastCalibratedAt }: {
+function ObservationsSection({ observations, plantId, lastCalibratedAt, dismissed }: {
   observations: PlantObservation[]
   plantId: string
   lastCalibratedAt?: string
+  dismissed: boolean
 }) {
   const qc = useQueryClient()
-  const storageKey = `obs-dismissed-${plantId}`
-  const seenCalibrationRef = useRef<string | undefined>(undefined)
+  const prevDismissedRef = useRef(dismissed)
+  const [expanded, setExpanded] = useState(!dismissed)
 
-  // Auto-expand if observations are from today and user hasn't collapsed them today.
-  // Stored value is the date the user collapsed; a new day or new calibration clears it.
-  function shouldExpand(calibratedAt: string | undefined): boolean {
-    if (!calibratedAt) return false
-    const calibratedDate = new Date(calibratedAt).toLocaleDateString('en-CA')
-    if (calibratedDate !== todayDate()) return false
-    const stored = localStorage.getItem(storageKey)
-    if (!stored) return true
-    const { date, calibratedAt: storedCalibratedAt } = JSON.parse(stored)
-    return date !== todayDate() || storedCalibratedAt !== calibratedAt
+  // If the AI sync job clears the dismissed bit, auto-expand
+  if (dismissed !== prevDismissedRef.current) {
+    prevDismissedRef.current = dismissed
+    if (!dismissed && !expanded) setExpanded(true)
   }
 
-  const [expanded, setExpanded] = useState(() => shouldExpand(lastCalibratedAt))
-
-  // Handle lastCalibratedAt updating while mounted (e.g. after refresh button)
-  if (lastCalibratedAt && lastCalibratedAt !== seenCalibrationRef.current) {
-    seenCalibrationRef.current = lastCalibratedAt
-    if (shouldExpand(lastCalibratedAt) && !expanded) setExpanded(true)
-  }
+  const dismiss = useMutation({
+    mutationFn: () => api.plants.dismissObservations(plantId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['plant', plantId] }),
+  })
 
   function handleToggle() {
-    if (expanded && lastCalibratedAt) {
-      localStorage.setItem(storageKey, JSON.stringify({ date: todayDate(), calibratedAt: lastCalibratedAt }))
-    }
+    if (expanded) dismiss.mutate()
     setExpanded(e => !e)
   }
 
@@ -778,7 +768,7 @@ export function PlantDetailPage() {
         <ChevronRight size={16} className="text-muted" />
       </button>
 
-      <ObservationsSection observations={observations} plantId={plant.plantId} lastCalibratedAt={plant.lastCalibratedAt} />
+      <ObservationsSection observations={observations} plantId={plant.plantId} lastCalibratedAt={plant.lastCalibratedAt} dismissed={plant.observationsDismissed ?? false} />
 
       {/* Journal view: date strip + single-day logs */}
       {view === 'journal' && (

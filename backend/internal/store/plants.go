@@ -198,6 +198,34 @@ func (s *PlantStore) UpdateDetails(ctx context.Context, plantID string, req mode
 	return plant, nil
 }
 
+func (s *PlantStore) SetObservationsDismissed(ctx context.Context, plantID string, dismissed bool) error {
+	var input *dynamodb.UpdateItemInput
+	if dismissed {
+		input = &dynamodb.UpdateItemInput{
+			TableName: aws.String(s.tableName),
+			Key: map[string]types.AttributeValue{
+				"plantId": &types.AttributeValueMemberS{Value: plantID},
+			},
+			UpdateExpression: aws.String("SET observationsDismissed = :v"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":v": &types.AttributeValueMemberBOOL{Value: true},
+			},
+		}
+	} else {
+		input = &dynamodb.UpdateItemInput{
+			TableName: aws.String(s.tableName),
+			Key: map[string]types.AttributeValue{
+				"plantId": &types.AttributeValueMemberS{Value: plantID},
+			},
+			UpdateExpression: aws.String("REMOVE observationsDismissed"),
+		}
+	}
+	if _, err := s.ddb.UpdateItem(ctx, input); err != nil {
+		return fmt.Errorf("set observationsDismissed: %w", err)
+	}
+	return nil
+}
+
 func (s *PlantStore) UpdateLastCalibratedAt(ctx context.Context, plantID, ts string) error {
 	_, err := s.ddb.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(s.tableName),

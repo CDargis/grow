@@ -37,6 +37,8 @@ export const api = {
       request<void>(`/plants/${id}/avatar`, { method: 'PUT', body: JSON.stringify({ avatarKey }) }),
     calibrate: (id: string) =>
       request<void>(`/plants/${id}/calibrate`, { method: 'POST', body: '{}' }),
+    dismissObservations: (id: string) =>
+      request<void>(`/plants/${id}/observations/dismiss`, { method: 'POST', body: '{}' }),
   },
 
   environments: {

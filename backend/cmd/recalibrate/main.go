@@ -454,6 +454,9 @@ func (a *app) processPlant(ctx context.Context, plant model.Plant, now time.Time
 	if err := a.plants.UpdateLastCalibratedAt(ctx, plant.PlantID, nowStr); err != nil {
 		log.Printf("warn: update lastCalibratedAt for %s: %v", plant.PlantID, err)
 	}
+	if err := a.plants.SetObservationsDismissed(ctx, plant.PlantID, false); err != nil {
+		log.Printf("warn: clear observationsDismissed for %s: %v", plant.PlantID, err)
+	}
 
 	log.Printf("recalibrated %s (%s): %d milestones, %d observations",
 		plant.Name, plant.PlantID, len(result.Milestones), len(result.Observations))

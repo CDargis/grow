@@ -89,6 +89,7 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/plants/{plantId}/milestones",                     a.listMilestones)
 	mux.HandleFunc("PATCH /api/plants/{plantId}/milestones/{milestoneType}",   a.updateMilestone)
 	mux.HandleFunc("GET /api/plants/{plantId}/observations",                   a.listObservations)
+	mux.HandleFunc("POST /api/plants/{plantId}/observations/dismiss",          a.dismissObservations)
 	mux.HandleFunc("POST /api/plants/{plantId}/calibrate",                     a.calibratePlant)
 }
 
@@ -501,6 +502,14 @@ func (a *app) listObservations(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, obs)
 }
 
+
+func (a *app) dismissObservations(w http.ResponseWriter, r *http.Request) {
+	if err := a.plants.SetObservationsDismissed(r.Context(), r.PathValue("plantId"), true); err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
 
 // ── Calibration ───────────────────────────────────────────────────────────────
 

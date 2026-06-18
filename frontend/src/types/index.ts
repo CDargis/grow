@@ -61,6 +61,7 @@ export interface Plant {
   environmentId?: string
   archivedAt?: string
   lastCalibratedAt?: string
+  observationsDismissed?: boolean
   createdAt: string
 }
 
