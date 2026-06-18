@@ -224,7 +224,7 @@ function FeedingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: s
                 value={n.unit}
                 onChange={e => updateNutrient(i, 'unit', e.target.value)}
               >
-                {['ml','oz','g','tsp'].map(u => <option key={u} value={u} className="bg-raised">{u}</option>)}
+                {['ml','oz','g','tsp','tbsp'].map(u => <option key={u} value={u} className="bg-raised">{u}</option>)}
               </select>
               {nutrients.length > 1 && (
                 <button onClick={() => setNutrients(rows => rows.filter((_, idx) => idx !== i))} className="text-muted active:opacity-60 flex-shrink-0">✕</button>
@@ -309,7 +309,7 @@ function NoteForm({ plantId, datetime, onSuccess, logId, init }: { plantId: stri
 function HeightForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: HeightData }) {
   const qc = useQueryClient()
   const [height, setHeight] = useState(init?.height?.toString() ?? '')
-  const [unit, setUnit]     = useState<HeightData['unit']>(init?.unit ?? 'cm')
+  const [unit, setUnit]     = useState<HeightData['unit']>(init?.unit ?? 'in')
 
   const mutation = useMutation({
     mutationFn: () => {
