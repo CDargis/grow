@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Droplets, Zap, Ruler, MessageSquare, Camera, GitBranch, ArrowRightLeft, ImagePlus, X } from 'lucide-react'
+import { Droplets, Zap, Ruler, MessageSquare, Camera, GitBranch, Scissors, ArrowRightLeft, ImagePlus, X } from 'lucide-react'
 import { BottomSheet } from './BottomSheet'
 import { MediaImage } from './MediaImage'
 import { api } from '@/api/client'
-import type { Plant, PlantPhase, Log, LogType, WateringData, FeedingData, NoteData, PhotoData, TransplantData, HeightData, SproutData } from '@/types'
+import type { Plant, PlantPhase, Log, LogType, WateringData, FeedingData, NoteData, PhotoData, TransplantData, HeightData } from '@/types'
 
 // ── Types config ─────────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ const LOG_TYPES: TypeConfig[] = [
   { type: 'note',       label: 'Note',     icon: <MessageSquare size={22} />, ready: true },
   { type: 'phase_change', label: 'Phase',  icon: <ArrowRightLeft size={22} />, ready: true },
   { type: 'training',   label: 'Training', icon: <GitBranch size={22} />, ready: false },
-  { type: 'sprout',     label: 'Sprout',   icon: <span className="text-xl">🌱</span>, ready: true  },
+  { type: 'trimming',   label: 'Trim',     icon: <Scissors  size={22} />, ready: false },
   { type: 'height',     label: 'Height',   icon: <Ruler     size={22} />, ready: true  },
   { type: 'photo',      label: 'Photo',    icon: <Camera    size={22} />, ready: true  },
   { type: 'transplant', label: 'Transplant', icon: <span className="text-xl">🪴</span>, ready: true },
@@ -411,37 +411,6 @@ function TransplantForm({ plantId, datetime, onSuccess, logId, init }: { plantId
   )
 }
 
-// ── Sprout form ───────────────────────────────────────────────────────────────
-
-function SproutForm({ plantId, datetime, onSuccess }: { plantId: string; datetime: string; onSuccess: () => void }) {
-  const qc = useQueryClient()
-  const mutation = useMutation({
-    mutationFn: () => api.logs.create(plantId, {
-      logType: 'sprout' as const,
-      date: datetimeToDate(datetime),
-      loggedAt: datetimeToISO(datetime),
-      data: {} as SproutData,
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
-      onSuccess()
-    },
-  })
-  return (
-    <div className="space-y-3 mt-2">
-      <p className="text-xs text-dim">Records the date your plant broke the surface. You can backdate this using the date/time picker above.</p>
-      {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}
-      <button
-        onClick={() => mutation.mutate()}
-        disabled={mutation.isPending}
-        className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
-      >
-        {mutation.isPending ? 'Saving…' : 'Log Sprout'}
-      </button>
-    </div>
-  )
-}
-
 // ── Phase change form ─────────────────────────────────────────────────────────
 
 function PhaseChangeForm({ plant, datetime, onSuccess }: { plant: Plant; datetime: string; onSuccess: () => void }) {
@@ -689,8 +658,6 @@ export function AddLogSheet({ open, onClose, plant, defaultDate, editLog }: Prop
         <HeightForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as HeightData | undefined} />
       ) : selected === 'transplant' ? (
         <TransplantForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as TransplantData | undefined} />
-      ) : selected === 'sprout' ? (
-        <SproutForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} />
       ) : selected === 'phase_change' ? (
         <PhaseChangeForm plant={plant} datetime={datetime} onSuccess={handleClose} />
       ) : selected === 'photo' ? (

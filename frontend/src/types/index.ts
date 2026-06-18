@@ -43,7 +43,7 @@ export type EnvironmentType =
   | 'room' | 'greenhouse' | 'other'
 
 export type LogType =
-  | 'watering' | 'feeding' | 'training' | 'sprout'
+  | 'watering' | 'feeding' | 'training' | 'trimming' | 'sprout'
   | 'transplant' | 'height' | 'note' | 'photo' | 'phase_change'
   | 'environment_change' | 'lighting_change' | 'vpd_change'
 

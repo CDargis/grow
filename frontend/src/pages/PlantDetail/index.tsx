@@ -16,6 +16,7 @@ const LOG_ICONS: Record<LogType, React.ReactNode> = {
   watering:           <Droplets size={16} />,
   feeding:            <Zap size={16} />,
   training:           <Scissors size={16} />,
+  trimming:           <Scissors size={16} />,
   sprout:             <span className="text-xs">🌱</span>,
   transplant:         <span className="text-xs">🪴</span>,
   height:             <Ruler size={16} />,
@@ -631,7 +632,15 @@ export function PlantDetailPage() {
     return [...dates, base].reduce((min, d) => d < min ? d : min)
   })()
 
-  const sproutDate = logs?.find(l => l.logType === 'sprout')?.date
+  const sproutDate = (() => {
+    if (!logs || !plant) return undefined
+    const toSeedling = logs
+      .filter(l => l.logType === 'phase_change' && (l.data as any).toPhase === 'seedling')
+      .sort((a, b) => a.date.localeCompare(b.date))[0]
+    if (toSeedling) return toSeedling.date
+    if (plant.phase === 'seedling') return plant.phaseStartDate
+    return undefined
+  })()
   const journalLogs = logs?.filter((l: Log) => l.date === journalDate) ?? []
 
   function toggleView() {
