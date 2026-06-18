@@ -24,7 +24,6 @@ import (
 type app struct {
 	plants       *store.PlantStore
 	logs         *store.LogStore
-	milestones   *store.MilestoneStore
 	observations *store.ObservationStore
 	s3           *s3.Client
 	mediaBkt     string
@@ -67,14 +66,6 @@ type claudeResponse struct {
 	Content []claudeResponseBlock `json:"content"`
 }
 
-type milestonePredict struct {
-	Type          string `json:"type"`
-	PredictedDate string `json:"predicted_date"`
-	Confidence    string `json:"confidence"`
-	Notes         string `json:"notes,omitempty"`
-	ChangeReason  string `json:"change_reason,omitempty"`
-}
-
 type observationPredict struct {
 	Category     string   `json:"category"`
 	Text         string   `json:"text"`
@@ -82,24 +73,14 @@ type observationPredict struct {
 }
 
 type recalResponse struct {
-	Milestones   []milestonePredict   `json:"milestones"`
 	Observations []observationPredict `json:"observations"`
 }
 
-const systemPrompt = `You are an AI assistant helping track cannabis plant growth milestones.
-Given information about a cannabis plant, predict upcoming milestone dates and note any observations.
+const systemPrompt = `You are an AI assistant helping track cannabis plant growth.
+Given information about a cannabis plant and its recent care logs, note any meaningful observations.
 
 Respond with ONLY valid JSON (no markdown fences) matching this exact schema:
 {
-  "milestones": [
-    {
-      "type": "<see valid types below>",
-      "predicted_date": "YYYY-MM-DD",
-      "confidence": "low|medium|high",
-      "notes": "optional brief explanation",
-      "change_reason": "required if changing an existing prediction — reference what was previously predicted and why you are updating it"
-    }
-  ],
   "observations": [
     {
       "category": "health|growth|pest|nutrient|general",
@@ -109,33 +90,11 @@ Respond with ONLY valid JSON (no markdown fences) matching this exact schema:
   ]
 }
 
-Valid milestone types and typical timing from sprout/germination:
-- cotyledons_off      — cotyledons yellowing/falling off (~10-21 days)
-- leaf_set_1          — 1st true leaf set visible (~7-12 days)
-- leaf_set_2          — 2nd true leaf set (~14-20 days)
-- leaf_set_3          — 3rd true leaf set (~20-28 days)
-- leaf_set_4          — 4th true leaf set, stop predicting leaf sets after this (~28-40 days)
-- early_veg           — 3-4 nodes, transition from seedling (~3-5 weeks from sprout)
-- full_veg            — 5+ nodes, vigorous growth established (~5-8 weeks from sprout)
-- pre_flower          — first pistils/sex signs at nodes; for autos this happens automatically (~4-7 weeks), for photos it's before the flip
-- flip_to_flower      — photoperiod only: light schedule change to 12/12 (grower decision, typically after 4-8 weeks veg)
-- peak_flower         — full canopy coverage, trichomes forming (~weeks 4-6 of flower)
-- harvest             — trichomes amber/milky, pistils receding (~weeks 8-10 photo flower, 10-14 auto from sprout)
-- dry_complete        — buds dry enough to jar (~7-14 days after harvest)
-- cure_ready          — properly cured, burping complete (~2-6 weeks after jarring)
-
 Rules:
-- Include ALL milestones relevant to the plant's current phase, whether they are upcoming OR have already passed.
-- For milestones that appear to have already occurred (based on phase timing, photo evidence, or elapsed days), include them with your best estimated past date and confidence=high.
-- Only skip milestones from phases the plant has clearly grown beyond (e.g., skip leaf sets entirely if the plant is already in veg or later).
-- For autoflowers: skip flip_to_flower entirely. Adjust harvest timing (~70-100 days from sprout).
-- For photoperiods: include flip_to_flower if still in veg or seedling.
-- Only predict leaf sets if the plant is currently in germination or seedling phase.
 - Keep observations sparse — only note something if the log data provides a meaningful signal.
 - Always include source_log_ids listing the specific log IDs your observation is based on.
-- Be conservative with confidence; prefer low/medium over false high confidence.
-- If a photo is provided, use it as the PRIMARY signal for current growth stage. Override text-based estimates if the image clearly shows a different stage. Don't predict milestones the photo shows have already passed.
-- For existing predicted milestones: omit them entirely if you agree with the current date. Only include them if you are changing the date or believe they have already occurred.`
+- If a photo is provided, use it as the primary signal for current growth stage.
+- Respond with JSON only, starting with {`
 
 func (a *app) fetchImageBase64(ctx context.Context, key string) (data, mediaType string, err error) {
 	out, err := a.s3.GetObject(ctx, &s3.GetObjectInput{
@@ -246,7 +205,7 @@ func min(a, b int) int {
 // ── Prompt builder ────────────────────────────────────────────────────────────
 
 // buildPrompt returns the text prompt and the S3 key of the most recent photo log (if any).
-func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Milestone, now time.Time) (string, string) {
+func buildPrompt(plant *model.Plant, logs []model.Log, now time.Time) (string, string) {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Plant: %s\n", plant.Name))
 	sb.WriteString(fmt.Sprintf("Strain: %s\n", plant.Strain))
@@ -349,24 +308,6 @@ func buildPrompt(plant *model.Plant, logs []model.Log, existing []model.Mileston
 		sb.WriteString("\nA recent photo is attached. Use it as the primary signal for current growth stage.\n")
 	}
 
-	predicted := make([]model.Milestone, 0)
-	for _, m := range existing {
-		if m.Status == model.MilestoneStatusPredicted {
-			predicted = append(predicted, m)
-		}
-	}
-	if len(predicted) > 0 {
-		sb.WriteString("\nExisting predicted milestones:\n")
-		for _, m := range predicted {
-			sb.WriteString(fmt.Sprintf("  - %s: currently predicted %s\n", m.MilestoneType, m.PredictedDate))
-		}
-		sb.WriteString("\nFor each existing milestone above: only include it in your response if your estimate has changed or you believe it has already occurred.\n")
-		sb.WriteString("If you agree with the current predicted date, omit it entirely — no need to repeat it.\n")
-		sb.WriteString("If you believe one has already occurred, include it with your best estimate of when it happened and confidence=high.\n")
-	}
-
-	sb.WriteString("\nRespond with JSON only, starting with {")
-
 	return sb.String(), latestPhotoKey
 }
 
@@ -379,62 +320,11 @@ func (a *app) processPlant(ctx context.Context, plant model.Plant, now time.Time
 		return
 	}
 
-	existing, err := a.milestones.ListForPlant(ctx, plant.PlantID)
-	if err != nil {
-		log.Printf("warn: get milestones for %s: %v", plant.PlantID, err)
-		return
-	}
-
-	existingByType := make(map[model.MilestoneType]model.Milestone, len(existing))
-	for _, m := range existing {
-		existingByType[m.MilestoneType] = m
-	}
-
-	prompt, photoKey := buildPrompt(&plant, logs, existing, now)
+	prompt, photoKey := buildPrompt(&plant, logs, now)
 	result, err := a.callClaude(ctx, prompt, photoKey)
 	if err != nil {
 		log.Printf("warn: claude for %s: %v", plant.PlantID, err)
 		return
-	}
-
-	for _, mp := range result.Milestones {
-		mt := model.MilestoneType(mp.Type)
-
-		if ex, found := existingByType[mt]; found {
-			if ex.Status == model.MilestoneStatusConfirmed || ex.Status == model.MilestoneStatusSkipped {
-				continue
-			}
-		}
-
-		confidence := model.MilestoneConfidence(mp.Confidence)
-		if confidence != model.ConfidenceLow && confidence != model.ConfidenceMedium && confidence != model.ConfidenceHigh {
-			confidence = model.ConfidenceLow
-		}
-
-		m := model.Milestone{
-			PlantID:       plant.PlantID,
-			MilestoneType: mt,
-			PredictedDate: mp.PredictedDate,
-			Confidence:    confidence,
-			Status:        model.MilestoneStatusPredicted,
-			Notes:         mp.Notes,
-		}
-
-		if ex, found := existingByType[mt]; found {
-			if ex.PredictedDate != mp.PredictedDate {
-				m.LastChangedAt    = nowStr
-				m.LastChangedFrom  = ex.PredictedDate
-				m.LastChangeReason = mp.ChangeReason
-			} else {
-				m.LastChangedAt    = ex.LastChangedAt
-				m.LastChangedFrom  = ex.LastChangedFrom
-				m.LastChangeReason = ex.LastChangeReason
-			}
-		}
-
-		if err := a.milestones.Upsert(ctx, m); err != nil {
-			log.Printf("warn: upsert milestone %s/%s: %v", plant.PlantID, mp.Type, err)
-		}
 	}
 
 	if err := a.observations.DeleteAll(ctx, plant.PlantID); err != nil {
@@ -458,8 +348,8 @@ func (a *app) processPlant(ctx context.Context, plant model.Plant, now time.Time
 		log.Printf("warn: clear observationsDismissed for %s: %v", plant.PlantID, err)
 	}
 
-	log.Printf("recalibrated %s (%s): %d milestones, %d observations",
-		plant.Name, plant.PlantID, len(result.Milestones), len(result.Observations))
+	log.Printf("recalibrated %s (%s): %d observations",
+		plant.Name, plant.PlantID, len(result.Observations))
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -521,7 +411,6 @@ func main() {
 	a := &app{
 		plants:       store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
 		logs:         store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI")),
-		milestones:   store.NewMilestoneStore(clients.DDB, os.Getenv("MILESTONES_TABLE")),
 		observations: store.NewObservationStore(clients.DDB, os.Getenv("OBSERVATIONS_TABLE")),
 		s3:           clients.S3,
 		mediaBkt:     os.Getenv("MEDIA_BUCKET"),
