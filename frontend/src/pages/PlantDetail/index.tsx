@@ -412,24 +412,29 @@ function ObservationsSection({ observations, plantId, lastCalibratedAt }: {
   const storageKey = `obs-dismissed-${plantId}`
   const seenCalibrationRef = useRef<string | undefined>(undefined)
 
-  // Auto-expand when there's a calibration the user hasn't dismissed yet.
-  // Dismissed state is keyed to lastCalibratedAt so new observations always re-open.
-  const [expanded, setExpanded] = useState(() => {
-    if (!lastCalibratedAt) return false
-    return localStorage.getItem(storageKey) !== lastCalibratedAt
-  })
+  // Auto-expand if observations are from today and user hasn't collapsed them today.
+  // Stored value is the date the user collapsed; a new day or new calibration clears it.
+  function shouldExpand(calibratedAt: string | undefined): boolean {
+    if (!calibratedAt) return false
+    const calibratedDate = new Date(calibratedAt).toLocaleDateString('en-CA')
+    if (calibratedDate !== todayDate()) return false
+    const stored = localStorage.getItem(storageKey)
+    if (!stored) return true
+    const { date, calibratedAt: storedCalibratedAt } = JSON.parse(stored)
+    return date !== todayDate() || storedCalibratedAt !== calibratedAt
+  }
 
-  // Handle lastCalibratedAt updating while the component is mounted (e.g. after refresh button)
+  const [expanded, setExpanded] = useState(() => shouldExpand(lastCalibratedAt))
+
+  // Handle lastCalibratedAt updating while mounted (e.g. after refresh button)
   if (lastCalibratedAt && lastCalibratedAt !== seenCalibrationRef.current) {
     seenCalibrationRef.current = lastCalibratedAt
-    if (localStorage.getItem(storageKey) !== lastCalibratedAt && !expanded) {
-      setExpanded(true)
-    }
+    if (shouldExpand(lastCalibratedAt) && !expanded) setExpanded(true)
   }
 
   function handleToggle() {
     if (expanded && lastCalibratedAt) {
-      localStorage.setItem(storageKey, lastCalibratedAt)
+      localStorage.setItem(storageKey, JSON.stringify({ date: todayDate(), calibratedAt: lastCalibratedAt }))
     }
     setExpanded(e => !e)
   }
