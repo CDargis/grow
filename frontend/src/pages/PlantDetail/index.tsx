@@ -70,7 +70,16 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
       const note   = d.note   ? ` · ${d.note}`                  : ''
       return `${vol}${ph}${runoff}${note}`
     }
-    case 'height':     { const d = log.data as any; return `${d.height} ${d.unit}` }
+    case 'feeding': {
+      const d = log.data as any
+      const nutrients = (d.nutrients as Array<{ name: string; amount: number; unit: string }> ?? [])
+        .filter(n => n.name)
+        .map(n => `${n.name} ${n.amount}${n.unit}`)
+        .join(' · ')
+      const ph    = d.ph       != null ? ` · pH ${d.ph}`       : ''
+      const total = d.totalVol != null ? ` · ${d.totalVol}ml`  : ''
+      return nutrients ? `${nutrients}${ph}${total}` : null
+    }
     case 'transplant': { const d = log.data as any; return d.medium ? `${d.potSize} · ${d.medium}` : d.potSize }
     case 'photo':      return (log.data as any).caption ?? null
     default:         return null
