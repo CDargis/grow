@@ -1,14 +1,14 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, CheckCircle2, Bot, RefreshCw, Gauge } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, Bot, RefreshCw, Gauge } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
 import { AddLogSheet } from '@/components/AddLogSheet'
 import { EditPlantSheet } from '@/components/EditPlantSheet'
 import { MediaImage } from '@/components/MediaImage'
-import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment, Milestone, MilestoneType, PlantObservation } from '@/types'
+import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment, PlantObservation } from '@/types'
 
 const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'feeding', 'note', 'height', 'transplant', 'photo'])
 
@@ -111,58 +111,6 @@ const PHASE_HEX: Record<PlantPhase, string> = {
   curing:      '#fbbf24',
   archived:    '#666666',
   dead:        '#f87171',
-}
-
-// ── Milestone helpers ─────────────────────────────────────────────────────────
-
-const MILESTONE_LABELS: Record<MilestoneType, string> = {
-  cotyledons_off: 'Cotyledons Fall Off',
-  leaf_set_1:     '1st True Leaves',
-  leaf_set_2:     '2nd Leaf Set',
-  leaf_set_3:     '3rd Leaf Set',
-  leaf_set_4:     '4th Leaf Set',
-  early_veg:      'Early Veg',
-  full_veg:       'Full Veg',
-  pre_flower:     'Pre-Flower / Sex Signs',
-  flip_to_flower: 'Flip to Flower',
-  peak_flower:    'Full Flower',
-  harvest:        'Harvest Window',
-  dry_complete:   'Dry Complete',
-  cure_ready:     'Cure Ready',
-}
-
-const PHASE_ORDER: PlantPhase[] = ['germination', 'seedling', 'veg', 'flower', 'harvest', 'drying', 'curing']
-
-// Which phases each milestone is relevant to
-const MILESTONE_PHASES: Record<MilestoneType, PlantPhase[]> = {
-  cotyledons_off: ['seedling'],
-  leaf_set_1:     ['seedling'],
-  leaf_set_2:     ['seedling'],
-  leaf_set_3:     ['seedling'],
-  leaf_set_4:     ['seedling'],
-  early_veg:      ['seedling', 'veg'],
-  full_veg:       ['veg'],
-  pre_flower:     ['veg', 'flower'],
-  flip_to_flower: ['veg'],
-  peak_flower:    ['flower'],
-  harvest:        ['flower', 'harvest'],
-  dry_complete:   ['drying'],
-  cure_ready:     ['curing'],
-}
-
-const CONFIDENCE_COLORS: Record<string, string> = {
-  high:   'text-fern border-fern/40',
-  medium: 'text-amber-400 border-amber-400/40',
-  low:    'text-muted border-border',
-}
-
-function formatMilestoneDate(dateStr: string): string {
-  const today = todayDate()
-  const d = new Date(dateStr + 'T12:00:00')
-  const diff = Math.round((d.getTime() - new Date(today + 'T12:00:00').getTime()) / 86400000)
-  if (diff === 0) return 'Today'
-  if (diff > 0) return `in ${diff}d · ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}`
-  return `${Math.abs(diff)}d ago · ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}`
 }
 
 // ── Phase period helpers ───────────────────────────────────────────────────────
@@ -298,136 +246,20 @@ function PhaseLogEntry({ log, color, envMap, onDelete, onEdit }: {
   )
 }
 
-// ── Milestone entry ───────────────────────────────────────────────────────────
-
-function MilestoneEntry({ milestone, onConfirm, onSkip }: {
-  milestone: Milestone
-  onConfirm: (type: MilestoneType, date: string) => void
-  onSkip: (type: MilestoneType) => void
-}) {
-  const today      = todayDate()
-  const isPastDue  = (milestone.predictedDate ?? '') <= today
-  const canAct     = milestone.status === 'predicted' && isPastDue
-  const [picking, setPicking] = useState(false)
-  const [pickDate, setPickDate] = useState(today)
-
-  if (milestone.status === 'skipped') return null
-
-  const label       = MILESTONE_LABELS[milestone.milestoneType] ?? milestone.milestoneType.replace(/_/g, ' ')
-  const colorCls    = CONFIDENCE_COLORS[milestone.confidence] ?? CONFIDENCE_COLORS.low
-  const isConfirmed = milestone.status === 'confirmed'
-
-  function handleConfirm() {
-    onConfirm(milestone.milestoneType, pickDate)
-    setPicking(false)
-  }
-
-  return (
-    <div className={`py-2 border-b border-border/40 last:border-0 ${isConfirmed ? 'opacity-70' : ''}`}>
-      <div className="flex items-start gap-2">
-        <div className="flex-shrink-0 mt-0.5">
-          {isConfirmed
-            ? <CheckCircle2 size={14} className="text-fern" />
-            : <Bot size={14} className={isPastDue ? 'text-amber-400' : 'text-violet-400/70'} />
-          }
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-primary">{label}</span>
-            {!isConfirmed && (
-              <span className={`text-[10px] border rounded px-1 py-px flex-shrink-0 ${colorCls}`}>
-                {milestone.confidence}
-              </span>
-            )}
-          </div>
-          <p className="text-[11px] text-dim mt-0.5">
-            {isConfirmed
-              ? `Confirmed ${new Date(milestone.confirmedDate! + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}`
-              : formatMilestoneDate(milestone.predictedDate ?? '')
-            }
-            {milestone.notes && !isConfirmed && <span className="ml-1 text-muted">· {milestone.notes}</span>}
-          </p>
-          {milestone.lastChangedAt && milestone.lastChangedFrom && !isConfirmed && (
-            <p className="text-[10px] text-muted mt-0.5">
-              ↻ changed from {new Date(milestone.lastChangedFrom + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
-              {' on '}
-              {new Date(milestone.lastChangedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-              {milestone.lastChangeReason && <span className="italic"> · {milestone.lastChangeReason}</span>}
-            </p>
-          )}
-          {canAct && !picking && (
-            <div className="flex gap-2 mt-1.5">
-              <button
-                onClick={() => { setPickDate(today); setPicking(true) }}
-                className="text-[10px] px-2 py-0.5 rounded bg-fern/20 text-fern border border-fern/30 active:opacity-70"
-              >
-                Confirm
-              </button>
-              <button
-                onClick={() => onSkip(milestone.milestoneType)}
-                className="text-[10px] px-2 py-0.5 rounded bg-raised text-muted border border-border active:opacity-70"
-              >
-                Skip
-              </button>
-            </div>
-          )}
-          {picking && (
-            <div className="flex items-center gap-2 mt-1.5">
-              <input
-                type="date"
-                value={pickDate}
-                max={today}
-                onChange={e => setPickDate(e.target.value)}
-                className="text-[11px] bg-surface border border-border rounded px-2 py-0.5 text-primary"
-              />
-              <button
-                onClick={handleConfirm}
-                className="text-[10px] px-2 py-0.5 rounded bg-fern/20 text-fern border border-fern/30 active:opacity-70"
-              >
-                Done
-              </button>
-              <button
-                onClick={() => setPicking(false)}
-                className="text-[10px] text-muted active:opacity-70"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Phase period section ───────────────────────────────────────────────────────
 
-function PhasePeriodSection({ period, isLast, envMap, milestones, onDelete, onEdit, onConfirmMilestone, onSkipMilestone }: {
+function PhasePeriodSection({ period, isLast, envMap, onDelete, onEdit }: {
   period: PhasePeriod
   isLast: boolean
   envMap: Map<string, string>
-  milestones: Milestone[]
   onDelete: (logId: string) => void
   onEdit: (log: Log) => void
-  onConfirmMilestone: (type: MilestoneType, date: string) => void
-  onSkipMilestone: (type: MilestoneType) => void
 }) {
   const ongoing = period.endDate === null
   const [expanded, setExpanded] = useState(ongoing)
   const color = PHASE_HEX[period.phase] ?? '#666'
 
-  // Active phase: show predicted + confirmed milestones belonging to this phase
-  // Completed phases: show only confirmed milestones belonging to this phase
-  const phaseMilestones = milestones
-    .filter(m => {
-      if (m.status === 'skipped') return false
-      if (!MILESTONE_PHASES[m.milestoneType]?.includes(period.phase)) return false
-      if (!ongoing && m.status === 'predicted') return false
-      return true
-    })
-    .sort((a, b) => (a.predictedDate ?? '').localeCompare(b.predictedDate ?? ''))
-
-  const hasContent = period.logs.length > 0 || phaseMilestones.length > 0
+  const hasContent = period.logs.length > 0
 
   return (
     <div className="relative flex items-start gap-3">
@@ -460,11 +292,6 @@ function PhasePeriodSection({ period, isLast, envMap, milestones, onDelete, onEd
                 live
               </span>
             )}
-            {phaseMilestones.length > 0 && !expanded && (
-              <span className="text-[9px] text-amber-400 border border-amber-400/30 rounded px-1 py-px">
-                {phaseMilestones.length} milestone{phaseMilestones.length > 1 ? 's' : ''}
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-1.5 text-muted flex-shrink-0">
             <span className="text-xs">{phaseDuration(period.startDate, period.endDate)}</span>
@@ -477,22 +304,6 @@ function PhasePeriodSection({ period, isLast, envMap, milestones, onDelete, onEd
 
         {expanded && (
           <div className="mt-2 border-t border-border/30">
-            {phaseMilestones.length > 0 && (
-              <>
-                <div className="flex items-center gap-1.5 pt-2 pb-0.5">
-                  <Bot size={11} className="text-violet-400" />
-                  <span className="text-[10px] font-medium text-violet-400 uppercase tracking-wide">AI Predictions</span>
-                </div>
-                {phaseMilestones.map(m => (
-                  <MilestoneEntry
-                    key={m.milestoneType}
-                    milestone={m}
-                    onConfirm={onConfirmMilestone}
-                    onSkip={onSkipMilestone}
-                  />
-                ))}
-              </>
-            )}
             {!hasContent ? (
               <p className="text-xs text-muted py-2">No activity logged this phase.</p>
             ) : (
@@ -507,144 +318,29 @@ function PhasePeriodSection({ period, isLast, envMap, milestones, onDelete, onEd
   )
 }
 
-// ── Upcoming phase section (future phases with AI-predicted milestones) ───────
-
-function UpcomingPhaseSection({ phase, milestones, isLast, onConfirmMilestone, onSkipMilestone }: {
-  phase: PlantPhase
-  milestones: Milestone[]
-  isLast: boolean
-  onConfirmMilestone: (type: MilestoneType, date: string) => void
-  onSkipMilestone: (type: MilestoneType) => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const color = PHASE_HEX[phase] ?? '#666'
-
-  return (
-    <div className="relative flex items-start gap-3">
-      <div className="flex flex-col items-center flex-shrink-0 w-3">
-        <div
-          className="w-3 h-3 rounded-full flex-shrink-0 mt-[5px] z-10 relative opacity-35"
-          style={{ backgroundColor: color }}
-        />
-        {!isLast && (
-          <div
-            className="w-0.5 flex-1 min-h-[20px] mt-1"
-            style={{ backgroundColor: color, opacity: 0.12 }}
-          />
-        )}
-      </div>
-      <div className="flex-1 min-w-0 pb-4">
-        <button
-          onClick={() => setExpanded(e => !e)}
-          className="flex items-center justify-between w-full text-left"
-        >
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-sm capitalize opacity-40" style={{ color }}>{phase}</span>
-            <span className="text-[9px] text-muted border border-border rounded px-1 py-px uppercase tracking-wide">upcoming</span>
-            {!expanded && (
-              <span className="text-[9px] text-violet-400 border border-violet-400/30 rounded px-1 py-px">
-                {milestones.length} predicted
-              </span>
-            )}
-          </div>
-          {expanded ? <ChevronUp size={12} className="text-muted" /> : <ChevronDown size={12} className="text-muted" />}
-        </button>
-        {expanded && (
-          <div className="mt-2 border-t border-border/30">
-            <div className="flex items-center gap-1.5 pt-2 pb-0.5">
-              <Bot size={11} className="text-violet-400" />
-              <span className="text-[10px] font-medium text-violet-400 uppercase tracking-wide">AI Predictions</span>
-            </div>
-            {milestones.map(m => (
-              <MilestoneEntry
-                key={m.milestoneType}
-                milestone={m}
-                onConfirm={onConfirmMilestone}
-                onSkip={onSkipMilestone}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ── Timeline view ─────────────────────────────────────────────────────────────
 
-function TimelineView({ plant, logs, envMap, milestones, onDelete, onEdit, onConfirmMilestone, onSkipMilestone }: {
+function TimelineView({ plant, logs, envMap, onDelete, onEdit }: {
   plant: Plant
   logs: Log[]
   envMap: Map<string, string>
-  milestones: Milestone[]
   onDelete: (logId: string) => void
   onEdit: (log: Log) => void
-  onConfirmMilestone: (type: MilestoneType, date: string) => void
-  onSkipMilestone: (type: MilestoneType) => void
 }) {
-  const periods = buildPhasePeriods(plant, logs)
-  const currentPhaseIdx = PHASE_ORDER.indexOf(plant.phase)
-
-  // Build upcoming sections: each predicted milestone assigned to its earliest future phase
-  const upcomingSections = PHASE_ORDER
-    .slice(currentPhaseIdx + 1)
-    .map(phase => ({
-      phase,
-      milestones: milestones
-        .filter(m => {
-          if (m.status !== 'predicted') return false
-          // Already shown in the active phase section
-          if (MILESTONE_PHASES[m.milestoneType]?.includes(plant.phase)) return false
-          // Assign to the first future phase this milestone belongs to
-          const firstFuturePhase = PHASE_ORDER
-            .slice(currentPhaseIdx + 1)
-            .find(p => MILESTONE_PHASES[m.milestoneType]?.includes(p))
-          return firstFuturePhase === phase
-        })
-        .sort((a, b) => (a.predictedDate ?? '').localeCompare(b.predictedDate ?? '')),
-    }))
-    .filter(s => s.milestones.length > 0)
-
-  type Section =
-    | { kind: 'period'; period: PhasePeriod }
-    | { kind: 'upcoming'; phase: PlantPhase; milestones: Milestone[] }
-
-  // Reverse-chronological: furthest future at top, active below upcoming, oldest past at bottom
-  const sections: Section[] = [
-    ...[...upcomingSections].reverse().map(s => ({ kind: 'upcoming' as const, phase: s.phase, milestones: s.milestones })),
-    ...[...periods].reverse().map(p => ({ kind: 'period' as const, period: p })),
-  ]
+  const periods = [...buildPhasePeriods(plant, logs)].reverse()
 
   return (
     <div className="pt-2">
-      {sections.map((section, idx) => {
-        const isLast = idx === sections.length - 1
-        if (section.kind === 'period') {
-          return (
-            <PhasePeriodSection
-              key={section.period.phase + section.period.startDate}
-              period={section.period}
-              isLast={isLast}
-              envMap={envMap}
-              milestones={milestones}
-              onDelete={onDelete}
-              onEdit={onEdit}
-              onConfirmMilestone={onConfirmMilestone}
-              onSkipMilestone={onSkipMilestone}
-            />
-          )
-        }
-        return (
-          <UpcomingPhaseSection
-            key={section.phase}
-            phase={section.phase}
-            milestones={section.milestones}
-            isLast={isLast}
-            onConfirmMilestone={onConfirmMilestone}
-            onSkipMilestone={onSkipMilestone}
-          />
-        )
-      })}
+      {periods.map((period, idx) => (
+        <PhasePeriodSection
+          key={period.phase + period.startDate}
+          period={period}
+          isLast={idx === periods.length - 1}
+          envMap={envMap}
+          onDelete={onDelete}
+          onEdit={onEdit}
+        />
+      ))}
     </div>
   )
 }
@@ -713,13 +409,29 @@ function ObservationsSection({ observations, plantId, lastCalibratedAt }: {
   lastCalibratedAt?: string
 }) {
   const qc = useQueryClient()
-  // Auto-expand when lastCalibratedAt changes (new sync). Stays collapsed once user collapses it.
+  const storageKey = `obs-dismissed-${plantId}`
   const seenCalibrationRef = useRef<string | undefined>(undefined)
-  const [expanded, setExpanded] = useState(false)
 
+  // Auto-expand when there's a calibration the user hasn't dismissed yet.
+  // Dismissed state is keyed to lastCalibratedAt so new observations always re-open.
+  const [expanded, setExpanded] = useState(() => {
+    if (!lastCalibratedAt) return false
+    return localStorage.getItem(storageKey) !== lastCalibratedAt
+  })
+
+  // Handle lastCalibratedAt updating while the component is mounted (e.g. after refresh button)
   if (lastCalibratedAt && lastCalibratedAt !== seenCalibrationRef.current) {
     seenCalibrationRef.current = lastCalibratedAt
-    if (!expanded) setExpanded(true)
+    if (localStorage.getItem(storageKey) !== lastCalibratedAt && !expanded) {
+      setExpanded(true)
+    }
+  }
+
+  function handleToggle() {
+    if (expanded && lastCalibratedAt) {
+      localStorage.setItem(storageKey, lastCalibratedAt)
+    }
+    setExpanded(e => !e)
   }
 
   const calibrate = useMutation({
@@ -733,7 +445,7 @@ function ObservationsSection({ observations, plantId, lastCalibratedAt }: {
     <div className="border-b border-border">
       <div className="flex items-center gap-2 px-4 py-2.5">
         <button
-          onClick={() => setExpanded(e => !e)}
+          onClick={handleToggle}
           className="flex items-center gap-2 flex-1 text-left min-w-0"
         >
           <Bot size={13} className="text-violet-400 flex-shrink-0" />
@@ -753,7 +465,7 @@ function ObservationsSection({ observations, plantId, lastCalibratedAt }: {
           <RefreshCw size={12} className={calibrate.isPending ? 'animate-spin' : ''} />
         </button>
         {observations.length > 0 && (
-          <button onClick={() => setExpanded(e => !e)} className="text-muted flex-shrink-0">
+          <button onClick={handleToggle} className="text-muted flex-shrink-0">
             {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
         )}
@@ -866,17 +578,6 @@ export function PlantDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['logs', 'plant', id] }),
   })
 
-  const confirmMilestone = useMutation({
-    mutationFn: ({ type, date }: { type: MilestoneType; date: string }) =>
-      api.milestones.confirm(id!, type, date),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['milestones', id] }),
-  })
-
-  const skipMilestone = useMutation({
-    mutationFn: (type: MilestoneType) => api.milestones.skip(id!, type),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['milestones', id] }),
-  })
-
   function handleEditLog(log: Log) {
     setEditLog(log)
     setLogSheetOpen(true)
@@ -912,12 +613,6 @@ export function PlantDetailPage() {
   const { data: envs } = useQuery({
     queryKey: ['environments'],
     queryFn: api.environments.list,
-  })
-
-  const { data: milestones = [] } = useQuery({
-    queryKey: ['milestones', id],
-    queryFn: () => api.milestones.listForPlant(id!),
-    enabled: !!id,
   })
 
   const { data: observations = [] } = useQuery({
@@ -1111,11 +806,8 @@ export function PlantDetailPage() {
               plant={plant}
               logs={logs ?? []}
               envMap={envMap}
-              milestones={milestones}
               onDelete={deleteLog.mutate}
               onEdit={handleEditLog}
-              onConfirmMilestone={(type, date) => confirmMilestone.mutate({ type, date })}
-              onSkipMilestone={type => skipMilestone.mutate(type)}
             />
           )}
         </div>
