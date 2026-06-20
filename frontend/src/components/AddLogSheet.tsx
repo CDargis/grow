@@ -492,7 +492,7 @@ function TrainingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
 
 // ── Trimming form ─────────────────────────────────────────────────────────────
 
-const TRIMMING_METHODS = ['Defoliation', 'Lollipopping', 'Schwazzing', 'Fan Leaf Removal', 'Other']
+const TRIMMING_METHODS = ['Defoliation', 'Lollipopping', 'Schwazzing', 'Fan Leaf Removal', 'Larf Removal', 'Other']
 
 function TrimmingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: TrimmingData }) {
   const qc = useQueryClient()
