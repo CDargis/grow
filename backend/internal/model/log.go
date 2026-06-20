@@ -8,6 +8,7 @@ const (
 	LogWatering           LogType = "watering"
 	LogFeeding            LogType = "feeding"
 	LogTraining           LogType = "training"
+	LogTrimming           LogType = "trimming"
 	LogSprout             LogType = "sprout"
 	LogTransplant         LogType = "transplant"
 	LogHeight             LogType = "height"
@@ -58,12 +59,15 @@ type FeedingData struct {
 }
 
 type TrainingData struct {
-	Method string `json:"method"`
-	Notes  string `json:"notes,omitempty"`
+	Method   string `json:"method"`
+	Notes    string `json:"notes,omitempty"`
+	PhotoKey string `json:"photoKey,omitempty"`
 }
 
 type TrimmingData struct {
-	Notes string `json:"notes,omitempty"`
+	Method   string `json:"method,omitempty"`
+	Notes    string `json:"notes,omitempty"`
+	PhotoKey string `json:"photoKey,omitempty"`
 }
 
 type TransplantData struct {

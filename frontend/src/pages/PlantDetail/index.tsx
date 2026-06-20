@@ -10,7 +10,7 @@ import { EditPlantSheet } from '@/components/EditPlantSheet'
 import { MediaImage } from '@/components/MediaImage'
 import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment, PlantObservation } from '@/types'
 
-const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'feeding', 'note', 'height', 'transplant', 'photo'])
+const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'feeding', 'training', 'trimming', 'note', 'height', 'transplant', 'photo'])
 
 const LOG_ICONS: Record<LogType, React.ReactNode> = {
   watering:           <Droplets size={16} />,
@@ -58,6 +58,15 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
       if (d.toVpd   != null) return `Set to ${d.toVpd} kPa`
       if (d.fromVpd != null) return `Target cleared (was ${d.fromVpd} kPa)`
       return null
+    }
+    case 'training': {
+      const d = log.data as any
+      return d.method ? `${d.method}${d.notes ? ` · ${d.notes}` : ''}` : (d.notes ?? null)
+    }
+    case 'trimming': {
+      const d = log.data as any
+      const parts = [d.method, d.notes].filter(Boolean)
+      return parts.length ? parts.join(' · ') : null
     }
     case 'sprout':   return 'Sprouted'
     case 'note':     return (log.data as any).text
@@ -201,7 +210,7 @@ function PhaseLogEntry({ log, color, envMap, onDelete, onEdit }: {
 }) {
   const [lightbox, setLightbox] = useState(false)
   const summary  = logSummary(log, envMap)
-  const photoKey = log.logType === 'photo' ? (log.data as any).photoKey as string | undefined : undefined
+  const photoKey = (log.data as any)?.photoKey as string | undefined
 
   return (
     <>
@@ -358,7 +367,7 @@ function TimelineView({ plant, logs, envMap, onDelete, onEdit }: {
 function LogEntry({ log, envMap, onDelete, onEdit }: { log: Log; envMap: Map<string, string>; onDelete: (logId: string) => void; onEdit: (log: Log) => void }) {
   const [lightbox, setLightbox] = useState(false)
   const summary = logSummary(log, envMap)
-  const photoKey = log.logType === 'photo' ? (log.data as any).photoKey as string | undefined : undefined
+  const photoKey = (log.data as any)?.photoKey as string | undefined
   return (
     <>
       <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">

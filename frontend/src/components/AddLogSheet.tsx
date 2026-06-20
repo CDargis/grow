@@ -4,7 +4,7 @@ import { Droplets, Zap, Ruler, MessageSquare, Camera, GitBranch, Scissors, Arrow
 import { BottomSheet } from './BottomSheet'
 import { MediaImage } from './MediaImage'
 import { api } from '@/api/client'
-import type { Plant, PlantPhase, Log, LogType, WateringData, FeedingData, NoteData, PhotoData, TransplantData, HeightData } from '@/types'
+import type { Plant, PlantPhase, Log, LogType, WateringData, FeedingData, TrainingData, TrimmingData, NoteData, PhotoData, TransplantData, HeightData } from '@/types'
 
 // ── Types config ─────────────────────────────────────────────────────────────
 
@@ -34,8 +34,8 @@ const LOG_TYPES: TypeConfig[] = [
   { type: 'feeding',    label: 'Feed',     icon: <Zap       size={22} />, ready: true  },
   { type: 'note',       label: 'Note',     icon: <MessageSquare size={22} />, ready: true },
   { type: 'phase_change', label: 'Phase',  icon: <ArrowRightLeft size={22} />, ready: true },
-  { type: 'training',   label: 'Training', icon: <GitBranch size={22} />, ready: false },
-  { type: 'trimming',   label: 'Trim',     icon: <Scissors  size={22} />, ready: false },
+  { type: 'training',   label: 'Training', icon: <GitBranch size={22} />, ready: true  },
+  { type: 'trimming',   label: 'Trim',     icon: <Scissors  size={22} />, ready: true  },
   { type: 'height',     label: 'Height',   icon: <Ruler     size={22} />, ready: true  },
   { type: 'photo',      label: 'Photo',    icon: <Camera    size={22} />, ready: true  },
   { type: 'transplant', label: 'Transplant', icon: <span className="text-xl">🪴</span>, ready: true },
@@ -411,6 +411,163 @@ function TransplantForm({ plantId, datetime, onSuccess, logId, init }: { plantId
   )
 }
 
+// ── Training form ─────────────────────────────────────────────────────────────
+
+const TRAINING_METHODS = ['LST', 'Topping', 'FIM', 'ScrOG', 'Supercropping', 'Mainlining', 'Other']
+
+function TrainingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: TrainingData }) {
+  const qc = useQueryClient()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [method, setMethod] = useState(init?.method ?? '')
+  const [notes, setNotes]   = useState(init?.notes ?? '')
+  const [file, setFile]     = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError]   = useState<string | null>(null)
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setFile(f)
+    setPreview(URL.createObjectURL(f))
+  }
+
+  async function handleSubmit() {
+    if (!method) return
+    setUploading(true)
+    setError(null)
+    try {
+      const photoKey = file
+        ? await api.media.uploadFile(file, `plants/${plantId}/logs`)
+        : init?.photoKey
+      const data: TrainingData = { method, ...(notes ? { notes } : {}), ...(photoKey ? { photoKey } : {}) }
+      const body = { logType: 'training' as const, date: datetimeToDate(datetime), loggedAt: datetimeToISO(datetime), data }
+      if (logId) { await api.logs.update(plantId, logId, body) } else { await api.logs.create(plantId, body) }
+      qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
+      onSuccess()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3 mt-2">
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      <div>
+        <label className={labelCls}>Method</label>
+        <select className={inputCls} value={method} onChange={e => setMethod(e.target.value)}>
+          <option value="">Select method</option>
+          {TRAINING_METHODS.map(m => <option key={m} value={m} className="bg-raised">{m}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className={labelCls}>Notes (optional)</label>
+        <textarea className={inputCls} rows={2} placeholder="Any details…" value={notes} onChange={e => setNotes(e.target.value)} />
+      </div>
+      <button
+        onClick={() => fileRef.current?.click()}
+        className={`w-full h-36 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors overflow-hidden ${preview || init?.photoKey ? 'border-transparent p-0' : 'border-border text-muted active:opacity-70'}`}
+      >
+        {preview
+          ? <img src={preview} alt="preview" className="w-full h-full object-cover" />
+          : init?.photoKey
+            ? <MediaImage photoKey={init.photoKey} alt="current" className="w-full h-full object-cover" />
+            : <><ImagePlus size={24} /><span className="text-sm">Add photo (optional)</span></>
+        }
+      </button>
+      {preview && (
+        <button onClick={() => { setFile(null); setPreview(null); if (fileRef.current) fileRef.current.value = '' }} className="text-xs text-muted active:opacity-70 flex items-center gap-1">
+          <X size={12} /> Remove photo
+        </button>
+      )}
+      {error && <p className="text-red-400 text-sm">{error}</p>}
+      <button onClick={handleSubmit} disabled={!method || uploading} className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50">
+        {uploading ? 'Uploading…' : 'Log Training'}
+      </button>
+    </div>
+  )
+}
+
+// ── Trimming form ─────────────────────────────────────────────────────────────
+
+const TRIMMING_METHODS = ['Defoliation', 'Lollipopping', 'Schwazzing', 'Fan Leaf Removal', 'Other']
+
+function TrimmingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: TrimmingData }) {
+  const qc = useQueryClient()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [method, setMethod] = useState(init?.method ?? '')
+  const [notes, setNotes]   = useState(init?.notes ?? '')
+  const [file, setFile]     = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError]   = useState<string | null>(null)
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setFile(f)
+    setPreview(URL.createObjectURL(f))
+  }
+
+  async function handleSubmit() {
+    setUploading(true)
+    setError(null)
+    try {
+      const photoKey = file
+        ? await api.media.uploadFile(file, `plants/${plantId}/logs`)
+        : init?.photoKey
+      const data: TrimmingData = { ...(method ? { method } : {}), ...(notes ? { notes } : {}), ...(photoKey ? { photoKey } : {}) }
+      const body = { logType: 'trimming' as const, date: datetimeToDate(datetime), loggedAt: datetimeToISO(datetime), data }
+      if (logId) { await api.logs.update(plantId, logId, body) } else { await api.logs.create(plantId, body) }
+      qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
+      onSuccess()
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3 mt-2">
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      <div>
+        <label className={labelCls}>Method (optional)</label>
+        <select className={inputCls} value={method} onChange={e => setMethod(e.target.value)}>
+          <option value="">Select method</option>
+          {TRIMMING_METHODS.map(m => <option key={m} value={m} className="bg-raised">{m}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className={labelCls}>Notes (optional)</label>
+        <textarea className={inputCls} rows={2} placeholder="Any details…" value={notes} onChange={e => setNotes(e.target.value)} />
+      </div>
+      <button
+        onClick={() => fileRef.current?.click()}
+        className={`w-full h-36 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors overflow-hidden ${preview || init?.photoKey ? 'border-transparent p-0' : 'border-border text-muted active:opacity-70'}`}
+      >
+        {preview
+          ? <img src={preview} alt="preview" className="w-full h-full object-cover" />
+          : init?.photoKey
+            ? <MediaImage photoKey={init.photoKey} alt="current" className="w-full h-full object-cover" />
+            : <><ImagePlus size={24} /><span className="text-sm">Add photo (optional)</span></>
+        }
+      </button>
+      {preview && (
+        <button onClick={() => { setFile(null); setPreview(null); if (fileRef.current) fileRef.current.value = '' }} className="text-xs text-muted active:opacity-70 flex items-center gap-1">
+          <X size={12} /> Remove photo
+        </button>
+      )}
+      {error && <p className="text-red-400 text-sm">{error}</p>}
+      <button onClick={handleSubmit} disabled={uploading} className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50">
+        {uploading ? 'Uploading…' : 'Log Trim'}
+      </button>
+    </div>
+  )
+}
+
 // ── Phase change form ─────────────────────────────────────────────────────────
 
 function PhaseChangeForm({ plant, datetime, onSuccess }: { plant: Plant; datetime: string; onSuccess: () => void }) {
@@ -658,6 +815,10 @@ export function AddLogSheet({ open, onClose, plant, defaultDate, editLog }: Prop
         <HeightForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as HeightData | undefined} />
       ) : selected === 'transplant' ? (
         <TransplantForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as TransplantData | undefined} />
+      ) : selected === 'training' ? (
+        <TrainingForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as TrainingData | undefined} />
+      ) : selected === 'trimming' ? (
+        <TrimmingForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as TrimmingData | undefined} />
       ) : selected === 'phase_change' ? (
         <PhaseChangeForm plant={plant} datetime={datetime} onSuccess={handleClose} />
       ) : selected === 'photo' ? (

@@ -90,7 +90,8 @@ export interface Log {
 
 export interface WateringData  { amount?: number; unit: 'ml' | 'l' | 'oz' | 'gal'; ph?: number; runoff?: number; note?: string }
 export interface FeedingData   { nutrients: Array<{ name: string; amount: number; unit: string }>; ph?: number; totalVol?: number }
-export interface TrainingData  { method: string; notes?: string }
+export interface TrainingData  { method: string; notes?: string; photoKey?: string }
+export interface TrimmingData  { method?: string; notes?: string; photoKey?: string }
 export interface SproutData    { }
 export interface TransplantData { potSize: string; medium?: string }
 export interface HeightData    { height: number; unit: 'cm' | 'in' }
@@ -102,7 +103,7 @@ export interface LightingChangeData    { fromSchedule?: string; toSchedule?: str
 export interface VpdChangeData         { fromVpd?: number; toVpd?: number }
 
 export type LogData =
-  | WateringData | FeedingData | TrainingData | SproutData
+  | WateringData | FeedingData | TrainingData | TrimmingData | SproutData
   | TransplantData | HeightData | NoteData | PhotoData | PhaseChangeData
   | EnvironmentChangeData | LightingChangeData
 
