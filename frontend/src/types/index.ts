@@ -4,29 +4,6 @@ export type PlantPhase =
 
 export type PlantType = 'autoflower' | 'photoperiod' | 'unknown'
 
-export type MilestoneType =
-  | 'cotyledons_off' | 'leaf_set_1' | 'leaf_set_2' | 'leaf_set_3' | 'leaf_set_4'
-  | 'early_veg' | 'full_veg' | 'pre_flower'
-  | 'flip_to_flower' | 'peak_flower' | 'harvest' | 'dry_complete' | 'cure_ready'
-
-export type MilestoneStatus = 'predicted' | 'confirmed' | 'skipped'
-
-export type MilestoneConfidence = 'low' | 'medium' | 'high'
-
-export interface Milestone {
-  plantId: string
-  milestoneType: MilestoneType
-  predictedDate: string
-  confidence: MilestoneConfidence
-  confirmedDate?: string
-  status: MilestoneStatus
-  updatedAt: string
-  notes?: string
-  lastChangedAt?: string
-  lastChangedFrom?: string
-  lastChangeReason?: string
-}
-
 export type EnvironmentType =
   | 'tent' | 'outdoor' | 'garage' | 'basement'
   | 'room' | 'greenhouse' | 'other'
@@ -93,16 +70,6 @@ export type LogData =
   | WateringData | FeedingData | TrainingData | TrimmingData | SproutData
   | TransplantData | HeightData | NoteData | PhotoData | PhaseChangeData
   | EnvironmentChangeData | LightingChangeData
-
-export interface MilestoneHistory {
-  plantId: string
-  recalSK: string
-  milestoneType: MilestoneType
-  predictedDate: string
-  confidence: MilestoneConfidence
-  recalibratedAt: string
-  reason?: string
-}
 
 export interface UpdatePlantDetailsRequest {
   name: string

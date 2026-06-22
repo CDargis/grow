@@ -76,15 +76,6 @@ public class GrowStack : Stack
             ProjectionType = ProjectionType.ALL
         });
 
-        Table milestonesTable = new Table(this, "MilestonesTable", new TableProps
-        {
-            TableName     = "grow-milestones",
-            PartitionKey  = new DynamoAttribute { Name = "plantId",       Type = AttributeType.STRING },
-            SortKey       = new DynamoAttribute { Name = "milestoneType", Type = AttributeType.STRING },
-            BillingMode   = BillingMode.PAY_PER_REQUEST,
-            RemovalPolicy = RemovalPolicy.RETAIN
-        });
-
         // ── S3 Buckets ────────────────────────────────────────────────────
 
         Bucket mediaBucket = new Bucket(this, "MediaBucket", new BucketProps
@@ -139,7 +130,6 @@ public class GrowStack : Stack
                 ["ENVIRONMENTS_TABLE"] = environmentsTable.TableName,
                 ["LOGS_TABLE"]         = logsTable.TableName,
                 ["LOGS_DATE_GSI"]      = "user-date-index",
-                ["MILESTONES_TABLE"]   = milestonesTable.TableName,
                 ["MEDIA_BUCKET"]       = mediaBucket.BucketName,
                 ["USER_ID"]            = "default"
             }
@@ -148,7 +138,6 @@ public class GrowStack : Stack
         plantsTable.GrantReadWriteData(apiFunction);
         environmentsTable.GrantReadWriteData(apiFunction);
         logsTable.GrantReadWriteData(apiFunction);
-        milestonesTable.GrantReadWriteData(apiFunction);
         mediaBucket.GrantReadWrite(apiFunction);
 
         // ── API Gateway ───────────────────────────────────────────────────

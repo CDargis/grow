@@ -1,6 +1,6 @@
 import imageCompression from 'browser-image-compression'
 import type {
-  Plant, Environment, Log, Milestone, MilestoneType,
+  Plant, Environment, Log,
   CreatePlantRequest, UpdatePlantDetailsRequest, CreateEnvironmentRequest, CreateLogRequest,
 } from '@/types'
 
@@ -53,18 +53,6 @@ export const api = {
     update: (plantId: string, logId: string, body: CreateLogRequest) =>
       request<Log>(`/plants/${plantId}/logs/${logId}`, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (plantId: string, logId: string)    => request<void>(`/plants/${plantId}/logs/${logId}`, { method: 'DELETE' }),
-  },
-
-  milestones: {
-    listForPlant: (plantId: string) => request<Milestone[]>(`/plants/${plantId}/milestones`),
-    confirm: (plantId: string, milestoneType: MilestoneType, confirmedDate: string) =>
-      request<void>(`/plants/${plantId}/milestones/${milestoneType}`, {
-        method: 'PATCH', body: JSON.stringify({ action: 'confirm', confirmedDate }),
-      }),
-    skip: (plantId: string, milestoneType: MilestoneType) =>
-      request<void>(`/plants/${plantId}/milestones/${milestoneType}`, {
-        method: 'PATCH', body: JSON.stringify({ action: 'skip' }),
-      }),
   },
 
   media: {
