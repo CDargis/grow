@@ -4,11 +4,6 @@ using Amazon.CDK.AWS.CloudFront;
 using Amazon.CDK.AWS.CloudFront.Origins;
 using Amazon.CDK.AWS.DynamoDB;
 using DynamoAttribute = Amazon.CDK.AWS.DynamoDB.Attribute;
-using Amazon.CDK.AWS.Events;
-using Amazon.CDK.AWS.Events.Targets;
-using EventsLambdaTarget = Amazon.CDK.AWS.Events.Targets.LambdaFunction;
-using SqsQueueTarget     = Amazon.CDK.AWS.Events.Targets.SqsQueue;
-using Amazon.CDK.AWS.SQS;
 using Amazon.CDK.AWS.IAM;
 using Amazon.CDK.AWS.Lambda;
 using LambdaFunction      = Amazon.CDK.AWS.Lambda.Function;
@@ -22,7 +17,6 @@ using Amazon.CDK.AWS.Route53;
 using Amazon.CDK.AWS.Route53.Targets;
 using Amazon.CDK.AWS.S3;
 using Amazon.CDK.AWS.S3.Deployment;
-using Amazon.CDK.AWS.SSM;
 using Constructs;
 
 namespace Grow;
@@ -91,15 +85,6 @@ public class GrowStack : Stack
             RemovalPolicy = RemovalPolicy.RETAIN
         });
 
-        Table observationsTable = new Table(this, "ObservationsTable", new TableProps
-        {
-            TableName     = "grow-observations",
-            PartitionKey  = new DynamoAttribute { Name = "plantId",       Type = AttributeType.STRING },
-            SortKey       = new DynamoAttribute { Name = "observationId", Type = AttributeType.STRING },
-            BillingMode   = BillingMode.PAY_PER_REQUEST,
-            RemovalPolicy = RemovalPolicy.RETAIN
-        });
-
         // ── S3 Buckets ────────────────────────────────────────────────────
 
         Bucket mediaBucket = new Bucket(this, "MediaBucket", new BucketProps
@@ -150,14 +135,13 @@ public class GrowStack : Stack
             }),
             Environment = new Dictionary<string, string>
             {
-                ["PLANTS_TABLE"]             = plantsTable.TableName,
-                ["ENVIRONMENTS_TABLE"]       = environmentsTable.TableName,
-                ["LOGS_TABLE"]               = logsTable.TableName,
-                ["LOGS_DATE_GSI"]            = "user-date-index",
-                ["MILESTONES_TABLE"]         = milestonesTable.TableName,
-                ["OBSERVATIONS_TABLE"]       = observationsTable.TableName,
-                ["MEDIA_BUCKET"]             = mediaBucket.BucketName,
-                ["USER_ID"]                  = "default"
+                ["PLANTS_TABLE"]       = plantsTable.TableName,
+                ["ENVIRONMENTS_TABLE"] = environmentsTable.TableName,
+                ["LOGS_TABLE"]         = logsTable.TableName,
+                ["LOGS_DATE_GSI"]      = "user-date-index",
+                ["MILESTONES_TABLE"]   = milestonesTable.TableName,
+                ["MEDIA_BUCKET"]       = mediaBucket.BucketName,
+                ["USER_ID"]            = "default"
             }
         });
 
@@ -165,79 +149,7 @@ public class GrowStack : Stack
         environmentsTable.GrantReadWriteData(apiFunction);
         logsTable.GrantReadWriteData(apiFunction);
         milestonesTable.GrantReadWriteData(apiFunction);
-        observationsTable.GrantReadWriteData(apiFunction);
         mediaBucket.GrantReadWrite(apiFunction);
-
-        // ── Recalibration Lambda ──────────────────────────────────────────
-
-        string anthropicApiKey = StringParameter.ValueForStringParameter(this, "/anthropic-api-key");
-
-        LambdaFunction recalibrateFunction = new LambdaFunction(this, "RecalibrateFunction", new LambdaFunctionProps
-        {
-            FunctionName = "grow-recalibrate",
-            Runtime      = LambdaRuntime.PROVIDED_AL2023,
-            Architecture = LambdaArchitecture.ARM_64,
-            Handler      = "bootstrap",
-            Timeout      = Duration.Minutes(5),
-            MemorySize   = 256,
-            Code = LambdaCode.FromAsset("../backend", new Amazon.CDK.AWS.S3.Assets.AssetOptions
-            {
-                Bundling = new BundlingOptions
-                {
-                    Image   = DockerImage.FromRegistry("public.ecr.aws/docker/library/golang:1.24-alpine"),
-                    Command = new[]
-                    {
-                        "sh", "-c",
-                        "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOCACHE=/tmp/go-build go build -tags lambda.norpc -o /asset-output/bootstrap ./cmd/recalibrate"
-                    }
-                }
-            }),
-            Environment = new Dictionary<string, string>
-            {
-                ["PLANTS_TABLE"]             = plantsTable.TableName,
-                ["LOGS_TABLE"]               = logsTable.TableName,
-                ["LOGS_DATE_GSI"]            = "user-date-index",
-                ["MILESTONES_TABLE"]         = milestonesTable.TableName,
-                ["OBSERVATIONS_TABLE"]       = observationsTable.TableName,
-                ["MEDIA_BUCKET"]             = mediaBucket.BucketName,
-                ["USER_ID"]                  = "default",
-                ["ANTHROPIC_API_KEY"]        = anthropicApiKey
-            }
-        });
-
-        plantsTable.GrantReadWriteData(recalibrateFunction);
-        logsTable.GrantReadData(recalibrateFunction);
-        milestonesTable.GrantReadWriteData(recalibrateFunction);
-        observationsTable.GrantReadWriteData(recalibrateFunction);
-        mediaBucket.GrantRead(recalibrateFunction);
-
-        // ── SQS Recalibrate Queue ─────────────────────────────────────────────
-
-        Queue recalibrateQueue = new Queue(this, "RecalibrateQueue", new QueueProps
-        {
-            QueueName         = "grow-recalibrate-queue",
-            VisibilityTimeout = Duration.Minutes(6),
-            RetentionPeriod   = Duration.Days(1),
-        });
-
-        // EventBridge cron → SQS (fires daily; empty body = process all plants)
-        Rule recalSchedule = new Rule(this, "RecalibrationSchedule", new RuleProps
-        {
-            Schedule = Schedule.Cron(new CronOptions { Hour = "14", Minute = "0" })
-        });
-        recalSchedule.AddTarget(new SqsQueueTarget(recalibrateQueue));
-
-        // SQS → recalibrate Lambda (batch size 1 so each message = one invocation)
-        recalibrateFunction.AddEventSourceMapping("SqsSource", new EventSourceMappingOptions
-        {
-            EventSourceArn = recalibrateQueue.QueueArn,
-            BatchSize      = 1,
-        });
-        recalibrateQueue.GrantConsumeMessages(recalibrateFunction);
-
-        // API Lambda can send messages to kick off per-plant calibration
-        recalibrateQueue.GrantSendMessages(apiFunction);
-        apiFunction.AddEnvironment("RECALIBRATE_QUEUE_URL", recalibrateQueue.QueueUrl);
 
         // ── API Gateway ───────────────────────────────────────────────────
 
