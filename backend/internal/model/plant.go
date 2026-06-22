@@ -32,12 +32,10 @@ type Plant struct {
 	PlantType      PlantType  `dynamodbav:"plantType"      json:"plantType,omitempty"`
 	Phase          PlantPhase `dynamodbav:"phase"          json:"phase"`
 	PhaseStartDate string     `dynamodbav:"phaseStartDate" json:"phaseStartDate"`
-	AvatarKey        string     `dynamodbav:"avatarKey"         json:"avatarKey,omitempty"`
-	EnvironmentID    string     `dynamodbav:"environmentId"     json:"environmentId,omitempty"`
-	ArchivedAt       string     `dynamodbav:"archivedAt"        json:"archivedAt,omitempty"`
-	LastCalibratedAt       string     `dynamodbav:"lastCalibratedAt"       json:"lastCalibratedAt,omitempty"`
-	ObservationsDismissed  bool       `dynamodbav:"observationsDismissed"  json:"observationsDismissed,omitempty"`
-	CreatedAt              string     `dynamodbav:"createdAt"              json:"createdAt"`
+	AvatarKey     string `dynamodbav:"avatarKey"     json:"avatarKey,omitempty"`
+	EnvironmentID string `dynamodbav:"environmentId" json:"environmentId,omitempty"`
+	ArchivedAt    string `dynamodbav:"archivedAt"    json:"archivedAt,omitempty"`
+	CreatedAt     string `dynamodbav:"createdAt"     json:"createdAt"`
 }
 
 type CreatePlantRequest struct {

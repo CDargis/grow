@@ -27,17 +27,6 @@ export interface Milestone {
   lastChangeReason?: string
 }
 
-export type ObservationCategory = 'health' | 'growth' | 'pest' | 'nutrient' | 'general'
-
-export interface PlantObservation {
-  plantId: string
-  observationId: string
-  observedAt: string
-  category: ObservationCategory
-  text: string
-  sourceLogIds?: string[]
-}
-
 export type EnvironmentType =
   | 'tent' | 'outdoor' | 'garage' | 'basement'
   | 'room' | 'greenhouse' | 'other'
@@ -60,8 +49,6 @@ export interface Plant {
   avatarKey?: string
   environmentId?: string
   archivedAt?: string
-  lastCalibratedAt?: string
-  observationsDismissed?: boolean
   createdAt: string
 }
 

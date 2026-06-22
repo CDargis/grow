@@ -1,14 +1,14 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, Bot, RefreshCw, Gauge } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, Gauge } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
 import { AddLogSheet } from '@/components/AddLogSheet'
 import { EditPlantSheet } from '@/components/EditPlantSheet'
 import { MediaImage } from '@/components/MediaImage'
-import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment, PlantObservation } from '@/types'
+import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment } from '@/types'
 
 const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'feeding', 'training', 'trimming', 'note', 'height', 'transplant', 'photo'])
 
@@ -420,89 +420,6 @@ function LogEntry({ log, envMap, onDelete, onEdit }: { log: Log; envMap: Map<str
   )
 }
 
-// ── Observation components ────────────────────────────────────────────────────
-
-function ObservationsSection({ observations, plantId, lastCalibratedAt, dismissed }: {
-  observations: PlantObservation[]
-  plantId: string
-  lastCalibratedAt?: string
-  dismissed: boolean
-}) {
-  const qc = useQueryClient()
-  const prevDismissedRef = useRef(dismissed)
-  const [expanded, setExpanded] = useState(!dismissed)
-
-  // If the AI sync job clears the dismissed bit, auto-expand
-  if (dismissed !== prevDismissedRef.current) {
-    prevDismissedRef.current = dismissed
-    if (!dismissed && !expanded) setExpanded(true)
-  }
-
-  const dismiss = useMutation({
-    mutationFn: () => api.plants.dismissObservations(plantId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['plant', plantId] }),
-  })
-
-  function handleToggle() {
-    if (expanded) dismiss.mutate()
-    setExpanded(e => !e)
-  }
-
-  const calibrate = useMutation({
-    mutationFn: () => api.plants.calibrate(plantId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['plant', plantId] }),
-  })
-
-  if (observations.length === 0 && !lastCalibratedAt) return null
-
-  return (
-    <div className="border-b border-border">
-      <div className="flex items-center gap-2 px-4 py-2.5">
-        <button
-          onClick={handleToggle}
-          className="flex items-center gap-2 flex-1 text-left min-w-0"
-        >
-          <Bot size={13} className="text-violet-400 flex-shrink-0" />
-          <span className="text-xs font-medium text-primary">AI Notes</span>
-          {lastCalibratedAt && (
-            <span className="text-[10px] text-muted/50 truncate">
-              · {new Date(lastCalibratedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => calibrate.mutate()}
-          disabled={calibrate.isPending}
-          className="text-muted/50 active:text-primary p-0.5 flex-shrink-0 disabled:opacity-40"
-          title="Run calibration"
-        >
-          <RefreshCw size={12} className={calibrate.isPending ? 'animate-spin' : ''} />
-        </button>
-        {observations.length > 0 && (
-          <button onClick={handleToggle} className="text-muted flex-shrink-0">
-            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          </button>
-        )}
-      </div>
-      {expanded && observations.length > 0 && (
-        <div className="px-4 pb-3 space-y-2">
-          {observations.map(obs => (
-            <div key={obs.observationId} className="flex items-start gap-2.5 rounded-xl p-2.5 bg-raised">
-              <Bot size={13} className="text-violet-400/60 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] text-primary leading-snug">{obs.text}</p>
-                <p className="text-[10px] text-muted/60 mt-0.5">
-                  {new Date(obs.observedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                  {' · '}<span className="capitalize">{obs.category}</span>
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function ChangeEnvironmentSheet({
   open, onClose, currentEnvId, plantId,
@@ -629,11 +546,6 @@ export function PlantDetailPage() {
     queryFn: api.environments.list,
   })
 
-  const { data: observations = [] } = useQuery({
-    queryKey: ['observations', id],
-    queryFn: () => api.observations.listForPlant(id!),
-    enabled: !!id,
-  })
 
 
   const envMap = new Map<string, string>(
@@ -794,8 +706,6 @@ export function PlantDetailPage() {
         </span>
         <ChevronRight size={16} className="text-muted" />
       </button>
-
-      <ObservationsSection observations={observations} plantId={plant.plantId} lastCalibratedAt={plant.lastCalibratedAt} dismissed={plant.observationsDismissed ?? false} />
 
       {/* Journal view: date strip + single-day logs */}
       {view === 'journal' && (

@@ -1,6 +1,6 @@
 import imageCompression from 'browser-image-compression'
 import type {
-  Plant, Environment, Log, Milestone, MilestoneType, PlantObservation,
+  Plant, Environment, Log, Milestone, MilestoneType,
   CreatePlantRequest, UpdatePlantDetailsRequest, CreateEnvironmentRequest, CreateLogRequest,
 } from '@/types'
 
@@ -35,10 +35,6 @@ export const api = {
       request<void>(`/plants/${id}/phase`,  { method: 'PUT', body: JSON.stringify({ phase, ...(date ? { date } : {}), ...(loggedAt ? { loggedAt } : {}) }) }),
     updateAvatar: (id: string, avatarKey: string) =>
       request<void>(`/plants/${id}/avatar`, { method: 'PUT', body: JSON.stringify({ avatarKey }) }),
-    calibrate: (id: string) =>
-      request<void>(`/plants/${id}/calibrate`, { method: 'POST', body: '{}' }),
-    dismissObservations: (id: string) =>
-      request<void>(`/plants/${id}/observations/dismiss`, { method: 'POST', body: '{}' }),
   },
 
   environments: {
@@ -69,10 +65,6 @@ export const api = {
       request<void>(`/plants/${plantId}/milestones/${milestoneType}`, {
         method: 'PATCH', body: JSON.stringify({ action: 'skip' }),
       }),
-  },
-
-  observations: {
-    listForPlant: (plantId: string) => request<PlantObservation[]>(`/plants/${plantId}/observations`),
   },
 
   media: {
