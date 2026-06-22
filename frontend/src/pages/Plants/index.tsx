@@ -26,27 +26,27 @@ function PlantCard({ plant, past = false }: { plant: Plant; past?: boolean }) {
   return (
     <Link
       to={`/plants/${plant.plantId}`}
-      className={`flex items-center gap-3 p-4 bg-surface rounded-xl border border-border active:scale-[0.98] transition-transform ${past ? 'opacity-50' : ''}`}
+      className={`block bg-surface rounded-xl border border-border overflow-hidden active:scale-[0.99] transition-transform ${past ? 'opacity-50' : ''}`}
     >
-      <div className="relative w-12 h-12 flex-shrink-0">
-        <div className="w-12 h-12 rounded-full bg-raised border border-border flex items-center justify-center text-2xl overflow-hidden">
-          {plant.avatarKey
-            ? <MediaImage photoKey={plant.avatarKey} alt={plant.name} className="w-full h-full object-cover" fallback={<span>🌱</span>} />
-            : '🌱'}
-        </div>
+      <div className="relative h-52 bg-raised flex items-center justify-center text-5xl overflow-hidden">
+        {plant.avatarKey
+          ? <MediaImage photoKey={plant.avatarKey} alt={plant.name} className="w-full h-full object-cover" fallback={<span>🌱</span>} />
+          : '🌱'}
         {badge && (
-          <span className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-surface border border-border flex items-center justify-center text-[10px] leading-none ${plant.phase === 'dead' ? '' : 'text-fern font-bold'}`}>
+          <span className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-xs leading-none">
             {badge}
           </span>
         )}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-3 pt-6 pb-2.5">
+          <p className="font-semibold text-white truncate">{plant.name}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-white/60 truncate">{plant.strain}</p>
+            <span className={`text-xs font-medium capitalize flex-shrink-0 ${PHASE_COLORS[plant.phase] ?? 'text-muted'}`}>
+              {plant.phase}
+            </span>
+          </div>
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-primary truncate">{plant.name}</p>
-        <p className="text-sm text-dim truncate">{plant.strain}</p>
-      </div>
-      <span className={`text-xs font-medium capitalize flex-shrink-0 ${PHASE_COLORS[plant.phase] ?? 'text-muted'}`}>
-        {plant.phase}
-      </span>
     </Link>
   )
 }
