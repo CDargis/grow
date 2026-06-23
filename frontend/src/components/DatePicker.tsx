@@ -41,9 +41,13 @@ export function DatePicker({ activeDates, selected, onSelect, weekRef: externalW
   const [internalRef, setInternalRef] = useState(new Date())
   const ref = externalWeekRef ?? internalRef
   const touchStartX = useRef<number | null>(null)
+  const slideDir    = useRef<'right' | 'left'>('right')
+  const hasMoved    = useRef(false)
 
   function setRef(updater: Date | ((prev: Date) => Date)) {
     const next = typeof updater === 'function' ? updater(ref) : updater
+    slideDir.current = next > ref ? 'right' : 'left'
+    hasMoved.current = true
     if (onWeekRefChange) {
       onWeekRefChange(next)
     } else {
@@ -70,6 +74,10 @@ export function DatePicker({ activeDates, selected, onSelect, weekRef: externalW
   if (!expanded) {
     const monday = weekStart(ref)
     const week = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
+    const weekKey = monday.toISOString()
+    const animClass = hasMoved.current
+      ? slideDir.current === 'right' ? 'animate-slide-in-right' : 'animate-slide-in-left'
+      : ''
 
     return (
       <div className="bg-surface border-b border-border">
@@ -84,27 +92,29 @@ export function DatePicker({ activeDates, selected, onSelect, weekRef: externalW
           >
             <ChevronLeft size={16} />
           </button>
-          <div className="flex flex-1 justify-around">
-            {week.map((day, i) => {
-              const str = toYMD(day)
-              const isSelected = str === selected
-              const isToday = str === todayStr
-              const hasActivity = activeDates.has(str)
-              return (
-                <button key={str} onClick={() => toggle(str)} className="flex flex-col items-center gap-0.5 py-0.5 px-0.5">
-                  <span className="text-[10px] text-muted leading-none">{DAY_LABELS[i]}</span>
-                  <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-medium ${
-                    isSelected ? 'bg-fern text-base font-semibold' :
-                    isToday    ? 'text-lime' : 'text-primary'
-                  }`}>
-                    {day.getDate()}
-                  </span>
-                  <span className={`w-1.5 h-1.5 rounded-full ${
-                    hasActivity ? (isSelected ? 'bg-base' : 'bg-fern') : 'bg-transparent'
-                  }`} />
-                </button>
-              )
-            })}
+          <div className="flex-1 overflow-hidden">
+            <div key={weekKey} className={`flex justify-around ${animClass}`}>
+              {week.map((day, i) => {
+                const str = toYMD(day)
+                const isSelected = str === selected
+                const isToday = str === todayStr
+                const hasActivity = activeDates.has(str)
+                return (
+                  <button key={str} onClick={() => toggle(str)} className="flex flex-col items-center gap-0.5 py-0.5 px-0.5">
+                    <span className="text-[10px] text-muted leading-none">{DAY_LABELS[i]}</span>
+                    <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-medium ${
+                      isSelected ? 'bg-fern text-base font-semibold' :
+                      isToday    ? 'text-lime' : 'text-primary'
+                    }`}>
+                      {day.getDate()}
+                    </span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      hasActivity ? (isSelected ? 'bg-base' : 'bg-fern') : 'bg-transparent'
+                    }`} />
+                  </button>
+                )
+              })}
+            </div>
           </div>
           <button
             onClick={() => setRef(d => addDays(d, 7))}
