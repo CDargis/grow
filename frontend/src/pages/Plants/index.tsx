@@ -28,7 +28,7 @@ function PlantCard({ plant, past = false }: { plant: Plant; past?: boolean }) {
       to={`/plants/${plant.plantId}`}
       className={`block bg-surface rounded-xl border border-border overflow-hidden active:scale-[0.99] transition-transform ${past ? 'opacity-50' : ''}`}
     >
-      <div className="relative h-36 bg-raised flex items-center justify-center text-5xl overflow-hidden">
+      <div className="relative h-28 bg-raised flex items-center justify-center text-5xl overflow-hidden">
         {plant.avatarKey
           ? <MediaImage photoKey={plant.avatarKey} alt={plant.name} className="w-full h-full object-cover" fallback={<span>🌱</span>} />
           : '🌱'}
