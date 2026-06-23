@@ -63,10 +63,16 @@ export function DatePicker({ activeDates, selected, onSelect }: DatePickerProps)
     return (
       <div className="bg-surface border-b border-border">
         <div
-          className="flex items-center px-3 py-2"
+          className="flex items-center px-2 py-2"
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
+          <button
+            onClick={() => setRef(d => addDays(d, -7))}
+            className="p-1.5 text-muted active:opacity-60"
+          >
+            <ChevronLeft size={16} />
+          </button>
           <div className="flex flex-1 justify-around">
             {week.map((day, i) => {
               const str = toYMD(day)
@@ -90,8 +96,14 @@ export function DatePicker({ activeDates, selected, onSelect }: DatePickerProps)
             })}
           </div>
           <button
+            onClick={() => setRef(d => addDays(d, 7))}
+            className="p-1.5 text-muted active:opacity-60"
+          >
+            <ChevronRight size={16} />
+          </button>
+          <button
             onClick={() => setExpanded(true)}
-            className="p-1.5 text-muted active:opacity-60 ml-1"
+            className="p-1.5 text-muted active:opacity-60 ml-0.5"
             title="Expand calendar"
           >
             <CalendarDays size={15} />
