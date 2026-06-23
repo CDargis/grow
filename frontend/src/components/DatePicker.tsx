@@ -30,15 +30,26 @@ interface DatePickerProps {
   activeDates: Set<string>
   selected: string | null
   onSelect: (date: string | null) => void
+  weekRef?: Date
+  onWeekRefChange?: (d: Date) => void
 }
 
-export function DatePicker({ activeDates, selected, onSelect }: DatePickerProps) {
+export function DatePicker({ activeDates, selected, onSelect, weekRef: externalWeekRef, onWeekRefChange }: DatePickerProps) {
   const [expanded, setExpanded] = useState(false)
   const todayStr = toYMD(new Date())
 
-  // ref tracks the anchor date for the current view (any day in the target week/month)
-  const [ref, setRef] = useState(new Date())
+  const [internalRef, setInternalRef] = useState(new Date())
+  const ref = externalWeekRef ?? internalRef
   const touchStartX = useRef<number | null>(null)
+
+  function setRef(updater: Date | ((prev: Date) => Date)) {
+    const next = typeof updater === 'function' ? updater(ref) : updater
+    if (onWeekRefChange) {
+      onWeekRefChange(next)
+    } else {
+      setInternalRef(next)
+    }
+  }
 
   function toggle(dateStr: string) {
     onSelect(selected === dateStr ? null : dateStr)

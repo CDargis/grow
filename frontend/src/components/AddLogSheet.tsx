@@ -690,9 +690,10 @@ interface Props {
   plant: Plant
   defaultDate?: string
   editLog?: Log
+  defaultLogType?: LogType
 }
 
-export function AddLogSheet({ open, onClose, plant, defaultDate, editLog }: Props) {
+export function AddLogSheet({ open, onClose, plant, defaultDate, editLog, defaultLogType }: Props) {
   const [selected, setSelected] = useState<LogType | null>(null)
   const [datetime, setDatetime] = useState(nowDatetime)
 
@@ -704,10 +705,10 @@ export function AddLogSheet({ open, onClose, plant, defaultDate, editLog }: Prop
       } else {
         const now = nowDatetime()
         setDatetime(defaultDate ? `${defaultDate}T${now.slice(11)}` : now)
-        setSelected(null)
+        setSelected(defaultLogType ?? null)
       }
     }
-  }, [open, defaultDate, editLog])
+  }, [open, defaultDate, editLog, defaultLogType])
 
   function reset() { setSelected(null) }
   function handleClose() { reset(); onClose() }

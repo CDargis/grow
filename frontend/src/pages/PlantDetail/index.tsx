@@ -568,6 +568,44 @@ export function PlantDetailPage() {
   const [editOpen, setEditOpen]         = useState(false)
   const [editLog, setEditLog]           = useState<Log | null>(null)
   const [phaseSheetOpen, setPhaseSheetOpen] = useState(false)
+  const [weekRef, setWeekRef] = useState(new Date())
+  const [quickLogType, setQuickLogType] = useState<LogType | null>(null)
+
+  function pdWeekStart(d: Date): Date {
+    const r = new Date(d); r.setHours(0, 0, 0, 0)
+    const dow = r.getDay()
+    r.setDate(r.getDate() - (dow === 0 ? 6 : dow - 1))
+    return r
+  }
+  function pdAddDays(d: Date, n: number): Date {
+    const r = new Date(d); r.setDate(r.getDate() + n); return r
+  }
+  function pdToYMD(d: Date): string { return d.toISOString().slice(0, 10) }
+
+  const currentWeek = Array.from({ length: 7 }, (_, i) =>
+    pdToYMD(pdAddDays(pdWeekStart(weekRef), i))
+  )
+
+  function handleWeekRefChange(newRef: Date) {
+    setWeekRef(newRef)
+    const newWeek = Array.from({ length: 7 }, (_, i) =>
+      pdToYMD(pdAddDays(pdWeekStart(newRef), i))
+    )
+    const effective = selectedDate ?? todayDate()
+    if (!newWeek.includes(effective)) {
+      const dow = new Date(effective + 'T12:00:00').getDay()
+      const mondayIdx = dow === 0 ? 6 : dow - 1
+      const candidate = newWeek[mondayIdx]
+      const today = todayDate()
+      setSelectedDate(candidate <= today ? candidate : (newWeek.filter(d => d <= today).pop() ?? null))
+    }
+  }
+
+  function openQuickLog(type: LogType) {
+    setQuickLogType(type)
+    setEditLog(null)
+    setLogSheetOpen(true)
+  }
 
   const deleteLog = useMutation({
     mutationFn: (logId: string) => api.logs.delete(id!, logId),
@@ -782,10 +820,47 @@ export function PlantDetailPage() {
         <ChevronRight size={16} className="text-muted" />
       </button>
 
-      {/* Journal view: date strip + single-day logs */}
+      {/* Journal view: date strip + instant actions + single-day logs */}
       {view === 'journal' && (
         <>
-          <DatePicker activeDates={activeDates} selected={selectedDate} onSelect={setSelectedDate} />
+          <DatePicker
+            activeDates={activeDates}
+            selected={selectedDate}
+            onSelect={setSelectedDate}
+            weekRef={weekRef}
+            onWeekRefChange={handleWeekRefChange}
+          />
+          {/* Instant action tray */}
+          {(() => {
+            const colIndex = currentWeek.indexOf(journalDate)
+            return (
+              <div className="relative bg-raised border-b border-border">
+                {colIndex >= 0 && (
+                  <div
+                    className="absolute w-3 h-3 rotate-45 bg-raised border-t border-l border-border z-10"
+                    style={{ top: '-6px', left: `calc(30px + ${colIndex + 0.5} * (100% - 102px) / 7)` }}
+                  />
+                )}
+                <div className="flex justify-around px-2 py-2">
+                  {([
+                    { type: 'watering' as LogType, icon: <Droplets size={20} />, label: 'Water' },
+                    { type: 'photo'    as LogType, icon: <Camera size={20} />,   label: 'Photo' },
+                    { type: 'note'     as LogType, icon: <MessageSquare size={20} />, label: 'Note' },
+                    { type: 'height'   as LogType, icon: <Ruler size={20} />,    label: 'Height' },
+                  ] as const).map(({ type, icon, label }) => (
+                    <button
+                      key={type}
+                      onClick={() => openQuickLog(type)}
+                      className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl active:bg-surface active:opacity-70"
+                    >
+                      <span className="text-dim">{icon}</span>
+                      <span className="text-[10px] text-muted leading-none">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
           <div className="p-4">
             <p className="text-xs text-muted mb-2 uppercase tracking-wide font-medium">
               {formatDateHeader(journalDate)}
@@ -827,10 +902,11 @@ export function PlantDetailPage() {
       />
       <AddLogSheet
         open={logSheetOpen}
-        onClose={() => { setLogSheetOpen(false); setEditLog(null) }}
+        onClose={() => { setLogSheetOpen(false); setEditLog(null); setQuickLogType(null) }}
         plant={plant}
         defaultDate={selectedDate ?? undefined}
         editLog={editLog ?? undefined}
+        defaultLogType={quickLogType ?? undefined}
       />
       <ChangeEnvironmentSheet
         open={envSheetOpen}
