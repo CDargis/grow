@@ -1,26 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Droplets, Zap, Ruler, MessageSquare, Camera, GitBranch, Scissors, ArrowRightLeft, ImagePlus, X } from 'lucide-react'
+import { Droplets, Zap, Ruler, MessageSquare, Camera, GitBranch, Scissors, ImagePlus, X } from 'lucide-react'
 import { BottomSheet } from './BottomSheet'
 import { MediaImage } from './MediaImage'
 import { api } from '@/api/client'
-import type { Plant, PlantPhase, Log, LogType, WateringData, FeedingData, TrainingData, TrimmingData, NoteData, PhotoData, TransplantData, HeightData } from '@/types'
+import type { Plant, Log, LogType, WateringData, FeedingData, TrainingData, TrimmingData, NoteData, PhotoData, TransplantData, HeightData } from '@/types'
 
 // ── Types config ─────────────────────────────────────────────────────────────
-
-const PHASES: PlantPhase[] = ['germination', 'seedling', 'veg', 'flower', 'harvest', 'drying', 'curing', 'archived', 'dead']
-
-const PHASE_COLORS: Record<PlantPhase, string> = {
-  germination: 'bg-yellow-400/20 text-yellow-300 border-yellow-400/30',
-  seedling:    'bg-lime/20 text-lime border-lime/30',
-  veg:         'bg-fern/20 text-fern border-fern/30',
-  flower:      'bg-purple-400/20 text-purple-300 border-purple-400/30',
-  harvest:     'bg-orange-400/20 text-orange-300 border-orange-400/30',
-  drying:      'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  curing:      'bg-amber-400/20 text-amber-300 border-amber-400/30',
-  archived:    'bg-muted/10 text-muted border-muted/20',
-  dead:        'bg-red-500/20 text-red-400 border-red-500/30',
-}
 
 type TypeConfig = {
   type: LogType
@@ -33,7 +19,6 @@ const LOG_TYPES: TypeConfig[] = [
   { type: 'watering',   label: 'Water',    icon: <Droplets  size={22} />, ready: true  },
   { type: 'feeding',    label: 'Feed',     icon: <Zap       size={22} />, ready: true  },
   { type: 'note',       label: 'Note',     icon: <MessageSquare size={22} />, ready: true },
-  { type: 'phase_change', label: 'Phase',  icon: <ArrowRightLeft size={22} />, ready: true },
   { type: 'training',   label: 'Training', icon: <GitBranch size={22} />, ready: true  },
   { type: 'trimming',   label: 'Trim',     icon: <Scissors  size={22} />, ready: true  },
   { type: 'height',     label: 'Height',   icon: <Ruler     size={22} />, ready: true  },
@@ -568,60 +553,6 @@ function TrimmingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
   )
 }
 
-// ── Phase change form ─────────────────────────────────────────────────────────
-
-function PhaseChangeForm({ plant, datetime, onSuccess }: { plant: Plant; datetime: string; onSuccess: () => void }) {
-  const qc = useQueryClient()
-  const [toPhase, setToPhase] = useState<PlantPhase | null>(null)
-
-  const mutation = useMutation({
-    mutationFn: () => api.plants.updatePhase(
-      plant.plantId, toPhase!,
-      datetimeToDate(datetime),
-      datetimeToISO(datetime),
-    ),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['plant', plant.plantId] })
-      qc.invalidateQueries({ queryKey: ['logs', 'plant', plant.plantId] })
-      qc.invalidateQueries({ queryKey: ['plants'] })
-      onSuccess()
-    },
-  })
-
-  return (
-    <div className="space-y-4 mt-2">
-      <div>
-        <p className={labelCls}>Move to</p>
-        <div className="grid grid-cols-3 gap-2">
-          {PHASES.filter(p => p !== plant.phase).map(phase => (
-            <button
-              key={phase}
-              onClick={() => setToPhase(phase)}
-              className={`py-2 px-2 rounded-xl text-xs font-medium border capitalize transition-colors ${
-                toPhase === phase
-                  ? PHASE_COLORS[phase]
-                  : 'border-border text-muted bg-raised active:opacity-70'
-              }`}
-            >
-              {phase}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}
-
-      <button
-        onClick={() => { if (toPhase) mutation.mutate() }}
-        disabled={!toPhase || mutation.isPending}
-        className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
-      >
-        {mutation.isPending ? 'Saving…' : 'Change Phase'}
-      </button>
-    </div>
-  )
-}
-
 // ── Photo form ────────────────────────────────────────────────────────────────
 
 function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: PhotoData }) {
@@ -819,8 +750,6 @@ export function AddLogSheet({ open, onClose, plant, defaultDate, editLog }: Prop
         <TrainingForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as TrainingData | undefined} />
       ) : selected === 'trimming' ? (
         <TrimmingForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as TrimmingData | undefined} />
-      ) : selected === 'phase_change' ? (
-        <PhaseChangeForm plant={plant} datetime={datetime} onSuccess={handleClose} />
       ) : selected === 'photo' ? (
         <PhotoForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as PhotoData | undefined} />
       ) : null}

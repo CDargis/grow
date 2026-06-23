@@ -12,6 +12,20 @@ import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingCh
 
 const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'feeding', 'training', 'trimming', 'note', 'height', 'transplant', 'photo'])
 
+const PHASES: PlantPhase[] = ['germination', 'seedling', 'veg', 'flower', 'harvest', 'drying', 'curing', 'archived', 'dead']
+
+const PHASE_COLORS: Record<PlantPhase, string> = {
+  germination: 'bg-yellow-400/20 text-yellow-300 border-yellow-400/30',
+  seedling:    'bg-lime/20 text-lime border-lime/30',
+  veg:         'bg-fern/20 text-fern border-fern/30',
+  flower:      'bg-purple-400/20 text-purple-300 border-purple-400/30',
+  harvest:     'bg-orange-400/20 text-orange-300 border-orange-400/30',
+  drying:      'bg-amber-500/20 text-amber-400 border-amber-500/30',
+  curing:      'bg-amber-400/20 text-amber-300 border-amber-400/30',
+  archived:    'bg-muted/10 text-muted border-muted/20',
+  dead:        'bg-red-500/20 text-red-400 border-red-500/30',
+}
+
 const LOG_ICONS: Record<LogType, React.ReactNode> = {
   watering:           <Droplets size={16} />,
   feeding:            <Zap size={16} />,
@@ -421,6 +435,56 @@ function LogEntry({ log, envMap, onDelete, onEdit }: { log: Log; envMap: Map<str
 }
 
 
+function PhaseChangeSheet({ plant, open, onClose }: { plant: Plant; open: boolean; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [toPhase, setToPhase] = useState<PlantPhase | null>(null)
+
+  const mutation = useMutation({
+    mutationFn: () => api.plants.updatePhase(
+      plant.plantId, toPhase!,
+      new Date().toLocaleDateString('en-CA'),
+      new Date().toISOString(),
+    ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plant', plant.plantId] })
+      qc.invalidateQueries({ queryKey: ['logs', 'plant', plant.plantId] })
+      qc.invalidateQueries({ queryKey: ['plants'] })
+      setToPhase(null)
+      onClose()
+    },
+  })
+
+  return (
+    <BottomSheet title="Change Phase" open={open} onClose={onClose}>
+      <div className="space-y-4 mt-2">
+        <div className="grid grid-cols-3 gap-2">
+          {PHASES.filter(p => p !== plant.phase).map(phase => (
+            <button
+              key={phase}
+              onClick={() => setToPhase(phase)}
+              className={`py-2 px-2 rounded-xl text-xs font-medium border capitalize transition-colors ${
+                toPhase === phase
+                  ? PHASE_COLORS[phase]
+                  : 'border-border text-muted bg-raised active:opacity-70'
+              }`}
+            >
+              {phase}
+            </button>
+          ))}
+        </div>
+        {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}
+        <button
+          onClick={() => { if (toPhase) mutation.mutate() }}
+          disabled={!toPhase || mutation.isPending}
+          className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
+        >
+          {mutation.isPending ? 'Saving…' : 'Change Phase'}
+        </button>
+      </div>
+    </BottomSheet>
+  )
+}
+
 function ChangeEnvironmentSheet({
   open, onClose, currentEnvId, plantId,
 }: {
@@ -501,8 +565,9 @@ export function PlantDetailPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [view, setView]           = useState<View>('journal')
-  const [editOpen, setEditOpen]   = useState(false)
-  const [editLog, setEditLog]     = useState<Log | null>(null)
+  const [editOpen, setEditOpen]         = useState(false)
+  const [editLog, setEditLog]           = useState<Log | null>(null)
+  const [phaseSheetOpen, setPhaseSheetOpen] = useState(false)
 
   const deleteLog = useMutation({
     mutationFn: (logId: string) => api.logs.delete(id!, logId),
@@ -648,7 +713,12 @@ export function PlantDetailPage() {
                   <span className="text-xs text-white/40">{elapsed(plantStartDate)} old</span>
                 </div>
               </div>
-              <span className="text-xs text-fern capitalize font-semibold flex-shrink-0 mb-0.5">{plant.phase}</span>
+              <button
+                onClick={e => { e.stopPropagation(); setPhaseSheetOpen(true) }}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold border capitalize flex-shrink-0 mb-0.5 ${PHASE_COLORS[plant.phase]}`}
+              >
+                {plant.phase}
+              </button>
             </div>
             {avatarUploading && (
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -684,7 +754,12 @@ export function PlantDetailPage() {
               <span className="text-xs text-muted">{elapsed(plantStartDate)} old</span>
             </div>
           </div>
-          <span className="text-xs text-fern capitalize font-medium flex-shrink-0">{plant.phase}</span>
+          <button
+            onClick={() => setPhaseSheetOpen(true)}
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold border capitalize flex-shrink-0 ${PHASE_COLORS[plant.phase]}`}
+          >
+            {plant.phase}
+          </button>
           <ViewToggle />
           <button onClick={() => setEditOpen(true)} className="text-muted active:opacity-70">
             <Pencil size={16} />
@@ -762,6 +837,11 @@ export function PlantDetailPage() {
         onClose={() => setEnvSheetOpen(false)}
         currentEnvId={plant.environmentId}
         plantId={plant.plantId}
+      />
+      <PhaseChangeSheet
+        plant={plant}
+        open={phaseSheetOpen}
+        onClose={() => setPhaseSheetOpen(false)}
       />
     </div>
   )

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { ChevronLeft, ChevronRight, CalendarDays, ChevronsUpDown } from 'lucide-react'
 
 const MONTH_NAMES = [
@@ -38,9 +38,22 @@ export function DatePicker({ activeDates, selected, onSelect }: DatePickerProps)
 
   // ref tracks the anchor date for the current view (any day in the target week/month)
   const [ref, setRef] = useState(new Date())
+  const touchStartX = useRef<number | null>(null)
 
   function toggle(dateStr: string) {
     onSelect(selected === dateStr ? null : dateStr)
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    touchStartX.current = null
+    if (Math.abs(dx) < 40) return
+    setRef(d => addDays(d, dx < 0 ? 7 : -7))
   }
 
   if (!expanded) {
@@ -49,14 +62,11 @@ export function DatePicker({ activeDates, selected, onSelect }: DatePickerProps)
 
     return (
       <div className="bg-surface border-b border-border">
-        <div className="flex items-center px-2 py-2">
-          <button
-            onClick={() => setRef(d => addDays(d, -7))}
-            className="p-1.5 text-muted active:opacity-60"
-          >
-            <ChevronLeft size={16} />
-          </button>
-
+        <div
+          className="flex items-center px-3 py-2"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           <div className="flex flex-1 justify-around">
             {week.map((day, i) => {
               const str = toYMD(day)
@@ -79,16 +89,9 @@ export function DatePicker({ activeDates, selected, onSelect }: DatePickerProps)
               )
             })}
           </div>
-
-          <button
-            onClick={() => setRef(d => addDays(d, 7))}
-            className="p-1.5 text-muted active:opacity-60"
-          >
-            <ChevronRight size={16} />
-          </button>
           <button
             onClick={() => setExpanded(true)}
-            className="p-1.5 text-muted active:opacity-60 ml-0.5"
+            className="p-1.5 text-muted active:opacity-60 ml-1"
             title="Expand calendar"
           >
             <CalendarDays size={15} />
