@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, Gauge } from 'lucide-react'
@@ -553,17 +553,64 @@ function ChangeEnvironmentSheet({
   )
 }
 
+function AvatarPickerSheet({ open, onClose, logs, plantId }: {
+  open: boolean
+  onClose: () => void
+  logs: Log[]
+  plantId: string
+}) {
+  const qc = useQueryClient()
+  const photoLogs = logs.filter(l => !!(l.data as any)?.photoKey)
+
+  const mutation = useMutation({
+    mutationFn: (photoKey: string) => api.plants.updateAvatar(plantId, photoKey),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plant', plantId] })
+      qc.invalidateQueries({ queryKey: ['plants'] })
+      onClose()
+    },
+  })
+
+  return (
+    <BottomSheet title="Choose Cover Photo" open={open} onClose={onClose}>
+      {photoLogs.length === 0 ? (
+        <p className="py-12 text-center text-muted text-sm">
+          No photos yet — add a photo log entry first.
+        </p>
+      ) : (
+        <div className="grid grid-cols-3 gap-1.5 mt-2">
+          {photoLogs.map(log => {
+            const photoKey = (log.data as any).photoKey as string
+            return (
+              <button
+                key={log.logId}
+                onClick={() => mutation.mutate(photoKey)}
+                disabled={mutation.isPending}
+                className="aspect-square rounded-lg overflow-hidden active:opacity-70 disabled:opacity-50"
+              >
+                <MediaImage photoKey={photoKey} alt="log photo" className="w-full h-full object-cover" />
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {mutation.isError && (
+        <p className="text-red-400 text-sm mt-2">{(mutation.error as Error).message}</p>
+      )}
+    </BottomSheet>
+  )
+}
+
 type View = 'journal' | 'timeline'
 
 export function PlantDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const avatarRef = useRef<HTMLInputElement>(null)
   const [envSheetOpen, setEnvSheetOpen] = useState(false)
   const [logSheetOpen, setLogSheetOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false)
   const [view, setView]           = useState<View>('journal')
   const [editOpen, setEditOpen]         = useState(false)
   const [editLog, setEditLog]           = useState<Log | null>(null)
@@ -615,21 +662,6 @@ export function PlantDetailPage() {
   function handleEditLog(log: Log) {
     setEditLog(log)
     setLogSheetOpen(true)
-  }
-
-  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || !id) return
-    setAvatarUploading(true)
-    try {
-      const key = await api.media.uploadFile(file, `plants/${id}/avatar`)
-      await api.plants.updateAvatar(id, key)
-      qc.invalidateQueries({ queryKey: ['plant', id] })
-      qc.invalidateQueries({ queryKey: ['plants'] })
-    } finally {
-      setAvatarUploading(false)
-      if (avatarRef.current) avatarRef.current.value = ''
-    }
   }
 
   const { data: plant, isLoading: plantLoading } = useQuery({
@@ -704,8 +736,6 @@ export function PlantDetailPage() {
 
   return (
     <div className="flex flex-col">
-      <input ref={avatarRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-
       {plant.avatarKey ? (
         /* Hero banner when photo is set */
         <div className="relative h-60 w-full flex-shrink-0">
@@ -737,8 +767,7 @@ export function PlantDetailPage() {
           </div>
 
           <button
-            onClick={() => avatarRef.current?.click()}
-            disabled={avatarUploading}
+            onClick={() => setAvatarPickerOpen(true)}
             className="absolute bottom-0 left-0 right-0 p-4 text-left"
           >
             <div className="flex items-end justify-between gap-2">
@@ -758,11 +787,6 @@ export function PlantDetailPage() {
                 {plant.phase}
               </button>
             </div>
-            {avatarUploading && (
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
           </button>
         </div>
       ) : (
@@ -772,16 +796,10 @@ export function PlantDetailPage() {
             <ArrowLeft size={20} />
           </button>
           <button
-            onClick={() => avatarRef.current?.click()}
-            disabled={avatarUploading}
-            className="relative w-11 h-11 rounded-full bg-raised border border-border flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden active:opacity-70"
+            onClick={() => setAvatarPickerOpen(true)}
+            className="w-11 h-11 rounded-full bg-raised border border-border flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden active:opacity-70"
           >
             <span>🌱</span>
-            {avatarUploading && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
           </button>
           <div className="flex-1 min-w-0">
             <h1 className="font-semibold text-primary">{plant.name}</h1>
@@ -895,6 +913,12 @@ export function PlantDetailPage() {
         </div>
       )}
 
+      <AvatarPickerSheet
+        open={avatarPickerOpen}
+        onClose={() => setAvatarPickerOpen(false)}
+        logs={logs ?? []}
+        plantId={plant.plantId}
+      />
       <EditPlantSheet
         open={editOpen}
         onClose={() => setEditOpen(false)}
