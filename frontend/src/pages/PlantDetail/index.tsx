@@ -757,12 +757,6 @@ export function PlantDetailPage() {
               >
                 <Pencil size={16} />
               </button>
-              <button
-                onClick={() => setLogSheetOpen(true)}
-                className="w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white active:opacity-70"
-              >
-                <Plus size={20} />
-              </button>
             </div>
           </div>
 
@@ -820,9 +814,6 @@ export function PlantDetailPage() {
           <button onClick={() => setEditOpen(true)} className="text-muted active:opacity-70">
             <Pencil size={16} />
           </button>
-          <button onClick={() => setLogSheetOpen(true)} className="text-fern active:opacity-70">
-            <Plus size={18} />
-          </button>
         </div>
       )}
 
@@ -875,6 +866,13 @@ export function PlantDetailPage() {
                       <span className="text-[10px] text-muted leading-none">{label}</span>
                     </button>
                   ))}
+                  <button
+                    onClick={() => { setEditLog(null); setQuickLogType(null); setLogSheetOpen(true) }}
+                    className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl active:bg-surface active:opacity-70"
+                  >
+                    <span className="text-dim"><Plus size={20} /></span>
+                    <span className="text-[10px] text-muted leading-none">More</span>
+                  </button>
                 </div>
               </div>
             )
