@@ -9,13 +9,48 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
     <title>grow</title>
+    <style>
+      @keyframes splash-breathe {
+        0%, 100% { opacity: 0.6; transform: scale(1); }
+        50%       { opacity: 1;   transform: scale(1.06); }
+      }
+      #splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #060C0A;
+        gap: 18px;
+      }
+      #splash img {
+        width: 80px;
+        height: 80px;
+        border-radius: 20px;
+        animation: splash-breathe 2s ease-in-out infinite;
+      }
+      #splash span {
+        color: #4A9E50;
+        font-family: system-ui, sans-serif;
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+      }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
   </head>
   <body class="bg-base text-primary">
-    <div id="root"></div>
+    <div id="root">
+      <div id="splash">
+        <img src="/apple-touch-icon.png" alt="" />
+        <span>grow</span>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
