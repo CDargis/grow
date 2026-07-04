@@ -21,13 +21,21 @@ const (
 )
 
 type Log struct {
-	PlantID  string          `dynamodbav:"plantId"  json:"plantId"`
-	LogID    string          `dynamodbav:"logId"    json:"logId"`
-	UserID   string          `dynamodbav:"userId"   json:"userId"`
-	LogType  LogType         `dynamodbav:"logType"  json:"logType"`
-	Date     string          `dynamodbav:"date"     json:"date"`
-	LoggedAt string          `dynamodbav:"loggedAt" json:"loggedAt"`
-	Data     json.RawMessage `dynamodbav:"data"     json:"data"`
+	PlantID     string          `dynamodbav:"plantId"     json:"plantId"`
+	LogID       string          `dynamodbav:"logId"       json:"logId"`
+	UserID      string          `dynamodbav:"userId"      json:"userId"`
+	LogType     LogType         `dynamodbav:"logType"     json:"logType"`
+	Date        string          `dynamodbav:"date"        json:"date"`
+	LoggedAt    string          `dynamodbav:"loggedAt"    json:"loggedAt"`
+	LogTypeDate string          `dynamodbav:"logTypeDate" json:"-"`
+	Data        json.RawMessage `dynamodbav:"data"        json:"data"`
+}
+
+type LastActivityItem struct {
+	PlantID  string  `json:"plantId"`
+	LogType  LogType `json:"logType"`
+	Date     string  `json:"date"`
+	LoggedAt string  `json:"loggedAt"`
 }
 
 type CreateLogRequest struct {

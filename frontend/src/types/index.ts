@@ -96,6 +96,13 @@ export interface CreateLogRequest {
   data: LogData
 }
 
+export interface LastActivity {
+  plantId: string
+  logType: LogType
+  date: string
+  loggedAt: string
+}
+
 export interface CreateEnvironmentRequest {
   name: string
   type: EnvironmentType

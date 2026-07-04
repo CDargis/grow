@@ -38,7 +38,7 @@ func main() {
 	a := &app{
 		plants:   store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
 		envs:     store.NewEnvironmentStore(clients.DDB, os.Getenv("ENVIRONMENTS_TABLE")),
-		logs:     store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI")),
+		logs:     store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI"), os.Getenv("LOGS_LOGTYPE_DATE_GSI")),
 		s3:       clients.S3,
 		presign:  s3.NewPresignClient(clients.S3),
 		mediaBkt: os.Getenv("MEDIA_BUCKET"),
@@ -48,7 +48,12 @@ func main() {
 	mux := http.NewServeMux()
 	a.registerRoutes(mux)
 
-	lambda.Start(httpadapter.NewV2(mux).ProxyWithContext)
+	if os.Getenv("LOCAL") == "1" {
+		log.Println("running local HTTP server on :3000")
+		log.Fatal(http.ListenAndServe(":3000", mux))
+	} else {
+		lambda.Start(httpadapter.NewV2(mux).ProxyWithContext)
+	}
 }
 
 func (a *app) registerRoutes(mux *http.ServeMux) {
@@ -67,6 +72,7 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/plants/{plantId}/logs/{logId}", a.deleteLog)
 
 	mux.HandleFunc("GET /api/logs",                      a.listLogsByDate)
+	mux.HandleFunc("GET /api/logs/last-by-type",          a.listLastByType)
 
 	mux.HandleFunc("GET /api/environments",              a.listEnvironments)
 	mux.HandleFunc("POST /api/environments",             a.createEnvironment)
@@ -242,6 +248,23 @@ func (a *app) listLogsByDate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, logs)
+}
+
+func (a *app) listLastByType(w http.ResponseWriter, r *http.Request) {
+	logType := r.URL.Query().Get("logType")
+	if logType == "" {
+		httpError(w, fmt.Errorf("logType required"), http.StatusBadRequest)
+		return
+	}
+	items, err := a.logs.LastByLogType(r.Context(), a.userID, logType)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	if items == nil {
+		items = []model.LastActivityItem{}
+	}
+	jsonOK(w, items)
 }
 
 func (a *app) createLog(w http.ResponseWriter, r *http.Request) {

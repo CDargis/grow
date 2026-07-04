@@ -1,6 +1,6 @@
 import imageCompression from 'browser-image-compression'
 import type {
-  Plant, Environment, Log,
+  Plant, Environment, Log, LastActivity,
   CreatePlantRequest, UpdatePlantDetailsRequest, CreateEnvironmentRequest, CreateLogRequest,
 } from '@/types'
 
@@ -48,6 +48,7 @@ export const api = {
   logs: {
     listForPlant: (plantId: string)             => request<Log[]>(`/plants/${plantId}/logs`),
     listForDate:  (date: string)                => request<Log[]>(`/logs?date=${date}`),
+    lastByType:   (logType: string)             => request<LastActivity[]>(`/logs/last-by-type?logType=${encodeURIComponent(logType)}`),
     create:       (plantId: string, body: CreateLogRequest) =>
       request<Log>(`/plants/${plantId}/logs`, { method: 'POST', body: JSON.stringify(body) }),
     update: (plantId: string, logId: string, body: CreateLogRequest) =>

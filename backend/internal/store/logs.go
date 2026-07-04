@@ -14,13 +14,14 @@ import (
 )
 
 type LogStore struct {
-	ddb       *dynamodb.Client
-	tableName string
-	dateGSI   string
+	ddb            *dynamodb.Client
+	tableName      string
+	dateGSI        string
+	logTypeDateGSI string
 }
 
-func NewLogStore(ddb *dynamodb.Client, tableName, dateGSI string) *LogStore {
-	return &LogStore{ddb: ddb, tableName: tableName, dateGSI: dateGSI}
+func NewLogStore(ddb *dynamodb.Client, tableName, dateGSI, logTypeDateGSI string) *LogStore {
+	return &LogStore{ddb: ddb, tableName: tableName, dateGSI: dateGSI, logTypeDateGSI: logTypeDateGSI}
 }
 
 func (s *LogStore) ListForPlant(ctx context.Context, plantID string) ([]model.Log, error) {
@@ -76,13 +77,14 @@ func (s *LogStore) Create(ctx context.Context, plantID, userID string, req model
 		loggedAt = now.Format(time.RFC3339)
 	}
 	entry := model.Log{
-		PlantID:  plantID,
-		LogID:    ulid.Make().String(),
-		UserID:   userID,
-		LogType:  req.LogType,
-		Date:     date,
-		LoggedAt: loggedAt,
-		Data:     req.Data,
+		PlantID:     plantID,
+		LogID:       ulid.Make().String(),
+		UserID:      userID,
+		LogType:     req.LogType,
+		Date:        date,
+		LoggedAt:    loggedAt,
+		LogTypeDate: string(req.LogType) + "#" + date,
+		Data:        req.Data,
 	}
 	item, err := attributevalue.MarshalMap(entry)
 	if err != nil {
@@ -108,13 +110,14 @@ func (s *LogStore) Update(ctx context.Context, plantID, logID, userID string, re
 		loggedAt = now.Format(time.RFC3339)
 	}
 	entry := model.Log{
-		PlantID:  plantID,
-		LogID:    logID,
-		UserID:   userID,
-		LogType:  req.LogType,
-		Date:     date,
-		LoggedAt: loggedAt,
-		Data:     req.Data,
+		PlantID:     plantID,
+		LogID:       logID,
+		UserID:      userID,
+		LogType:     req.LogType,
+		Date:        date,
+		LoggedAt:    loggedAt,
+		LogTypeDate: string(req.LogType) + "#" + date,
+		Data:        req.Data,
 	}
 	item, err := attributevalue.MarshalMap(entry)
 	if err != nil {
@@ -127,6 +130,42 @@ func (s *LogStore) Update(ctx context.Context, plantID, logID, userID string, re
 		return nil, fmt.Errorf("update log: %w", err)
 	}
 	return &entry, nil
+}
+
+func (s *LogStore) LastByLogType(ctx context.Context, userID, logType string) ([]model.LastActivityItem, error) {
+	prefix := logType + "#"
+	out, err := s.ddb.Query(ctx, &dynamodb.QueryInput{
+		TableName:              aws.String(s.tableName),
+		IndexName:              aws.String(s.logTypeDateGSI),
+		KeyConditionExpression: aws.String("userId = :uid AND begins_with(logTypeDate, :prefix)"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":uid":    &types.AttributeValueMemberS{Value: userID},
+			":prefix": &types.AttributeValueMemberS{Value: prefix},
+		},
+		ScanIndexForward: aws.Bool(false),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("last by log type: %w", err)
+	}
+	var logs []model.Log
+	if err := attributevalue.UnmarshalListOfMaps(out.Items, &logs); err != nil {
+		return nil, fmt.Errorf("unmarshal: %w", err)
+	}
+	seen := map[string]bool{}
+	var result []model.LastActivityItem
+	for _, l := range logs {
+		if seen[l.PlantID] {
+			continue
+		}
+		seen[l.PlantID] = true
+		result = append(result, model.LastActivityItem{
+			PlantID:  l.PlantID,
+			LogType:  l.LogType,
+			Date:     l.Date,
+			LoggedAt: l.LoggedAt,
+		})
+	}
+	return result, nil
 }
 
 func (s *LogStore) Delete(ctx context.Context, plantID, logID string) error {

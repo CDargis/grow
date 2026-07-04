@@ -3,6 +3,7 @@ import { BottomNav } from '@/components/BottomNav'
 import { PlantsPage } from '@/pages/Plants'
 import { EnvironmentsPage } from '@/pages/Environments'
 import { PlantDetailPage } from '@/pages/PlantDetail'
+import { OverviewPage } from '@/pages/Overview'
 
 export default function App() {
   return (
@@ -13,6 +14,7 @@ export default function App() {
           <Route path="/plants"         element={<PlantsPage />} />
           <Route path="/plants/:id"     element={<PlantDetailPage />} />
           <Route path="/environments"   element={<EnvironmentsPage />} />
+          <Route path="/overview"       element={<OverviewPage />} />
         </Routes>
       </main>
 

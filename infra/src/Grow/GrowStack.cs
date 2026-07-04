@@ -75,6 +75,13 @@ public class GrowStack : Stack
             SortKey        = new DynamoAttribute { Name = "date",   Type = AttributeType.STRING },
             ProjectionType = ProjectionType.ALL
         });
+        logsTable.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
+        {
+            IndexName      = "user-logtype-date-index",
+            PartitionKey   = new DynamoAttribute { Name = "userId",      Type = AttributeType.STRING },
+            SortKey        = new DynamoAttribute { Name = "logTypeDate", Type = AttributeType.STRING },
+            ProjectionType = ProjectionType.ALL
+        });
 
         // ── S3 Buckets ────────────────────────────────────────────────────
 
@@ -129,7 +136,8 @@ public class GrowStack : Stack
                 ["PLANTS_TABLE"]       = plantsTable.TableName,
                 ["ENVIRONMENTS_TABLE"] = environmentsTable.TableName,
                 ["LOGS_TABLE"]         = logsTable.TableName,
-                ["LOGS_DATE_GSI"]      = "user-date-index",
+                ["LOGS_DATE_GSI"]           = "user-date-index",
+                ["LOGS_LOGTYPE_DATE_GSI"]   = "user-logtype-date-index",
                 ["MEDIA_BUCKET"]       = mediaBucket.BucketName,
                 ["USER_ID"]            = "default"
             }
