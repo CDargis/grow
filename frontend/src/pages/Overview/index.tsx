@@ -8,6 +8,12 @@ import type { Log, LogType, Plant } from '@/types'
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
+function getPhotoKeys(data: any): string[] {
+  if (Array.isArray(data?.photoKeys)) return data.photoKeys
+  if (data?.photoKey) return [data.photoKey]
+  return []
+}
+
 function relativeDate(dateStr: string): string {
   const days = Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / 86400000)
   if (days === 0) return 'today'
@@ -210,7 +216,7 @@ function FeedView({ plants }: { plants: Plant[] }) {
           {logs.map(log => {
             const plant   = plantMap.get(log.plantId)
             const summary = feedSummary(log)
-            const photoKey = (log.data as any)?.photoKey as string | undefined
+            const photoKeys = getPhotoKeys(log.data)
             return (
               <button
                 key={log.logId}
@@ -231,9 +237,9 @@ function FeedView({ plants }: { plants: Plant[] }) {
                   </div>
                   {summary && <p className="text-xs text-dim truncate">{summary}</p>}
                 </div>
-                {photoKey && (
+                {photoKeys[0] && (
                   <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0">
-                    <MediaImage photoKey={photoKey} alt="photo" className="w-full h-full object-cover" />
+                    <MediaImage photoKey={photoKeys[0]} alt="photo" className="w-full h-full object-cover" />
                   </div>
                 )}
               </button>

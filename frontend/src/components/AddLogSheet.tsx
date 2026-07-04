@@ -555,41 +555,53 @@ function TrimmingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
 
 // ── Photo form ────────────────────────────────────────────────────────────────
 
+function getInitPhotoKeys(init?: PhotoData): string[] {
+  if (!init) return []
+  if (Array.isArray((init as any).photoKeys)) return (init as any).photoKeys
+  if ((init as any).photoKey) return [(init as any).photoKey]
+  return []
+}
+
 function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: PhotoData }) {
   const qc = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [caption, setCaption] = useState(init?.caption ?? '')
-  const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const existingKeys = getInitPhotoKeys(init)
+  const [newFiles, setNewFiles]     = useState<File[]>([])
+  const [previews, setPreviews]     = useState<string[]>([])
+  const [caption, setCaption]       = useState(init?.caption ?? '')
+  const [uploading, setUploading]   = useState(false)
+  const [error, setError]           = useState<string | null>(null)
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (!f) return
-    setFile(f)
-    setPreview(URL.createObjectURL(f))
-  }
-
-  function removePhoto() {
-    setFile(null)
-    setPreview(null)
+  function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? [])
+    if (!selected.length) return
+    setNewFiles(prev => [...prev, ...selected])
+    setPreviews(prev => [...prev, ...selected.map(f => URL.createObjectURL(f))])
     if (fileRef.current) fileRef.current.value = ''
   }
 
+  function removeNew(idx: number) {
+    setNewFiles(prev => prev.filter((_, i) => i !== idx))
+    setPreviews(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const totalCount = existingKeys.length + newFiles.length
+  const canSave    = totalCount > 0
+
   async function handleSubmit() {
-    if (!file && !init?.photoKey) return
+    if (!canSave) return
     setUploading(true)
     setError(null)
     try {
-      const photoKey = file
-        ? await api.media.uploadFile(file, `plants/${plantId}/logs`)
-        : init!.photoKey
+      const uploadedKeys = await Promise.all(
+        newFiles.map(f => api.media.uploadFile(f, `plants/${plantId}/logs`))
+      )
+      const photoKeys = [...existingKeys, ...uploadedKeys]
       const body = {
         logType: 'photo' as const,
         date: datetimeToDate(datetime),
         loggedAt: datetimeToISO(datetime),
-        data: { photoKey, ...(caption ? { caption } : {}) } as PhotoData,
+        data: { photoKeys, ...(caption ? { caption } : {}) } as PhotoData,
       }
       if (logId) {
         await api.logs.update(plantId, logId, body)
@@ -607,29 +619,41 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
 
   return (
     <div className="space-y-3 mt-2">
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles} />
 
-      <button
-        onClick={() => fileRef.current?.click()}
-        className={`w-full h-52 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors overflow-hidden ${
-          preview || init?.photoKey ? 'border-transparent p-0' : 'border-border text-muted active:opacity-70'
-        }`}
-      >
-        {preview
-          ? <img src={preview} alt="preview" className="w-full h-full object-cover" />
-          : init?.photoKey
-            ? <MediaImage photoKey={init.photoKey} alt="current photo" className="w-full h-full object-cover" />
-            : <>
-                <ImagePlus size={28} />
-                <span className="text-sm">Tap to select photo</span>
-              </>
-        }
-      </button>
-
-      {preview && (
-        <button onClick={removePhoto} className="text-xs text-muted active:opacity-70 flex items-center gap-1">
-          <X size={12} /> Remove photo
+      {totalCount === 0 ? (
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="w-full h-48 rounded-xl border-2 border-dashed border-border text-muted flex flex-col items-center justify-center gap-2 active:opacity-70"
+        >
+          <ImagePlus size={28} />
+          <span className="text-sm">Tap to select photos</span>
         </button>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {existingKeys.map(key => (
+            <div key={key} className="aspect-square rounded-lg overflow-hidden">
+              <MediaImage photoKey={key} alt="photo" className="w-full h-full object-cover" />
+            </div>
+          ))}
+          {previews.map((src, i) => (
+            <div key={i} className="relative aspect-square rounded-lg overflow-hidden">
+              <img src={src} alt="preview" className="w-full h-full object-cover" />
+              <button
+                onClick={() => removeNew(i)}
+                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center"
+              >
+                <X size={11} className="text-white" />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="aspect-square rounded-lg border-2 border-dashed border-border text-muted flex items-center justify-center active:opacity-70"
+          >
+            <ImagePlus size={20} />
+          </button>
+        </div>
       )}
 
       <div>
@@ -646,10 +670,13 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
 
       <button
         onClick={handleSubmit}
-        disabled={(!file && !init?.photoKey) || uploading}
+        disabled={!canSave || uploading}
         className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
       >
-        {uploading ? 'Uploading…' : logId ? 'Save Changes' : 'Save Photo'}
+        {uploading
+          ? `Uploading ${newFiles.length > 1 ? `${newFiles.length} photos` : 'photo'}…`
+          : logId ? 'Save Changes' : `Save ${totalCount > 1 ? `${totalCount} Photos` : 'Photo'}`
+        }
       </button>
     </div>
   )

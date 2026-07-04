@@ -60,7 +60,7 @@ export interface SproutData    { }
 export interface TransplantData { potSize: string; medium?: string }
 export interface HeightData    { height: number; unit: 'cm' | 'in' }
 export interface NoteData      { text: string }
-export interface PhotoData     { photoKey: string; caption?: string }
+export interface PhotoData     { photoKeys: string[]; caption?: string }
 export interface PhaseChangeData       { fromPhase: PlantPhase; toPhase: PlantPhase }
 export interface EnvironmentChangeData { fromEnvironmentId?: string; toEnvironmentId?: string }
 export interface LightingChangeData    { fromSchedule?: string; toSchedule?: string }

@@ -12,6 +12,12 @@ import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingCh
 
 const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'feeding', 'training', 'trimming', 'note', 'height', 'transplant', 'photo'])
 
+function getPhotoKeys(data: any): string[] {
+  if (Array.isArray(data?.photoKeys)) return data.photoKeys
+  if (data?.photoKey) return [data.photoKey]
+  return []
+}
+
 const PHASES: PlantPhase[] = ['germination', 'seedling', 'veg', 'flower', 'harvest', 'drying', 'curing', 'archived', 'dead']
 
 const PHASE_COLORS: Record<PlantPhase, string> = {
@@ -215,6 +221,31 @@ function phaseDuration(startDate: string, endDate: string | null): string {
 
 // ── Phase log entry (compact row inside an expanded phase) ────────────────────
 
+function PhotoGrid({ photoKeys, size = 'sm' }: { photoKeys: string[]; size?: 'sm' | 'md' }) {
+  const [lightboxKey, setLightboxKey] = useState<string | null>(null)
+  const px = size === 'sm' ? 'w-14 h-14' : 'w-20 h-20'
+  if (!photoKeys.length) return null
+  return (
+    <>
+      <div className="flex flex-wrap gap-1.5 mt-1.5">
+        {photoKeys.map(key => (
+          <button key={key} onClick={() => setLightboxKey(key)} className={`${px} rounded-lg overflow-hidden flex-shrink-0 active:opacity-80`}>
+            <MediaImage photoKey={key} alt="photo" className="w-full h-full object-cover" />
+          </button>
+        ))}
+      </div>
+      {lightboxKey && (
+        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" onClick={() => setLightboxKey(null)}>
+          <button className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white">
+            <X size={20} />
+          </button>
+          <MediaImage photoKey={lightboxKey} alt="photo" className="max-w-full max-h-full object-contain" />
+        </div>
+      )}
+    </>
+  )
+}
+
 function PhaseLogEntry({ log, color, envMap, onDelete, onEdit }: {
   log: Log
   color: string
@@ -222,60 +253,41 @@ function PhaseLogEntry({ log, color, envMap, onDelete, onEdit }: {
   onDelete: (logId: string) => void
   onEdit: (log: Log) => void
 }) {
-  const [lightbox, setLightbox] = useState(false)
-  const summary  = logSummary(log, envMap)
-  const photoKey = (log.data as any)?.photoKey as string | undefined
+  const summary   = logSummary(log, envMap)
+  const photoKeys = getPhotoKeys(log.data)
 
   return (
-    <>
-      <div className="flex items-start gap-2 py-2 border-b border-border/40 last:border-0">
-        <div
-          className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-[5px]"
-          style={{ backgroundColor: color, opacity: 0.65 }}
-        />
-        <div className="w-5 h-5 rounded-full bg-raised border border-border flex items-center justify-center text-dim flex-shrink-0 mt-0.5">
-          {LOG_ICONS[log.logType]}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-medium capitalize text-primary">
-              {log.logType.replace(/_/g, ' ')}
-            </span>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <span className="text-[10px] text-muted">
-                {new Date(log.date + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
-              </span>
-              {EDITABLE_LOG_TYPES.has(log.logType) && (
-                <button onClick={() => onEdit(log)} className="text-muted/40 active:text-primary p-0.5">
-                  <Pencil size={11} />
-                </button>
-              )}
-              <button onClick={() => onDelete(log.logId)} className="text-muted/40 active:text-red-400 p-0.5">
-                <Trash2 size={11} />
-              </button>
-            </div>
-          </div>
-          {summary && <p className="text-[11px] text-dim mt-0.5 break-words">{summary}</p>}
-          {photoKey && (
-            <button onClick={() => setLightbox(true)} className="mt-1.5 w-16 h-16 rounded-lg overflow-hidden block active:opacity-80">
-              <MediaImage photoKey={photoKey} alt="photo" className="w-full h-full object-cover" />
-            </button>
-          )}
-        </div>
+    <div className="flex items-start gap-2 py-2 border-b border-border/40 last:border-0">
+      <div
+        className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-[5px]"
+        style={{ backgroundColor: color, opacity: 0.65 }}
+      />
+      <div className="w-5 h-5 rounded-full bg-raised border border-border flex items-center justify-center text-dim flex-shrink-0 mt-0.5">
+        {LOG_ICONS[log.logType]}
       </div>
-
-      {lightbox && photoKey && (
-        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" onClick={() => setLightbox(false)}>
-          <button
-            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white"
-            onClick={() => setLightbox(false)}
-          >
-            <X size={20} />
-          </button>
-          <MediaImage photoKey={photoKey} alt="photo" className="max-w-full max-h-full object-contain" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium capitalize text-primary">
+            {log.logType.replace(/_/g, ' ')}
+          </span>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <span className="text-[10px] text-muted">
+              {new Date(log.date + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' })}
+            </span>
+            {EDITABLE_LOG_TYPES.has(log.logType) && (
+              <button onClick={() => onEdit(log)} className="text-muted/40 active:text-primary p-0.5">
+                <Pencil size={11} />
+              </button>
+            )}
+            <button onClick={() => onDelete(log.logId)} className="text-muted/40 active:text-red-400 p-0.5">
+              <Trash2 size={11} />
+            </button>
+          </div>
         </div>
-      )}
-    </>
+        {summary && <p className="text-[11px] text-dim mt-0.5 break-words">{summary}</p>}
+        <PhotoGrid photoKeys={photoKeys} size="sm" />
+      </div>
+    </div>
   )
 }
 
@@ -379,58 +391,36 @@ function TimelineView({ plant, logs, envMap, onDelete, onEdit }: {
 }
 
 function LogEntry({ log, envMap, onDelete, onEdit }: { log: Log; envMap: Map<string, string>; onDelete: (logId: string) => void; onEdit: (log: Log) => void }) {
-  const [lightbox, setLightbox] = useState(false)
-  const summary = logSummary(log, envMap)
-  const photoKey = (log.data as any)?.photoKey as string | undefined
+  const summary   = logSummary(log, envMap)
+  const photoKeys = getPhotoKeys(log.data)
   return (
-    <>
-      <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
-        <div className="w-7 h-7 rounded-full bg-raised border border-border flex items-center justify-center text-dim flex-shrink-0 mt-0.5">
-          {LOG_ICONS[log.logType]}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium capitalize text-primary">
-              {log.logType.replace(/_/g, ' ')}
-            </span>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="text-xs text-muted">
-                {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-              {EDITABLE_LOG_TYPES.has(log.logType) && (
-                <button onClick={() => onEdit(log)} className="text-muted/50 active:text-primary p-0.5">
-                  <Pencil size={12} />
-                </button>
-              )}
-              <button onClick={() => onDelete(log.logId)} className="text-muted/50 active:text-red-400 active:opacity-80 p-0.5">
-                <Trash2 size={13} />
-              </button>
-            </div>
-          </div>
-          {summary && <p className="text-xs text-dim mt-0.5 break-words">{summary}</p>}
-          {photoKey && (
-            <button onClick={() => setLightbox(true)} className="mt-2 w-28 h-28 rounded-lg overflow-hidden block active:opacity-80">
-              <MediaImage photoKey={photoKey} alt="photo log" className="w-full h-full object-cover" />
-            </button>
-          )}
-        </div>
+    <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
+      <div className="w-7 h-7 rounded-full bg-raised border border-border flex items-center justify-center text-dim flex-shrink-0 mt-0.5">
+        {LOG_ICONS[log.logType]}
       </div>
-
-      {lightbox && photoKey && (
-        <div
-          className="fixed inset-0 z-50 bg-black flex items-center justify-center"
-          onClick={() => setLightbox(false)}
-        >
-          <button
-            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white"
-            onClick={() => setLightbox(false)}
-          >
-            <X size={20} />
-          </button>
-          <MediaImage photoKey={photoKey} alt="photo log" className="max-w-full max-h-full object-contain" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium capitalize text-primary">
+            {log.logType.replace(/_/g, ' ')}
+          </span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-xs text-muted">
+              {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            {EDITABLE_LOG_TYPES.has(log.logType) && (
+              <button onClick={() => onEdit(log)} className="text-muted/50 active:text-primary p-0.5">
+                <Pencil size={12} />
+              </button>
+            )}
+            <button onClick={() => onDelete(log.logId)} className="text-muted/50 active:text-red-400 active:opacity-80 p-0.5">
+              <Trash2 size={13} />
+            </button>
+          </div>
         </div>
-      )}
-    </>
+        {summary && <p className="text-xs text-dim mt-0.5 break-words">{summary}</p>}
+        <PhotoGrid photoKeys={photoKeys} size="md" />
+      </div>
+    </div>
   )
 }
 
@@ -560,7 +550,7 @@ function AvatarPickerSheet({ open, onClose, logs, plantId }: {
   plantId: string
 }) {
   const qc = useQueryClient()
-  const photoLogs = logs.filter(l => !!(l.data as any)?.photoKey)
+  const photoLogs = logs.filter(l => getPhotoKeys(l.data).length > 0)
 
   const mutation = useMutation({
     mutationFn: (photoKey: string) => api.plants.updateAvatar(plantId, photoKey),
@@ -579,19 +569,18 @@ function AvatarPickerSheet({ open, onClose, logs, plantId }: {
         </p>
       ) : (
         <div className="grid grid-cols-3 gap-1.5 mt-2">
-          {photoLogs.map(log => {
-            const photoKey = (log.data as any).photoKey as string
-            return (
+          {photoLogs.flatMap(log =>
+            getPhotoKeys(log.data).map(photoKey => (
               <button
-                key={log.logId}
+                key={`${log.logId}-${photoKey}`}
                 onClick={() => mutation.mutate(photoKey)}
                 disabled={mutation.isPending}
                 className="aspect-square rounded-lg overflow-hidden active:opacity-70 disabled:opacity-50"
               >
                 <MediaImage photoKey={photoKey} alt="log photo" className="w-full h-full object-cover" />
               </button>
-            )
-          })}
+            ))
+          )}
         </div>
       )}
       {mutation.isError && (
