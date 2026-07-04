@@ -1,20 +1,20 @@
 # grow — Todo
 
-## In Progress
-- [ ] Scaffold project structure (infra, backend, frontend)
-
-## Up Next
-- [ ] CDK synth + bootstrap + first deploy
-- [ ] Go Lambda: implement CRUD for plants, environments, logs
-- [ ] React: Garden view (plant cards, bottom nav, date strip)
-- [ ] React: Plant detail view with log timeline
-- [ ] React: Log entry forms (watering, feeding, training, etc.)
-- [ ] Photo upload flow (pre-signed URL → S3 → photoKey in log)
+## Shipped
+- [x] CDK infra — DynamoDB, Lambda, API Gateway, CloudFront, Route53
+- [x] Go Lambda: full CRUD for plants, environments, logs
+- [x] Plant detail: journal view (date strip, quick action tray, log entries)
+- [x] Plant detail: phase timeline view
+- [x] Plant detail: phase changes, environment assignment
+- [x] Log types: watering, feeding, training, trimming, height, note, photo, transplant, sprout
+- [x] Photo upload via pre-signed S3 URLs
+- [x] Plant avatar/cover photo (selected from existing log photos)
+- [x] Activity tab: cross-plant recent feed + sort by log type
+- [x] DynamoDB GSI for log-type-date queries (user-logtype-date-index)
+- [x] PWA manifest + splash screen for Android home screen install
 
 ## Backlog
-- [ ] Environment detail view (plants assigned, light schedule)
-- [ ] Phase change tracking with auto-logged phase_change entries
 - [ ] Height chart per plant
 - [ ] Feeding/watering history charts
-- [ ] Auth (Cognito) — userId is already in schema, no migration needed
-- [ ] Push notifications for scheduled waterings
+- [ ] Environment detail view (plants assigned, light schedule, assigned plants)
+- [ ] Multi-user / auth — see plans/backlog/multi-user.md

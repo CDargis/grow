@@ -3,7 +3,7 @@
 A personal cannabis grow journal web app. Track plants through their full lifecycle, log daily activity (watering, feeding, training, etc.), and manage multiple grow environments.
 
 ## Status
-Scaffolding in progress. Infrastructure and frontend/backend shells being built.
+Shipped and in active use. Core feature set complete — plant journal, phase timeline, activity feed, cross-plant sorting, PWA home screen install on Android.
 
 ## Stack
 - **Frontend**: React + TypeScript + Vite, deployed to S3/CloudFront

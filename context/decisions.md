@@ -15,5 +15,8 @@ ULIDs are time-sortable and URL-safe. The logs table uses logId as SK, so time-s
 ## userId is a fixed constant initially
 Single-user app to start. userId = "default". Auth can be layered in later (Cognito or similar) without schema changes since userId is already in the data model.
 
+## logTypeDate composite attribute on logs
+A `logTypeDate` attribute (`logType#date`, e.g. `watering#2026-07-04`) is written on every log create/update. Powers the `user-logtype-date-index` GSI, enabling efficient "last occurrence of log type X per plant" queries for the Activity sort view — without this, the query would require a full scan filtered by logType.
+
 ## date field on logs (denormalized)
 The `date` (YYYY-MM-DD) field on Log is denormalized from `loggedAt` to enable the GSI for date-strip queries. Without it, date-range queries on the GSI would require timestamp comparisons across ISO strings.
