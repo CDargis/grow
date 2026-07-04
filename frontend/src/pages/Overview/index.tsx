@@ -58,17 +58,17 @@ const LOG_ICONS: Partial<Record<LogType, React.ReactNode>> = {
 
 const SORT_LOG_TYPES: { type: LogType; label: string }[] = [
   { type: 'watering', label: 'Water'    },
-  { type: 'feeding',  label: 'Feed'     },
   { type: 'photo',    label: 'Photo'    },
-  { type: 'training', label: 'Training' },
-  { type: 'trimming', label: 'Trim'     },
   { type: 'height',   label: 'Height'   },
   { type: 'note',     label: 'Note'     },
+  { type: 'training', label: 'Training' },
+  { type: 'trimming', label: 'Trim'     },
+  { type: 'feeding',  label: 'Feed'     },
 ]
 
 function SortView({ plants }: { plants: Plant[] }) {
   const [logType, setLogType] = useState<LogType>('watering')
-  const [dir, setDir]         = useState<'desc' | 'asc'>('desc')
+  const [dir, setDir]         = useState<'desc' | 'asc'>('asc')
 
   const { data: activity, isLoading } = useQuery({
     queryKey: ['logs', 'last-by-type', logType],
@@ -250,7 +250,7 @@ function FeedView({ plants }: { plants: Plant[] }) {
 type Mode = 'feed' | 'sort'
 
 export function OverviewPage() {
-  const [mode, setMode] = useState<Mode>('feed')
+  const [mode, setMode] = useState<Mode>('sort')
 
   const { data: plants = [] } = useQuery({
     queryKey: ['plants'],
