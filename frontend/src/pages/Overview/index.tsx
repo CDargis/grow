@@ -15,7 +15,9 @@ function getPhotoKeys(data: any): string[] {
 }
 
 function relativeDate(dateStr: string): string {
-  const days = Math.floor((Date.now() - new Date(dateStr + 'T12:00:00').getTime()) / 86400000)
+  const [y, m, d]    = dateStr.split('-').map(Number)
+  const [ty, tm, td] = todayDate().split('-').map(Number)
+  const days = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, d)) / 86400000)
   if (days === 0) return 'today'
   if (days === 1) return 'yesterday'
   if (days < 7)  return `${days} days ago`
