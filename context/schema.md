@@ -14,8 +14,10 @@ type EnvironmentType =
   | 'room' | 'greenhouse' | 'other';
 
 type LogType =
-  | 'watering' | 'feeding' | 'training' | 'trimming'
+  | 'watering' | 'training' | 'trimming'
   | 'transplant' | 'height' | 'note' | 'photo' | 'phase_change';
+// 'feeding' retired 2026-07-19 — collapsed into WateringData.nutrients
+// (one-time migration: backend/cmd/migrate-feeding)
 
 // ── Plant ─────────────────────────────────────────────────────────────────────
 
@@ -61,8 +63,20 @@ interface Log {
 }
 
 // Log data variants by logType
-interface WateringData  { amount: number; unit: 'ml' | 'l' | 'oz' | 'gal'; ph?: number; runoff?: number; }
-interface FeedingData   { nutrients: Array<{ name: string; amount: number; unit: string }>; ph?: number; totalVol?: number; }
+
+// Unified water/feed/top-dress entry. Labels are derived (frontend
+// lib/logDisplay.ts): nutrients present = "feeding"; nutrients but no
+// amount = "top dress"; otherwise "watering".
+interface WateringData {
+  amount?: number;               // water volume; absent for a dry top-dress
+  unit: 'ml' | 'l' | 'oz' | 'gal';
+  ph?: number;
+  runoff?: number;               // runoff pH
+  tds?: number;                  // ppm
+  runoffTds?: number;            // ppm
+  nutrients?: Array<{ name: string; amount: number; unit: string }>;
+  note?: string;
+}
 interface TrainingData  { method: string; notes?: string; }  // LST, topping, defoliation, etc.
 interface TrimmingData  { notes?: string; }
 interface TransplantData { potSize: string; medium?: string; }
@@ -72,7 +86,7 @@ interface PhotoData     { photoKey: string; caption?: string; }
 interface PhaseChangeData { fromPhase: PlantPhase; toPhase: PlantPhase; }
 
 type LogData =
-  | WateringData | FeedingData | TrainingData | TrimmingData
+  | WateringData | TrainingData | TrimmingData
   | TransplantData | HeightData | NoteData | PhotoData | PhaseChangeData;
 ```
 

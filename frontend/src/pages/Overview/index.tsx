@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, ArrowUp, ArrowDown } from 'lucide-react'
 import { api } from '@/api/client'
 import { MediaImage } from '@/components/MediaImage'
+import { isFeedLog, logTypeLabel } from '@/lib/logDisplay'
 import type { Log, LogType, Plant } from '@/types'
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
@@ -40,7 +41,14 @@ function dateLabel(date: string): string {
 function feedSummary(log: Log): string | null {
   const d = log.data as any
   switch (log.logType) {
-    case 'watering':   return d.amount != null ? `${d.amount} ${d.unit}${d.ph != null ? ` · pH ${d.ph}` : ''}` : null
+    case 'watering': {
+      const parts: string[] = []
+      if (d.amount != null) parts.push(`${d.amount} ${d.unit}`)
+      const nuts = (d.nutrients as any[] ?? []).filter((n: any) => n.name).map((n: any) => n.name).join(', ')
+      if (nuts)            parts.push(nuts)
+      if (d.ph != null)    parts.push(`pH ${d.ph}`)
+      return parts.length ? parts.join(' · ') : null
+    }
     case 'feeding':    return (d.nutrients as any[] ?? []).filter((n: any) => n.name).map((n: any) => n.name).join(', ') || null
     case 'training':   return d.method ?? null
     case 'trimming':   return d.method ?? null
@@ -65,13 +73,12 @@ const LOG_ICONS: Partial<Record<LogType, React.ReactNode>> = {
 // ── Sort mode ──────────────────────────────────────────────────────────────────
 
 const SORT_LOG_TYPES: { type: LogType; label: string }[] = [
-  { type: 'watering', label: 'Water'    },
+  { type: 'watering', label: 'Water / Feed' },
   { type: 'photo',    label: 'Photo'    },
   { type: 'height',   label: 'Height'   },
   { type: 'note',     label: 'Note'     },
   { type: 'training', label: 'Training' },
   { type: 'trimming', label: 'Trim'     },
-  { type: 'feeding',  label: 'Feed'     },
 ]
 
 function SortView({ plants }: { plants: Plant[] }) {
@@ -233,9 +240,9 @@ function FeedView({ plants }: { plants: Plant[] }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-dim">{LOG_ICONS[log.logType] ?? null}</span>
+                    <span className="text-dim">{isFeedLog(log) ? <Zap size={14} /> : LOG_ICONS[log.logType] ?? null}</span>
                     <span className="text-xs font-medium text-primary">{plant?.name ?? log.plantId}</span>
-                    <span className="text-xs text-muted capitalize">{log.logType.replace(/_/g, ' ')}</span>
+                    <span className="text-xs text-muted capitalize">{logTypeLabel(log)}</span>
                   </div>
                   {summary && <p className="text-xs text-dim truncate">{summary}</p>}
                 </div>

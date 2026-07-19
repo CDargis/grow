@@ -52,8 +52,24 @@ export interface Log {
   data: LogData
 }
 
-export interface WateringData  { amount?: number; unit: 'ml' | 'l' | 'oz' | 'gal'; ph?: number; runoff?: number; note?: string }
-export interface FeedingData   { nutrients: Array<{ name: string; amount: number; unit: string }>; ph?: number; totalVol?: number }
+export interface Nutrient { name: string; amount: number; unit: string }
+
+// Unified water/feed/top-dress entry. Nutrients present = feed; nutrients with
+// no amount = dry top-dress. See lib/logDisplay.ts for the derived labels.
+export interface WateringData {
+  amount?: number
+  unit: 'ml' | 'l' | 'oz' | 'gal'
+  ph?: number
+  runoff?: number
+  tds?: number
+  runoffTds?: number
+  nutrients?: Nutrient[]
+  note?: string
+}
+
+// Legacy — replaced by WateringData.nutrients; kept so pre-migration 'feeding'
+// rows still render. No new logs of this shape are written.
+export interface FeedingData   { nutrients: Nutrient[]; ph?: number; totalVol?: number }
 export interface TrainingData  { method: string; notes?: string; photoKey?: string }
 export interface TrimmingData  { method?: string; notes?: string; photoKey?: string }
 export interface SproutData    { }

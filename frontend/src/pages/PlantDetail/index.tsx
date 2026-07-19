@@ -9,9 +9,10 @@ import { AddLogSheet } from '@/components/AddLogSheet'
 import { EditPlantSheet } from '@/components/EditPlantSheet'
 import { MediaImage } from '@/components/MediaImage'
 import { PhotoLightbox, type PhotoLightboxItem } from '@/components/PhotoLightbox'
+import { isFeedLog, logTypeLabel } from '@/lib/logDisplay'
 import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment } from '@/types'
 
-const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'feeding', 'training', 'trimming', 'note', 'height', 'transplant', 'photo'])
+const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'training', 'trimming', 'note', 'height', 'transplant', 'photo'])
 
 function getPhotoKeys(data: any): string[] {
   if (Array.isArray(data?.photoKeys)) return data.photoKeys
@@ -94,11 +95,19 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
     case 'height':   { const d = log.data as any; return `${d.height} ${d.unit}` }
     case 'watering': {
       const d = log.data as any
-      const vol    = d.amount != null ? `${d.amount} ${d.unit}` : d.unit
-      const ph     = d.ph     != null ? ` · pH ${d.ph}`         : ''
-      const runoff = d.runoff != null ? ` · runoff ${d.runoff}` : ''
-      const note   = d.note   ? ` · ${d.note}`                  : ''
-      return `${vol}${ph}${runoff}${note}`
+      const parts: string[] = []
+      if (d.amount != null) parts.push(`${d.amount} ${d.unit}`)
+      const nuts = (d.nutrients as Array<{ name: string; amount: number; unit: string }> ?? [])
+        .filter(n => n.name)
+        .map(n => `${n.name} ${n.amount}${n.unit}`)
+        .join(' · ')
+      if (nuts)                  parts.push(nuts)
+      if (d.ph        != null)   parts.push(`pH ${d.ph}`)
+      if (d.tds       != null)   parts.push(`TDS ${d.tds}`)
+      if (d.runoff    != null)   parts.push(`runoff ${d.runoff}`)
+      if (d.runoffTds != null)   parts.push(`runoff TDS ${d.runoffTds}`)
+      if (d.note)                parts.push(d.note)
+      return parts.length ? parts.join(' · ') : null
     }
     case 'feeding': {
       const d = log.data as any
@@ -254,12 +263,12 @@ function PhaseLogEntry({ log, color, envMap, onDelete, onEdit, onOpenPhoto }: {
         style={{ backgroundColor: color, opacity: 0.65 }}
       />
       <div className="w-5 h-5 rounded-full bg-raised border border-border flex items-center justify-center text-dim flex-shrink-0 mt-0.5">
-        {LOG_ICONS[log.logType]}
+        {isFeedLog(log) ? <Zap size={16} /> : LOG_ICONS[log.logType]}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-medium capitalize text-primary">
-            {log.logType.replace(/_/g, ' ')}
+            {logTypeLabel(log)}
           </span>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <span className="text-[10px] text-muted">
@@ -390,12 +399,12 @@ function LogEntry({ log, envMap, onDelete, onEdit, onOpenPhoto }: { log: Log; en
   return (
     <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
       <div className="w-7 h-7 rounded-full bg-raised border border-border flex items-center justify-center text-dim flex-shrink-0 mt-0.5">
-        {LOG_ICONS[log.logType]}
+        {isFeedLog(log) ? <Zap size={16} /> : LOG_ICONS[log.logType]}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium capitalize text-primary">
-            {log.logType.replace(/_/g, ' ')}
+            {logTypeLabel(log)}
           </span>
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-xs text-muted">

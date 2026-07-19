@@ -20,3 +20,6 @@ A `logTypeDate` attribute (`logType#date`, e.g. `watering#2026-07-04`) is writte
 
 ## date field on logs (denormalized)
 The `date` (YYYY-MM-DD) field on Log is denormalized from `loggedAt` to enable the GSI for date-strip queries. Without it, date-range queries on the GSI would require timestamp comparisons across ISO strings.
+
+## Feeding collapsed into watering (2026-07-19)
+Real-world feeds are waterings with nutrients mixed in, and dry top-dresses get watered in too — the split forced double-logging (July 18 sessions produced watering+feeding pairs for single events). `WateringData` now carries optional `nutrients[]`, `tds`, `runoffTds`; the stored logType is always `watering` and UI labels derive from data shape (nutrients → "feeding", nutrients without amount → "top dress"). Chose a one-time migration (`backend/cmd/migrate-feeding`, dry-run by default) over read-time shimming: only 11 feeding rows existed, and shimming would leave every consumer branching on two types forever, with old and new feeds under different GSI keys. The migration also merges same-event watering+feeding twins (same plant/date, matching volume, <1h apart) and deletes the duplicate row.

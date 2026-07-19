@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Droplets, Zap, Ruler, MessageSquare, Camera, GitBranch, Scissors, ImagePlus, X } from 'lucide-react'
+import { Droplets, Ruler, MessageSquare, Camera, GitBranch, Scissors, ImagePlus, X } from 'lucide-react'
 import { BottomSheet } from './BottomSheet'
 import { MediaImage } from './MediaImage'
 import { api } from '@/api/client'
-import type { Plant, Log, LogType, WateringData, FeedingData, TrainingData, TrimmingData, NoteData, PhotoData, TransplantData, HeightData } from '@/types'
+import type { Plant, Log, LogType, WateringData, TrainingData, TrimmingData, NoteData, PhotoData, TransplantData, HeightData } from '@/types'
 
 // ── Types config ─────────────────────────────────────────────────────────────
 
@@ -16,8 +16,7 @@ type TypeConfig = {
 }
 
 const LOG_TYPES: TypeConfig[] = [
-  { type: 'watering',   label: 'Water',    icon: <Droplets  size={22} />, ready: true  },
-  { type: 'feeding',    label: 'Feed',     icon: <Zap       size={22} />, ready: true  },
+  { type: 'watering',   label: 'Water / Feed', icon: <Droplets  size={22} />, ready: true  },
   { type: 'note',       label: 'Note',     icon: <MessageSquare size={22} />, ready: true },
   { type: 'training',   label: 'Training', icon: <GitBranch size={22} />, ready: true  },
   { type: 'trimming',   label: 'Trim',     icon: <Scissors  size={22} />, ready: true  },
@@ -55,7 +54,9 @@ function isoToDatetime(iso: string): string {
 const inputCls = 'w-full bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary placeholder:text-muted focus:outline-none focus:border-fern'
 const labelCls = 'block text-xs text-dim mb-1'
 
-// ── Watering form ─────────────────────────────────────────────────────────────
+// ── Watering / feeding form ───────────────────────────────────────────────────
+
+type NutrientRow = { name: string; amount: string; unit: string }
 
 function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: WateringData }) {
   const qc = useQueryClient()
@@ -63,7 +64,22 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
   const [unit, setUnit]      = useState<WateringData['unit']>(init?.unit ?? 'ml')
   const [ph, setPh]          = useState(init?.ph?.toString() ?? '')
   const [runoff, setRunoff]  = useState(init?.runoff?.toString() ?? '')
+  const [tds, setTds]        = useState(init?.tds?.toString() ?? '')
+  const [runoffTds, setRunoffTds] = useState(init?.runoffTds?.toString() ?? '')
   const [note, setNote]      = useState(init?.note ?? '')
+  const [showNutrients, setShowNutrients] = useState((init?.nutrients?.length ?? 0) > 0)
+  const [nutrients, setNutrients] = useState<NutrientRow[]>(
+    init?.nutrients?.length
+      ? init.nutrients.map(n => ({ name: n.name, amount: String(n.amount), unit: n.unit }))
+      : [{ name: '', amount: '', unit: 'ml' }]
+  )
+
+  function updateNutrient(i: number, field: keyof NutrientRow, value: string) {
+    setNutrients(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: value } : r))
+  }
+
+  const activeNutrients = showNutrients ? nutrients.filter(n => n.name && n.amount) : []
+  const valid = Boolean(amount) || activeNutrients.length > 0
 
   const body = {
     logType: 'watering' as const,
@@ -72,8 +88,13 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
     data: {
       ...(amount ? { amount: Number(amount) } : {}),
       unit,
-      ...(ph     ? { ph: Number(ph) }         : {}),
-      ...(runoff ? { runoff: Number(runoff) }  : {}),
+      ...(ph        ? { ph: Number(ph) }               : {}),
+      ...(runoff    ? { runoff: Number(runoff) }       : {}),
+      ...(tds       ? { tds: Number(tds) }             : {}),
+      ...(runoffTds ? { runoffTds: Number(runoffTds) } : {}),
+      ...(activeNutrients.length
+        ? { nutrients: activeNutrients.map(n => ({ name: n.name.trim(), amount: Number(n.amount), unit: n.unit })) }
+        : {}),
       ...(note   ? { note }                   : {}),
     } as WateringData,
   }
@@ -121,6 +142,71 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
         </div>
       </div>
 
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>TDS (ppm)</label>
+          <input type="number" className={inputCls} placeholder="315" value={tds} onChange={e => setTds(e.target.value)} />
+        </div>
+        <div>
+          <label className={labelCls}>Runoff TDS</label>
+          <input type="number" className={inputCls} placeholder="270" value={runoffTds} onChange={e => setRunoffTds(e.target.value)} />
+        </div>
+      </div>
+
+      {!showNutrients ? (
+        <button
+          type="button"
+          onClick={() => setShowNutrients(true)}
+          className="text-xs text-fern active:opacity-70"
+        >
+          + Add nutrients / amendments
+        </button>
+      ) : (
+        <div>
+          <label className={labelCls}>Nutrients / amendments</label>
+          <div className="space-y-2">
+            {nutrients.map((n, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                <input
+                  className={inputCls + ' flex-1'}
+                  placeholder="Name"
+                  value={n.name}
+                  onChange={e => updateNutrient(i, 'name', e.target.value)}
+                />
+                <input
+                  type="number"
+                  className="w-20 bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary focus:outline-none focus:border-fern"
+                  placeholder="0"
+                  value={n.amount}
+                  onChange={e => updateNutrient(i, 'amount', e.target.value)}
+                />
+                <select
+                  className="bg-raised border border-border rounded-lg px-2 py-2.5 text-sm text-primary focus:outline-none focus:border-fern"
+                  value={n.unit}
+                  onChange={e => updateNutrient(i, 'unit', e.target.value)}
+                >
+                  {['ml','oz','g','tsp','tbsp'].map(u => <option key={u} value={u} className="bg-raised">{u}</option>)}
+                </select>
+                <button
+                  onClick={() => {
+                    if (nutrients.length === 1) { setShowNutrients(false); setNutrients([{ name: '', amount: '', unit: 'ml' }]) }
+                    else setNutrients(rows => rows.filter((_, idx) => idx !== i))
+                  }}
+                  className="text-muted active:opacity-60 flex-shrink-0"
+                >✕</button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setNutrients(rows => [...rows, { name: '', amount: '', unit: 'ml' }])}
+            className="mt-2 text-xs text-fern active:opacity-70"
+          >
+            + Add nutrient
+          </button>
+        </div>
+      )}
+
       <div>
         <label className={labelCls}>Note</label>
         <textarea
@@ -135,116 +221,15 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
       {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}
 
       <button
-        onClick={() => mutation.mutate()}
-        disabled={mutation.isPending}
-        className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
-      >
-        {mutation.isPending ? 'Saving…' : 'Log Watering'}
-      </button>
-    </div>
-  )
-}
-
-// ── Feeding form ──────────────────────────────────────────────────────────────
-
-type NutrientRow = { name: string; amount: string; unit: string }
-
-function FeedingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: FeedingData }) {
-  const qc = useQueryClient()
-  const [nutrients, setNutrients] = useState<NutrientRow[]>(
-    init?.nutrients?.map(n => ({ name: n.name, amount: String(n.amount), unit: n.unit })) ?? [{ name: '', amount: '', unit: 'ml' }]
-  )
-  const [ph, setPh]         = useState(init?.ph?.toString() ?? '')
-  const [totalVol, setVol]  = useState(init?.totalVol?.toString() ?? '')
-
-  function updateNutrient(i: number, field: keyof NutrientRow, value: string) {
-    setNutrients(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: value } : r))
-  }
-
-  const valid = nutrients.some(n => n.name && n.amount)
-
-  const body = {
-    logType: 'feeding' as const,
-    date: datetimeToDate(datetime),
-    loggedAt: datetimeToISO(datetime),
-    data: {
-      nutrients: nutrients
-        .filter(n => n.name && n.amount)
-        .map(n => ({ name: n.name, amount: Number(n.amount), unit: n.unit })),
-      ...(ph       ? { ph: Number(ph) }             : {}),
-      ...(totalVol ? { totalVol: Number(totalVol) } : {}),
-    } as FeedingData,
-  }
-
-  const mutation = useMutation({
-    mutationFn: () => logId ? api.logs.update(plantId, logId, body) : api.logs.create(plantId, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['logs', 'plant', plantId] })
-      onSuccess()
-    },
-  })
-
-  return (
-    <div className="space-y-3 mt-2">
-      <div>
-        <label className={labelCls}>Nutrients</label>
-        <div className="space-y-2">
-          {nutrients.map((n, i) => (
-            <div key={i} className="flex gap-2 items-center">
-              <input
-                className={inputCls + ' flex-1'}
-                placeholder="Name"
-                value={n.name}
-                onChange={e => updateNutrient(i, 'name', e.target.value)}
-              />
-              <input
-                type="number"
-                className="w-20 bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary focus:outline-none focus:border-fern"
-                placeholder="0"
-                value={n.amount}
-                onChange={e => updateNutrient(i, 'amount', e.target.value)}
-              />
-              <select
-                className="bg-raised border border-border rounded-lg px-2 py-2.5 text-sm text-primary focus:outline-none focus:border-fern"
-                value={n.unit}
-                onChange={e => updateNutrient(i, 'unit', e.target.value)}
-              >
-                {['ml','oz','g','tsp','tbsp'].map(u => <option key={u} value={u} className="bg-raised">{u}</option>)}
-              </select>
-              {nutrients.length > 1 && (
-                <button onClick={() => setNutrients(rows => rows.filter((_, idx) => idx !== i))} className="text-muted active:opacity-60 flex-shrink-0">✕</button>
-              )}
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => setNutrients(rows => [...rows, { name: '', amount: '', unit: 'ml' }])}
-          className="mt-2 text-xs text-fern active:opacity-70"
-        >
-          + Add nutrient
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className={labelCls}>pH</label>
-          <input type="number" step="0.1" className={inputCls} placeholder="6.2" value={ph} onChange={e => setPh(e.target.value)} />
-        </div>
-        <div>
-          <label className={labelCls}>Total Vol (ml)</label>
-          <input type="number" className={inputCls} placeholder="1000" value={totalVol} onChange={e => setVol(e.target.value)} />
-        </div>
-      </div>
-
-      {mutation.isError && <p className="text-red-400 text-sm">{(mutation.error as Error).message}</p>}
-
-      <button
         onClick={() => { if (valid) mutation.mutate() }}
         disabled={!valid || mutation.isPending}
         className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
       >
-        {mutation.isPending ? 'Saving…' : 'Log Feeding'}
+        {mutation.isPending
+          ? 'Saving…'
+          : activeNutrients.length
+            ? (amount ? 'Log Feeding' : 'Log Top Dress')
+            : 'Log Watering'}
       </button>
     </div>
   )
@@ -766,8 +751,6 @@ export function AddLogSheet({ open, onClose, plant, defaultDate, editLog, defaul
         <TypePicker onSelect={setSelected} />
       ) : selected === 'watering' ? (
         <WateringForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as WateringData | undefined} />
-      ) : selected === 'feeding' ? (
-        <FeedingForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as FeedingData | undefined} />
       ) : selected === 'note' ? (
         <NoteForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as NoteData | undefined} />
       ) : selected === 'height' ? (
