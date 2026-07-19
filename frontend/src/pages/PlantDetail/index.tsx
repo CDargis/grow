@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, X, CalendarDays, List, Sun, Pencil, Gauge } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, CalendarDays, List, Sun, Pencil, Gauge } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
 import { AddLogSheet } from '@/components/AddLogSheet'
 import { EditPlantSheet } from '@/components/EditPlantSheet'
 import { MediaImage } from '@/components/MediaImage'
+import { PhotoLightbox, type PhotoLightboxItem } from '@/components/PhotoLightbox'
 import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment } from '@/types'
 
 const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'feeding', 'training', 'trimming', 'note', 'height', 'transplant', 'photo'])
@@ -221,37 +222,27 @@ function phaseDuration(startDate: string, endDate: string | null): string {
 
 // ── Phase log entry (compact row inside an expanded phase) ────────────────────
 
-function PhotoGrid({ photoKeys, size = 'sm' }: { photoKeys: string[]; size?: 'sm' | 'md' }) {
-  const [lightboxKey, setLightboxKey] = useState<string | null>(null)
+function PhotoGrid({ photoKeys, size = 'sm', onPhotoTap }: { photoKeys: string[]; size?: 'sm' | 'md'; onPhotoTap: (photoKey: string) => void }) {
   const px = size === 'sm' ? 'w-14 h-14' : 'w-20 h-20'
   if (!photoKeys.length) return null
   return (
-    <>
-      <div className="flex flex-wrap gap-1.5 mt-1.5">
-        {photoKeys.map(key => (
-          <button key={key} onClick={() => setLightboxKey(key)} className={`${px} rounded-lg overflow-hidden flex-shrink-0 active:opacity-80`}>
-            <MediaImage photoKey={key} alt="photo" className="w-full h-full object-cover" />
-          </button>
-        ))}
-      </div>
-      {lightboxKey && (
-        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" onClick={() => setLightboxKey(null)}>
-          <button className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white">
-            <X size={20} />
-          </button>
-          <MediaImage photoKey={lightboxKey} alt="photo" className="max-w-full max-h-full object-contain" />
-        </div>
-      )}
-    </>
+    <div className="flex flex-wrap gap-1.5 mt-1.5">
+      {photoKeys.map(key => (
+        <button key={key} onClick={() => onPhotoTap(key)} className={`${px} rounded-lg overflow-hidden flex-shrink-0 active:opacity-80`}>
+          <MediaImage photoKey={key} alt="photo" className="w-full h-full object-cover" />
+        </button>
+      ))}
+    </div>
   )
 }
 
-function PhaseLogEntry({ log, color, envMap, onDelete, onEdit }: {
+function PhaseLogEntry({ log, color, envMap, onDelete, onEdit, onOpenPhoto }: {
   log: Log
   color: string
   envMap: Map<string, string>
   onDelete: (logId: string) => void
   onEdit: (log: Log) => void
+  onOpenPhoto: (log: Log, photoKey: string) => void
 }) {
   const summary   = logSummary(log, envMap)
   const photoKeys = getPhotoKeys(log.data)
@@ -285,7 +276,7 @@ function PhaseLogEntry({ log, color, envMap, onDelete, onEdit }: {
           </div>
         </div>
         {summary && <p className="text-[11px] text-dim mt-0.5 break-words">{summary}</p>}
-        <PhotoGrid photoKeys={photoKeys} size="sm" />
+        <PhotoGrid photoKeys={photoKeys} size="sm" onPhotoTap={key => onOpenPhoto(log, key)} />
       </div>
     </div>
   )
@@ -293,12 +284,13 @@ function PhaseLogEntry({ log, color, envMap, onDelete, onEdit }: {
 
 // ── Phase period section ───────────────────────────────────────────────────────
 
-function PhasePeriodSection({ period, isLast, envMap, onDelete, onEdit }: {
+function PhasePeriodSection({ period, isLast, envMap, onDelete, onEdit, onOpenPhoto }: {
   period: PhasePeriod
   isLast: boolean
   envMap: Map<string, string>
   onDelete: (logId: string) => void
   onEdit: (log: Log) => void
+  onOpenPhoto: (log: Log, photoKey: string) => void
 }) {
   const ongoing = period.endDate === null
   const [expanded, setExpanded] = useState(ongoing)
@@ -353,7 +345,7 @@ function PhasePeriodSection({ period, isLast, envMap, onDelete, onEdit }: {
               <p className="text-xs text-muted py-2">No activity logged this phase.</p>
             ) : (
               period.logs.map(log => (
-                <PhaseLogEntry key={log.logId} log={log} color={color} envMap={envMap} onDelete={onDelete} onEdit={onEdit} />
+                <PhaseLogEntry key={log.logId} log={log} color={color} envMap={envMap} onDelete={onDelete} onEdit={onEdit} onOpenPhoto={onOpenPhoto} />
               ))
             )}
           </div>
@@ -365,12 +357,13 @@ function PhasePeriodSection({ period, isLast, envMap, onDelete, onEdit }: {
 
 // ── Timeline view ─────────────────────────────────────────────────────────────
 
-function TimelineView({ plant, logs, envMap, onDelete, onEdit }: {
+function TimelineView({ plant, logs, envMap, onDelete, onEdit, onOpenPhoto }: {
   plant: Plant
   logs: Log[]
   envMap: Map<string, string>
   onDelete: (logId: string) => void
   onEdit: (log: Log) => void
+  onOpenPhoto: (log: Log, photoKey: string) => void
 }) {
   const periods = [...buildPhasePeriods(plant, logs)].reverse()
 
@@ -384,13 +377,14 @@ function TimelineView({ plant, logs, envMap, onDelete, onEdit }: {
           envMap={envMap}
           onDelete={onDelete}
           onEdit={onEdit}
+          onOpenPhoto={onOpenPhoto}
         />
       ))}
     </div>
   )
 }
 
-function LogEntry({ log, envMap, onDelete, onEdit }: { log: Log; envMap: Map<string, string>; onDelete: (logId: string) => void; onEdit: (log: Log) => void }) {
+function LogEntry({ log, envMap, onDelete, onEdit, onOpenPhoto }: { log: Log; envMap: Map<string, string>; onDelete: (logId: string) => void; onEdit: (log: Log) => void; onOpenPhoto: (log: Log, photoKey: string) => void }) {
   const summary   = logSummary(log, envMap)
   const photoKeys = getPhotoKeys(log.data)
   return (
@@ -418,7 +412,7 @@ function LogEntry({ log, envMap, onDelete, onEdit }: { log: Log; envMap: Map<str
           </div>
         </div>
         {summary && <p className="text-xs text-dim mt-0.5 break-words">{summary}</p>}
-        <PhotoGrid photoKeys={photoKeys} size="md" />
+        <PhotoGrid photoKeys={photoKeys} size="md" onPhotoTap={key => onOpenPhoto(log, key)} />
       </div>
     </div>
   )
@@ -606,6 +600,7 @@ export function PlantDetailPage() {
   const [phaseSheetOpen, setPhaseSheetOpen] = useState(false)
   const [weekRef, setWeekRef] = useState(new Date())
   const [quickLogType, setQuickLogType] = useState<LogType | null>(null)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   function pdWeekStart(d: Date): Date {
     const r = new Date(d); r.setHours(0, 0, 0, 0)
@@ -675,6 +670,35 @@ export function PlantDetailPage() {
   const envMap = new Map<string, string>(
     envs?.map((e: Environment) => [e.environmentId, e.name]) ?? []
   )
+
+  // Every photo on this plant, oldest → newest, so the lightbox flows across
+  // log entries as a time-lapse. Left = back in time, right = forward.
+  const photoItems: Array<PhotoLightboxItem & { logId: string }> = useMemo(() => {
+    if (!plant || !logs) return []
+    const periods = buildPhasePeriods(plant, logs)
+    return [...logs]
+      .sort((a, b) => a.date.localeCompare(b.date) || a.loggedAt.localeCompare(b.loggedAt))
+      .flatMap(log =>
+        getPhotoKeys(log.data).map(photoKey => {
+          const period = periods.find(p => log.date >= p.startDate && (p.endDate === null || log.date < p.endDate))
+          const day = period
+            ? Math.floor((new Date(log.date + 'T00:00:00').getTime() - new Date(period.startDate + 'T00:00:00').getTime()) / 86400000) + 1
+            : null
+          return {
+            logId: log.logId,
+            photoKey,
+            title: new Date(log.date + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
+            subtitle: period ? `${period.phase} · day ${day}` : undefined,
+            accent: period ? PHASE_HEX[period.phase] : undefined,
+          }
+        })
+      )
+  }, [plant, logs])
+
+  function openPhoto(log: Log, photoKey: string) {
+    const idx = photoItems.findIndex(p => p.logId === log.logId && p.photoKey === photoKey)
+    if (idx >= 0) setLightboxIndex(idx)
+  }
 
   const activeDates = new Set(logs?.map((l: Log) => l.date) ?? [])
   const journalDate = selectedDate ?? todayDate()
@@ -876,7 +900,7 @@ export function PlantDetailPage() {
               <div className="text-muted text-sm py-8 text-center">No activity on this day.</div>
             ) : (
               journalLogs.map((log: Log) => (
-                <LogEntry key={log.logId} log={log} envMap={envMap} onDelete={deleteLog.mutate} onEdit={handleEditLog} />
+                <LogEntry key={log.logId} log={log} envMap={envMap} onDelete={deleteLog.mutate} onEdit={handleEditLog} onOpenPhoto={openPhoto} />
               ))
             )}
           </div>
@@ -895,11 +919,18 @@ export function PlantDetailPage() {
               envMap={envMap}
               onDelete={deleteLog.mutate}
               onEdit={handleEditLog}
+              onOpenPhoto={openPhoto}
             />
           )}
         </div>
       )}
 
+      <PhotoLightbox
+        items={photoItems}
+        index={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onNavigate={setLightboxIndex}
+      />
       <AvatarPickerSheet
         open={avatarPickerOpen}
         onClose={() => setAvatarPickerOpen(false)}

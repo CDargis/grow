@@ -12,6 +12,7 @@
 - [x] Activity tab: cross-plant recent feed + sort by log type
 - [x] DynamoDB GSI for log-type-date queries (user-logtype-date-index)
 - [x] PWA manifest + splash screen for Android home screen install
+- [x] Photo lightbox: swipe/chevron prev-next across all of a plant's photos (chronological, with date · phase · day overlay)
 
 ## Backlog
 - [ ] Height chart per plant
