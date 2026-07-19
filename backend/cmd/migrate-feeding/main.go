@@ -16,6 +16,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -83,7 +84,19 @@ func parseTime(iso string) time.Time {
 
 func main() {
 	apply := flag.Bool("apply", false, "execute the migration (default is dry run)")
+	force := flag.String("force-merge", "", "comma-separated feedingLogId=wateringLogId pairs to merge regardless of auto-match rules")
 	flag.Parse()
+
+	forcePairs := map[string]string{}
+	if *force != "" {
+		for _, pair := range strings.Split(*force, ",") {
+			parts := strings.SplitN(pair, "=", 2)
+			if len(parts) != 2 {
+				log.Fatalf("bad -force-merge pair %q", pair)
+			}
+			forcePairs[parts[0]] = parts[1]
+		}
+	}
 
 	table := os.Getenv("LOGS_TABLE")
 	if table == "" {
@@ -163,11 +176,26 @@ func main() {
 		newLoggedAt := f.LoggedAt
 
 		// Look for a twin watering: same plant + date, volume matches the
-		// feeding's totalVol, logged within an hour. Closest in time wins.
+		// feeding's totalVol. Sessions can involve several distinct mixes
+		// minutes apart, so a matching pH outranks a closer timestamp.
 		var twin *logItem
-		if fd.TotalVol != nil {
+		if forced, ok := forcePairs[f.LogID]; ok {
+			for i := range waterings {
+				if waterings[i].LogID == forced {
+					twin = &waterings[i]
+					break
+				}
+			}
+			if twin == nil {
+				log.Fatalf("force-merge: watering %s not found (or not a watering)", forced)
+			}
+			if usedWaterings[twin.LogID] {
+				log.Fatalf("force-merge: watering %s already merged with another feeding", forced)
+			}
+		} else if fd.TotalVol != nil {
 			fTime := parseTime(f.LoggedAt)
-			bestGap := time.Hour
+			bestGap := time.Duration(math.MaxInt64)
+			bestPh := false
 			for i := range waterings {
 				w := &waterings[i]
 				if usedWaterings[w.LogID] || w.PlantID != f.PlantID || w.Date != f.Date {
@@ -180,12 +208,14 @@ func main() {
 				if math.Abs(toMl(*wd.Amount, wd.Unit)-*fd.TotalVol) > 1 {
 					continue
 				}
+				phMatch := fd.Ph != nil && wd.Ph != nil && *fd.Ph == *wd.Ph
 				gap := fTime.Sub(parseTime(w.LoggedAt))
 				if gap < 0 {
 					gap = -gap
 				}
-				if gap <= bestGap {
+				if (phMatch && !bestPh) || (phMatch == bestPh && gap < bestGap) {
 					bestGap = gap
+					bestPh = phMatch
 					twin = w
 				}
 			}
