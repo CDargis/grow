@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, CalendarDays, List, Sun, Pencil, Gauge } from 'lucide-react'
@@ -641,6 +641,37 @@ export function PlantDetailPage() {
     }
   }
 
+  // Swiping the log area moves one day at a time; if the new day falls
+  // outside the visible week, the date strip follows.
+  function changeDay(delta: number) {
+    const next = pdAddDays(new Date(journalDate + 'T12:00:00'), delta)
+    const nextStr = pdToYMD(next)
+    setSelectedDate(nextStr)
+    if (!currentWeek.includes(nextStr)) {
+      setWeekRef(next)
+    }
+  }
+
+  const dayTouch = useRef<{ x: number; y: number } | null>(null)
+
+  function handleDayTouchStart(e: React.TouchEvent) {
+    dayTouch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+  }
+
+  function handleDayTouchEnd(e: React.TouchEvent) {
+    if (!dayTouch.current) return
+    const dx = e.changedTouches[0].clientX - dayTouch.current.x
+    const dy = e.changedTouches[0].clientY - dayTouch.current.y
+    dayTouch.current = null
+    // Must be a clearly horizontal gesture so vertical scrolling never triggers it
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    changeDay(dx < 0 ? 1 : -1)
+  }
+
+  // Slide direction derived from the date actually changing, so tapping the
+  // strip animates the day content the same way a swipe does.
+  const prevJournalDate = useRef<string | null>(null)
+
   function openQuickLog(type: LogType) {
     setQuickLogType(type)
     setEditLog(null)
@@ -711,6 +742,11 @@ export function PlantDetailPage() {
 
   const activeDates = new Set(logs?.map((l: Log) => l.date) ?? [])
   const journalDate = selectedDate ?? todayDate()
+
+  const dayAnim = prevJournalDate.current && prevJournalDate.current !== journalDate
+    ? (journalDate > prevJournalDate.current ? 'animate-slide-in-right' : 'animate-slide-in-left')
+    : ''
+  prevJournalDate.current = journalDate
 
   const plantStartDate = (() => {
     const base = plant?.phaseStartDate ?? ''
@@ -899,19 +935,25 @@ export function PlantDetailPage() {
               </div>
             )
           })()}
-          <div className="p-4">
-            <p className="text-xs text-muted mb-2 uppercase tracking-wide font-medium">
-              {formatDateHeader(journalDate)}
-            </p>
-            {logsLoading ? (
-              <div className="text-muted text-sm">Loading…</div>
-            ) : journalLogs.length === 0 ? (
-              <div className="text-muted text-sm py-8 text-center">No activity on this day.</div>
-            ) : (
-              journalLogs.map((log: Log) => (
-                <LogEntry key={log.logId} log={log} envMap={envMap} onDelete={deleteLog.mutate} onEdit={handleEditLog} onOpenPhoto={openPhoto} />
-              ))
-            )}
+          <div
+            className="p-4 min-h-[40vh] overflow-x-hidden"
+            onTouchStart={handleDayTouchStart}
+            onTouchEnd={handleDayTouchEnd}
+          >
+            <div key={journalDate} className={dayAnim}>
+              <p className="text-xs text-muted mb-2 uppercase tracking-wide font-medium">
+                {formatDateHeader(journalDate)}
+              </p>
+              {logsLoading ? (
+                <div className="text-muted text-sm">Loading…</div>
+              ) : journalLogs.length === 0 ? (
+                <div className="text-muted text-sm py-8 text-center">No activity on this day.</div>
+              ) : (
+                journalLogs.map((log: Log) => (
+                  <LogEntry key={log.logId} log={log} envMap={envMap} onDelete={deleteLog.mutate} onEdit={handleEditLog} onOpenPhoto={openPhoto} />
+                ))
+              )}
+            </div>
           </div>
         </>
       )}

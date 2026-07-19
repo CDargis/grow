@@ -41,13 +41,19 @@ export function DatePicker({ activeDates, selected, onSelect, weekRef: externalW
   const [internalRef, setInternalRef] = useState(new Date())
   const ref = externalWeekRef ?? internalRef
   const touchStartX = useRef<number | null>(null)
-  const slideDir    = useRef<'right' | 'left'>('right')
-  const hasMoved    = useRef(false)
+
+  // Slide direction is derived from the week actually changing (rather than
+  // from our own gestures) so externally driven weekRef changes — e.g. a day
+  // swipe in the log area overflowing into the next week — animate too.
+  const prevMonday = useRef<string | null>(null)
+  const mondayStr  = toYMD(weekStart(ref))
+  const animClass  = prevMonday.current && prevMonday.current !== mondayStr
+    ? (mondayStr > prevMonday.current ? 'animate-slide-in-right' : 'animate-slide-in-left')
+    : ''
+  prevMonday.current = mondayStr
 
   function setRef(updater: Date | ((prev: Date) => Date)) {
     const next = typeof updater === 'function' ? updater(ref) : updater
-    slideDir.current = next > ref ? 'right' : 'left'
-    hasMoved.current = true
     if (onWeekRefChange) {
       onWeekRefChange(next)
     } else {
@@ -74,10 +80,7 @@ export function DatePicker({ activeDates, selected, onSelect, weekRef: externalW
   if (!expanded) {
     const monday = weekStart(ref)
     const week = Array.from({ length: 7 }, (_, i) => addDays(monday, i))
-    const weekKey = monday.toISOString()
-    const animClass = hasMoved.current
-      ? slideDir.current === 'right' ? 'animate-slide-in-right' : 'animate-slide-in-left'
-      : ''
+    const weekKey = mondayStr
 
     return (
       <div className="bg-surface border-b border-border">
