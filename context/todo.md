@@ -14,6 +14,7 @@
 - [x] PWA manifest + splash screen for Android home screen install
 - [x] Photo lightbox: swipe/chevron prev-next across all of a plant's photos (chronological, with date · phase · day overlay)
 - [x] Unified water/feed/top-dress log entry (nutrients + TDS on WateringData; feeding type retired; migrate-feeding command)
+- [x] Journal day-swipe: horizontal swipe in log area moves ±1 day; date strip follows when crossing a week boundary
 
 ## Backlog
 - [ ] Height chart per plant
