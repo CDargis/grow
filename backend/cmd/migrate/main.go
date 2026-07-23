@@ -18,8 +18,19 @@ func main() {
 		table = "grow-logs"
 	}
 
+	region := os.Getenv("AWS_REGION")
+	if region == "" {
+		region = os.Getenv("AWS_DEFAULT_REGION")
+	}
+	if region == "" {
+		log.Fatalf("AWS_REGION must be set")
+	}
+
 	ctx := context.Background()
-	cfg, err := config.LoadDefaultConfig(ctx)
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion(region),
+		config.WithSharedConfigProfile(os.Getenv("AWS_PROFILE")),
+	)
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
