@@ -168,15 +168,27 @@ func (s *LogStore) LastByLogType(ctx context.Context, userID, logType string) ([
 	return result, nil
 }
 
-func (s *LogStore) Delete(ctx context.Context, plantID, logID string) error {
-	if _, err := s.ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+// Delete removes the log entry and returns the item as it was just before
+// deletion, so callers can clean up anything the entry referenced (e.g.
+// photos in S3) without a separate read.
+func (s *LogStore) Delete(ctx context.Context, plantID, logID string) (*model.Log, error) {
+	out, err := s.ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.tableName),
 		Key: map[string]types.AttributeValue{
 			"plantId": &types.AttributeValueMemberS{Value: plantID},
 			"logId":   &types.AttributeValueMemberS{Value: logID},
 		},
-	}); err != nil {
-		return fmt.Errorf("delete log: %w", err)
+		ReturnValues: types.ReturnValueAllOld,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("delete log: %w", err)
 	}
-	return nil
+	if len(out.Attributes) == 0 {
+		return nil, nil
+	}
+	var deleted model.Log
+	if err := attributevalue.UnmarshalMap(out.Attributes, &deleted); err != nil {
+		return nil, fmt.Errorf("unmarshal deleted log: %w", err)
+	}
+	return &deleted, nil
 }

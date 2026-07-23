@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"github.com/cdargis/grow/internal/model"
 	"github.com/cdargis/grow/internal/store"
@@ -297,11 +298,60 @@ func (a *app) updateLog(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *app) deleteLog(w http.ResponseWriter, r *http.Request) {
-	if err := a.logs.Delete(r.Context(), r.PathValue("plantId"), r.PathValue("logId")); err != nil {
+	deleted, err := a.logs.Delete(r.Context(), r.PathValue("plantId"), r.PathValue("logId"))
+	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
 	}
+	if deleted != nil {
+		if keys := photoKeysForLog(deleted.LogType, deleted.Data); len(keys) > 0 {
+			a.deleteMedia(r.Context(), keys)
+		}
+	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// photoKeysForLog extracts any S3 media keys referenced by a log entry's
+// data payload, so they can be cleaned up when the entry is deleted.
+func photoKeysForLog(logType model.LogType, data json.RawMessage) []string {
+	switch logType {
+	case model.LogPhoto:
+		var d model.PhotoData
+		if err := json.Unmarshal(data, &d); err != nil {
+			return nil
+		}
+		return d.PhotoKeys
+	case model.LogTraining:
+		var d model.TrainingData
+		if err := json.Unmarshal(data, &d); err != nil || d.PhotoKey == "" {
+			return nil
+		}
+		return []string{d.PhotoKey}
+	case model.LogTrimming:
+		var d model.TrimmingData
+		if err := json.Unmarshal(data, &d); err != nil || d.PhotoKey == "" {
+			return nil
+		}
+		return []string{d.PhotoKey}
+	default:
+		return nil
+	}
+}
+
+// deleteMedia best-effort deletes media objects from S3. Failures are
+// logged, not surfaced — the log entry itself is already gone, and a
+// dangling S3 object is preferable to reporting the delete as failed.
+func (a *app) deleteMedia(ctx context.Context, keys []string) {
+	objects := make([]s3types.ObjectIdentifier, len(keys))
+	for i, k := range keys {
+		objects[i] = s3types.ObjectIdentifier{Key: aws.String(k)}
+	}
+	if _, err := a.s3.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+		Bucket: aws.String(a.mediaBkt),
+		Delete: &s3types.Delete{Objects: objects},
+	}); err != nil {
+		log.Printf("delete media objects %v: %v", keys, err)
+	}
 }
 
 // ── Environments ──────────────────────────────────────────────────────────────

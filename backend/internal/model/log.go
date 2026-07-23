@@ -93,8 +93,8 @@ type NoteData struct {
 }
 
 type PhotoData struct {
-	PhotoKey string `json:"photoKey"`
-	Caption  string `json:"caption,omitempty"`
+	PhotoKeys []string `json:"photoKeys"`
+	Caption   string   `json:"caption,omitempty"`
 }
 
 type PhaseChangeData struct {
