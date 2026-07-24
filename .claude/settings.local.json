@@ -35,7 +35,11 @@
       "Bash(node -e ' *)",
       "Bash(go vet *)",
       "Bash(AWS_REGION=us-east-1 go run ./cmd/migrate-feeding)",
-      "Bash(aws codepipeline get-pipeline-state *)"
+      "Bash(aws codepipeline get-pipeline-state *)",
+      "Read(//tmp/**)",
+      "Bash(pkill -f \"go run ./cmd/api\")",
+      "Bash(pkill -f \"cmd/api\")",
+      "Bash(taskkill //F //IM api.exe)"
     ]
   }
 }
