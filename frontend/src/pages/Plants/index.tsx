@@ -112,8 +112,8 @@ export function PlantsPage() {
       <div
         className={layoutMode === 'fixed' ? 'space-y-2' : 'grid gap-2 flex-1 min-h-0'}
         style={
-          layoutMode === 'grid' ? { gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gridAutoRows: 'minmax(7rem, 1fr)' } :
-          layoutMode === 'rows' ? { gridTemplateColumns: '1fr', gridAutoRows: 'minmax(7rem, 1fr)' } :
+          layoutMode === 'grid' ? { gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gridAutoRows: 'minmax(4.5rem, 1fr)' } :
+          layoutMode === 'rows' ? { gridTemplateColumns: '1fr', gridAutoRows: 'minmax(4.5rem, 1fr)' } :
           undefined
         }
       >
