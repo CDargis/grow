@@ -81,8 +81,8 @@ export function PlantsPage() {
   ].filter(Boolean).join(' · ')
 
   return (
-    <div className="min-h-full flex flex-col p-4">
-      <div className="flex items-center justify-between mb-4">
+    <div className="h-full flex flex-col p-4 overflow-y-auto">
+      <div className="flex items-center justify-between mb-4 shrink-0">
         <h1 className="text-lg font-semibold">Plants</h1>
         <div className="flex items-center gap-3">
           <button
@@ -110,7 +110,7 @@ export function PlantsPage() {
       )}
 
       <div
-        className={layoutMode === 'fixed' ? 'space-y-2' : 'grid gap-2 flex-1 min-h-0'}
+        className={layoutMode === 'fixed' ? 'space-y-2' : 'grid gap-2 flex-1'}
         style={
           layoutMode === 'grid' ? { gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gridAutoRows: 'minmax(4.5rem, 1fr)' } :
           layoutMode === 'rows' ? { gridTemplateColumns: '1fr', gridAutoRows: 'minmax(4.5rem, 1fr)' } :
@@ -121,7 +121,7 @@ export function PlantsPage() {
       </div>
 
       {past.length > 0 && (
-        <div className="mt-6">
+        <div className="mt-6 shrink-0">
           <button
             onClick={() => setShowPast(p => !p)}
             className="flex items-center justify-between w-full mb-2 group"
