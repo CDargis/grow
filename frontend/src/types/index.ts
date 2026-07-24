@@ -119,7 +119,7 @@ export interface LastActivity {
   loggedAt: string
 }
 
-export type PlantsLayoutMode = 'auto-fit' | 'fixed'
+export type PlantsLayoutMode = 'grid' | 'rows' | 'fixed'
 
 export interface Settings {
   userId: string

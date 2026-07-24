@@ -20,21 +20,22 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
     onSuccess:  () => qc.invalidateQueries({ queryKey: ['settings'] }),
   })
 
-  const layoutMode: PlantsLayoutMode = settings?.plantsLayoutMode ?? 'auto-fit'
+  const layoutMode: PlantsLayoutMode = settings?.plantsLayoutMode ?? 'grid'
 
   return (
     <BottomSheet title="Settings" open={open} onClose={onClose}>
       <div className="flex flex-col gap-2">
         <p className="text-xs text-muted mb-1">Plants screen layout</p>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2">
           {([
-            { mode: 'auto-fit' as PlantsLayoutMode, label: 'Auto-fit', desc: 'Cards fill the screen' },
-            { mode: 'fixed'    as PlantsLayoutMode, label: 'Fixed size', desc: 'Original list layout' },
+            { mode: 'grid'  as PlantsLayoutMode, label: 'Grid',       desc: 'Cards fill the screen in columns and rows' },
+            { mode: 'rows'  as PlantsLayoutMode, label: 'Rows',       desc: 'One column, rows fill the screen' },
+            { mode: 'fixed' as PlantsLayoutMode, label: 'Fixed size', desc: 'Original list layout' },
           ]).map(({ mode, label, desc }) => (
             <button
               key={mode}
               onClick={() => updateSettings.mutate({ plantsLayoutMode: mode })}
-              className={`flex-1 flex flex-col items-start gap-0.5 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+              className={`flex items-start gap-0.5 flex-col px-3 py-2.5 rounded-xl border text-left transition-colors ${
                 layoutMode === mode
                   ? 'bg-fern/20 text-fern border-fern/40'
                   : 'bg-raised text-muted border-border'

@@ -44,9 +44,12 @@ Photo read:
 - Three independent preferences share this one record:
   - `shortcutLogTypes` — PlantDetail quick-action tray (3–5 of 7 log types)
   - `sortChipOrder` — Activity/Sort chip strip order (all 6 chip types, no hide)
-  - `plantsLayoutMode` — `'auto-fit' | 'fixed'` for the Plants page card grid
+  - `plantsLayoutMode` — `'grid' | 'rows' | 'fixed'` for the Plants page card layout
 - Reordering UI: `frontend/src/components/LogTypeReorderSheet.tsx`, built on `@dnd-kit/core` + `@dnd-kit/sortable` with a `PointerSensor` activation delay (hold-to-drag, like rearranging home-screen icons). Two modes:
   - `divider` (shortcuts): single list of all catalog types with a visual divider; dragging an item across it toggles shown/hidden, clamped to min/max — one gesture picks both order and count
   - `plain` (sort chips): straightforward reorder, no hide/show
 - Entry point is long-press on the tray/chip-strip itself (`frontend/src/lib/useLongPress.ts`), not a settings screen — editors open as a `BottomSheet`
-- Plants page layout is pure CSS (`grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))` + `gridAutoRows: 1fr` inside a `flex-1` container that fills the viewport): cards grow to fill the screen when there's room, and only wrap/scroll once they'd shrink below the minmax floor — no JS-computed sizing
+- Plants page layout is pure CSS, no JS-computed sizing, inside a `flex-1` container that fills the viewport:
+  - `grid` — `grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))` + `gridAutoRows: 1fr`: cards fill the screen in columns and rows, wrapping/scrolling once they'd shrink below the minmax floor
+  - `rows` — same idea but `gridTemplateColumns: '1fr'` (single column): rows fill the screen vertically instead
+  - `fixed` — original fixed-height list, no auto-sizing

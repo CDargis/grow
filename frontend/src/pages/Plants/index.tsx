@@ -66,7 +66,7 @@ export function PlantsPage() {
     queryKey: ['settings'],
     queryFn:  api.settings.get,
   })
-  const layoutMode = settings?.plantsLayoutMode ?? 'auto-fit'
+  const layoutMode = settings?.plantsLayoutMode ?? 'grid'
 
   const active   = plants?.filter(p => !PAST_PHASES.includes(p.phase)) ?? []
   const past     = plants?.filter(p =>  PAST_PHASES.includes(p.phase)) ?? []
@@ -108,10 +108,14 @@ export function PlantsPage() {
       )}
 
       <div
-        className={layoutMode === 'auto-fit' ? 'grid gap-2 flex-1' : 'space-y-2'}
-        style={layoutMode === 'auto-fit' ? { gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gridAutoRows: '1fr' } : undefined}
+        className={layoutMode === 'fixed' ? 'space-y-2' : 'grid gap-2 flex-1'}
+        style={
+          layoutMode === 'grid' ? { gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gridAutoRows: '1fr' } :
+          layoutMode === 'rows' ? { gridTemplateColumns: '1fr', gridAutoRows: '1fr' } :
+          undefined
+        }
       >
-        {active.map(plant => <PlantCard key={plant.plantId} plant={plant} fill={layoutMode === 'auto-fit'} />)}
+        {active.map(plant => <PlantCard key={plant.plantId} plant={plant} fill={layoutMode !== 'fixed'} />)}
       </div>
 
       {past.length > 0 && (

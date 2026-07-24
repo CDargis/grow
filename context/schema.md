@@ -95,7 +95,7 @@ interface Settings {
   userId: string;
   shortcutLogTypes?: LogType[];   // PlantDetail quick-action tray, 3-5 items; unset = default 4
   sortChipOrder?: LogType[];      // Activity/Sort chip strip order; unset = catalog default order
-  plantsLayoutMode?: 'auto-fit' | 'fixed';  // Plants page card layout; unset = 'auto-fit'
+  plantsLayoutMode?: 'grid' | 'rows' | 'fixed';  // Plants page card layout; unset = 'grid'
 }
 ```
 
