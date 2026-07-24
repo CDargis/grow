@@ -119,6 +119,21 @@ export interface LastActivity {
   loggedAt: string
 }
 
+export type PlantsLayoutMode = 'auto-fit' | 'fixed'
+
+export interface Settings {
+  userId: string
+  shortcutLogTypes?: LogType[]
+  sortChipOrder?: LogType[]
+  plantsLayoutMode?: PlantsLayoutMode
+}
+
+export interface UpdateSettingsRequest {
+  shortcutLogTypes?: LogType[]
+  sortChipOrder?: LogType[]
+  plantsLayoutMode?: PlantsLayoutMode
+}
+
 export interface CreateEnvironmentRequest {
   name: string
   type: EnvironmentType

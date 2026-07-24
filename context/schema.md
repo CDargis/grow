@@ -82,12 +82,21 @@ interface TrimmingData  { notes?: string; }
 interface TransplantData { potSize: string; medium?: string; }
 interface HeightData    { height: number; unit: 'cm' | 'in'; }
 interface NoteData      { text: string; }
-interface PhotoData     { photoKey: string; caption?: string; }
+interface PhotoData     { photoKeys: string[]; caption?: string; }  // one photo log entry can hold many photos
 interface PhaseChangeData { fromPhase: PlantPhase; toPhase: PlantPhase; }
 
 type LogData =
   | WateringData | TrainingData | TrimmingData
   | TransplantData | HeightData | NoteData | PhotoData | PhaseChangeData;
+
+// ── Settings (global, one row per user) ────────────────────────────────────────
+
+interface Settings {
+  userId: string;
+  shortcutLogTypes?: LogType[];   // PlantDetail quick-action tray, 3-5 items; unset = default 4
+  sortChipOrder?: LogType[];      // Activity/Sort chip strip order; unset = catalog default order
+  plantsLayoutMode?: 'auto-fit' | 'fixed';  // Plants page card layout; unset = 'auto-fit'
+}
 ```
 
 ## DynamoDB Tables
@@ -110,6 +119,11 @@ type LogData =
 | PK: `plantId` | STRING | |
 | SK: `logId` | STRING | ULID — enables range queries for a plant's logs |
 | GSI `user-date-index` | PK=userId, SK=date | powers the date strip (all logs across plants for a day) |
+
+### grow-settings
+| Key | Type | Notes |
+|-----|------|-------|
+| PK: `userId` | STRING | one item per user; keyed by userId (not a single fixed row) so it's already multi-user-ready once real auth replaces the hardcoded `USER_ID=default` |
 
 ## S3 Media Keys
 

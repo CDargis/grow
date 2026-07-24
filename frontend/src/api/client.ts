@@ -1,7 +1,7 @@
 import imageCompression from 'browser-image-compression'
 import type {
-  Plant, Environment, Log, LastActivity,
-  CreatePlantRequest, UpdatePlantDetailsRequest, CreateEnvironmentRequest, CreateLogRequest,
+  Plant, Environment, Log, LastActivity, Settings,
+  CreatePlantRequest, UpdatePlantDetailsRequest, CreateEnvironmentRequest, CreateLogRequest, UpdateSettingsRequest,
 } from '@/types'
 
 const BASE = '/api'
@@ -54,6 +54,11 @@ export const api = {
     update: (plantId: string, logId: string, body: CreateLogRequest) =>
       request<Log>(`/plants/${plantId}/logs/${logId}`, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (plantId: string, logId: string)    => request<void>(`/plants/${plantId}/logs/${logId}`, { method: 'DELETE' }),
+  },
+
+  settings: {
+    get:    ()                              => request<Settings>('/settings'),
+    update: (body: UpdateSettingsRequest)   => request<Settings>('/settings', { method: 'PUT', body: JSON.stringify(body) }),
   },
 
   media: {

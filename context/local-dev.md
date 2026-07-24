@@ -21,6 +21,7 @@ ENVIRONMENTS_TABLE=grow-environments \
 LOGS_TABLE=grow-logs \
 LOGS_DATE_GSI=user-date-index \
 LOGS_LOGTYPE_DATE_GSI=user-logtype-date-index \
+SETTINGS_TABLE=grow-settings \
 MEDIA_BUCKET=grow-media \
 USER_ID=default \
 go run ./cmd/api

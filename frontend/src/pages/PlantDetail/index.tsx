@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, CalendarDays, List, Sun, Pencil, Gauge } from 'lucide-react'
+import { ArrowLeft, Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, Wind, ChevronRight, ChevronDown, ChevronUp, Plus, Trash2, CalendarDays, List, Sun, Pencil, Gauge, GitBranch } from 'lucide-react'
 import { api } from '@/api/client'
 import { BottomSheet } from '@/components/BottomSheet'
 import { DatePicker } from '@/components/DatePicker'
@@ -9,8 +9,24 @@ import { AddLogSheet } from '@/components/AddLogSheet'
 import { EditPlantSheet } from '@/components/EditPlantSheet'
 import { MediaImage } from '@/components/MediaImage'
 import { PhotoLightbox, type PhotoLightboxItem } from '@/components/PhotoLightbox'
+import { LogTypeReorderSheet, type LogTypeCatalogItem } from '@/components/LogTypeReorderSheet'
 import { isFeedLog, logTypeLabel } from '@/lib/logDisplay'
+import { useLongPress } from '@/lib/useLongPress'
 import type { Log, LogType, Plant, PlantPhase, EnvironmentChangeData, LightingChangeData, Environment } from '@/types'
+
+// ── Shortcut tray config ─────────────────────────────────────────────────────
+
+const SHORTCUT_CATALOG: LogTypeCatalogItem[] = [
+  { type: 'watering',   label: 'Water/Feed', icon: <Droplets size={20} /> },
+  { type: 'photo',      label: 'Photo',      icon: <Camera size={20} /> },
+  { type: 'note',       label: 'Note',       icon: <MessageSquare size={20} /> },
+  { type: 'height',     label: 'Height',     icon: <Ruler size={20} /> },
+  { type: 'training',   label: 'Training',   icon: <GitBranch size={20} /> },
+  { type: 'trimming',   label: 'Trim',       icon: <Scissors size={20} /> },
+  { type: 'transplant', label: 'Transplant', icon: <span className="text-base">🪴</span> },
+]
+
+const DEFAULT_SHORTCUTS: LogType[] = ['watering', 'photo', 'note', 'height']
 
 const EDITABLE_LOG_TYPES = new Set<LogType>(['watering', 'training', 'trimming', 'note', 'height', 'transplant', 'photo'])
 
@@ -610,6 +626,7 @@ export function PlantDetailPage() {
   const [weekRef, setWeekRef] = useState(new Date())
   const [quickLogType, setQuickLogType] = useState<LogType | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [shortcutsEditorOpen, setShortcutsEditorOpen] = useState(false)
 
   function pdWeekStart(d: Date): Date {
     const r = new Date(d); r.setHours(0, 0, 0, 0)
@@ -705,7 +722,18 @@ export function PlantDetailPage() {
     queryFn: api.environments.list,
   })
 
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: api.settings.get,
+  })
 
+  const updateSettings = useMutation({
+    mutationFn: (body: Parameters<typeof api.settings.update>[0]) => api.settings.update(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] }),
+  })
+
+  const shortcuts = settings?.shortcutLogTypes ?? DEFAULT_SHORTCUTS
+  const shortcutsLongPress = useLongPress(() => setShortcutsEditorOpen(true))
 
   const envMap = new Map<string, string>(
     envs?.map((e: Environment) => [e.environmentId, e.name]) ?? []
@@ -908,22 +936,21 @@ export function PlantDetailPage() {
                     style={{ top: '-6px', left: `calc(30px + ${colIndex + 0.5} * (100% - 102px) / 7)` }}
                   />
                 )}
-                <div className="flex justify-around px-2 py-2">
-                  {([
-                    { type: 'watering' as LogType, icon: <Droplets size={20} />, label: 'Water' },
-                    { type: 'photo'    as LogType, icon: <Camera size={20} />,   label: 'Photo' },
-                    { type: 'note'     as LogType, icon: <MessageSquare size={20} />, label: 'Note' },
-                    { type: 'height'   as LogType, icon: <Ruler size={20} />,    label: 'Height' },
-                  ] as const).map(({ type, icon, label }) => (
-                    <button
-                      key={type}
-                      onClick={() => openQuickLog(type)}
-                      className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl active:bg-surface active:opacity-70"
-                    >
-                      <span className="text-dim">{icon}</span>
-                      <span className="text-[10px] text-muted leading-none">{label}</span>
-                    </button>
-                  ))}
+                <div className="flex justify-around px-2 py-2" {...shortcutsLongPress}>
+                  {shortcuts.map(type => {
+                    const item = SHORTCUT_CATALOG.find(c => c.type === type)
+                    if (!item) return null
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => openQuickLog(type)}
+                        className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl active:bg-surface active:opacity-70"
+                      >
+                        <span className="text-dim">{item.icon}</span>
+                        <span className="text-[10px] text-muted leading-none">{item.label}</span>
+                      </button>
+                    )
+                  })}
                   <button
                     onClick={() => { setEditLog(null); setQuickLogType(null); setLogSheetOpen(true) }}
                     className="flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl active:bg-surface active:opacity-70"
@@ -1011,6 +1038,17 @@ export function PlantDetailPage() {
         plant={plant}
         open={phaseSheetOpen}
         onClose={() => setPhaseSheetOpen(false)}
+      />
+      <LogTypeReorderSheet
+        open={shortcutsEditorOpen}
+        onClose={() => setShortcutsEditorOpen(false)}
+        title="Shortcuts"
+        catalog={SHORTCUT_CATALOG}
+        value={shortcuts}
+        mode="divider"
+        min={3}
+        max={5}
+        onSave={order => updateSettings.mutate({ shortcutLogTypes: order })}
       />
     </div>
   )

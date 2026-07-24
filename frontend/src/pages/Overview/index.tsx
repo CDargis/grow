@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { useQuery, useQueries } from '@tanstack/react-query'
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Droplets, Zap, Scissors, Ruler, MessageSquare, Camera, ArrowUp, ArrowDown } from 'lucide-react'
 import { api } from '@/api/client'
 import { MediaImage } from '@/components/MediaImage'
+import { LogTypeReorderSheet, type LogTypeCatalogItem } from '@/components/LogTypeReorderSheet'
 import { isFeedLog, logTypeLabel } from '@/lib/logDisplay'
+import { useLongPress } from '@/lib/useLongPress'
 import type { Log, LogType, Plant } from '@/types'
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
@@ -72,23 +74,38 @@ const LOG_ICONS: Partial<Record<LogType, React.ReactNode>> = {
 
 // ── Sort mode ──────────────────────────────────────────────────────────────────
 
-const SORT_LOG_TYPES: { type: LogType; label: string }[] = [
-  { type: 'watering', label: 'Water / Feed' },
-  { type: 'photo',    label: 'Photo'    },
-  { type: 'height',   label: 'Height'   },
-  { type: 'note',     label: 'Note'     },
-  { type: 'training', label: 'Training' },
-  { type: 'trimming', label: 'Trim'     },
+const SORT_LOG_TYPE_CATALOG: LogTypeCatalogItem[] = [
+  { type: 'watering', label: 'Water / Feed', icon: <Droplets size={14} /> },
+  { type: 'photo',    label: 'Photo',        icon: <Camera size={14} /> },
+  { type: 'height',   label: 'Height',       icon: <Ruler size={14} /> },
+  { type: 'note',     label: 'Note',         icon: <MessageSquare size={14} /> },
+  { type: 'training', label: 'Training',     icon: <Scissors size={14} /> },
+  { type: 'trimming', label: 'Trim',         icon: <Scissors size={14} /> },
 ]
+
+const DEFAULT_SORT_CHIP_ORDER: LogType[] = SORT_LOG_TYPE_CATALOG.map(c => c.type)
 
 function SortView({ plants }: { plants: Plant[] }) {
   const [logType, setLogType] = useState<LogType>('watering')
   const [dir, setDir]         = useState<'desc' | 'asc'>('asc')
+  const [chipEditorOpen, setChipEditorOpen] = useState(false)
 
   const { data: activity, isLoading } = useQuery({
     queryKey: ['logs', 'last-by-type', logType],
     queryFn:  () => api.logs.lastByType(logType),
   })
+
+  const qc = useQueryClient()
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn:  api.settings.get,
+  })
+  const updateSettings = useMutation({
+    mutationFn: (body: Parameters<typeof api.settings.update>[0]) => api.settings.update(body),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['settings'] }),
+  })
+  const chipOrder = settings?.sortChipOrder ?? DEFAULT_SORT_CHIP_ORDER
+  const chipLongPress = useLongPress(() => setChipEditorOpen(true))
 
   const navigate = useNavigate()
 
@@ -106,20 +123,24 @@ function SortView({ plants }: { plants: Plant[] }) {
   return (
     <div className="flex flex-col">
       {/* Log type chips */}
-      <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-border no-scrollbar">
-        {SORT_LOG_TYPES.map(({ type, label }) => (
-          <button
-            key={type}
-            onClick={() => setLogType(type)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              logType === type
-                ? 'bg-fern/20 text-fern border-fern/40'
-                : 'bg-raised text-muted border-border'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="flex gap-2 overflow-x-auto px-4 py-3 border-b border-border no-scrollbar" {...chipLongPress}>
+        {chipOrder.map(type => {
+          const item = SORT_LOG_TYPE_CATALOG.find(c => c.type === type)
+          if (!item) return null
+          return (
+            <button
+              key={type}
+              onClick={() => setLogType(type)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                logType === type
+                  ? 'bg-fern/20 text-fern border-fern/40'
+                  : 'bg-raised text-muted border-border'
+              }`}
+            >
+              {item.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Sort toggle */}
@@ -170,6 +191,16 @@ function SortView({ plants }: { plants: Plant[] }) {
           )}
         </div>
       )}
+
+      <LogTypeReorderSheet
+        open={chipEditorOpen}
+        onClose={() => setChipEditorOpen(false)}
+        title="Reorder Chips"
+        catalog={SORT_LOG_TYPE_CATALOG}
+        value={chipOrder}
+        mode="plain"
+        onSave={order => updateSettings.mutate({ sortChipOrder: order })}
+      />
     </div>
   )
 }
@@ -278,7 +309,7 @@ export function OverviewPage() {
     <div className="flex flex-col">
       {/* Mode toggle */}
       <div className="flex border-b border-border px-4 pt-3 gap-4">
-        {(['feed', 'sort'] as Mode[]).map(m => (
+        {(['sort', 'feed'] as Mode[]).map(m => (
           <button
             key={m}
             onClick={() => setMode(m)}

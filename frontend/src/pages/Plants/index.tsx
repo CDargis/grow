@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Plus, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, ChevronDown, ChevronUp, Settings } from 'lucide-react'
 import { api } from '@/api/client'
 import { AddPlantSheet } from '@/components/AddPlantSheet'
 import { MediaImage } from '@/components/MediaImage'
+import { SettingsSheet } from '@/components/SettingsSheet'
 import type { Plant, PlantPhase } from '@/types'
 
 const PAST_PHASES: PlantPhase[] = ['archived', 'dead']
@@ -21,14 +22,14 @@ const PHASE_COLORS: Record<PlantPhase, string> = {
   dead:        'text-red-400',
 }
 
-function PlantCard({ plant, past = false }: { plant: Plant; past?: boolean }) {
+function PlantCard({ plant, past = false, fill = false }: { plant: Plant; past?: boolean; fill?: boolean }) {
   const badge = plant.phase === 'dead' ? '💀' : plant.phase === 'archived' ? '✓' : null
   return (
     <Link
       to={`/plants/${plant.plantId}`}
-      className={`block bg-surface rounded-xl border border-border overflow-hidden active:scale-[0.99] transition-transform ${past ? 'opacity-50' : ''}`}
+      className={`block bg-surface rounded-xl border border-border overflow-hidden active:scale-[0.99] transition-transform ${fill ? 'h-full' : ''} ${past ? 'opacity-50' : ''}`}
     >
-      <div className="relative h-28 bg-raised flex items-center justify-center text-5xl overflow-hidden">
+      <div className={`relative bg-raised flex items-center justify-center text-5xl overflow-hidden ${fill ? 'h-full' : 'h-28'}`}>
         {plant.avatarKey
           ? <MediaImage photoKey={plant.avatarKey} alt={plant.name} className="w-full h-full object-cover" fallback={<span>🌱</span>} />
           : '🌱'}
@@ -52,13 +53,20 @@ function PlantCard({ plant, past = false }: { plant: Plant; past?: boolean }) {
 }
 
 export function PlantsPage() {
-  const [addOpen, setAddOpen]   = useState(false)
-  const [showPast, setShowPast] = useState(false)
+  const [addOpen, setAddOpen]           = useState(false)
+  const [showPast, setShowPast]         = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const { data: plants, isLoading } = useQuery({
     queryKey: ['plants'],
     queryFn: api.plants.list,
   })
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn:  api.settings.get,
+  })
+  const layoutMode = settings?.plantsLayoutMode ?? 'auto-fit'
 
   const active   = plants?.filter(p => !PAST_PHASES.includes(p.phase)) ?? []
   const past     = plants?.filter(p =>  PAST_PHASES.includes(p.phase)) ?? []
@@ -71,16 +79,24 @@ export function PlantsPage() {
   ].filter(Boolean).join(' · ')
 
   return (
-    <div className="p-4">
+    <div className="min-h-full flex flex-col p-4">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-lg font-semibold">Plants</h1>
-        <button
-          onClick={() => setAddOpen(true)}
-          className="flex items-center gap-1 text-sm text-fern active:opacity-70"
-        >
-          <Plus size={18} />
-          Add
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="text-muted active:opacity-70"
+          >
+            <Settings size={18} />
+          </button>
+          <button
+            onClick={() => setAddOpen(true)}
+            className="flex items-center gap-1 text-sm text-fern active:opacity-70"
+          >
+            <Plus size={18} />
+            Add
+          </button>
+        </div>
       </div>
 
       {isLoading && (
@@ -91,8 +107,11 @@ export function PlantsPage() {
         <div className="text-muted text-center py-16 text-sm">No plants yet.</div>
       )}
 
-      <div className="space-y-2">
-        {active.map(plant => <PlantCard key={plant.plantId} plant={plant} />)}
+      <div
+        className={layoutMode === 'auto-fit' ? 'grid gap-2 flex-1' : 'space-y-2'}
+        style={layoutMode === 'auto-fit' ? { gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gridAutoRows: '1fr' } : undefined}
+      >
+        {active.map(plant => <PlantCard key={plant.plantId} plant={plant} fill={layoutMode === 'auto-fit'} />)}
       </div>
 
       {past.length > 0 && (
@@ -116,6 +135,7 @@ export function PlantsPage() {
       )}
 
       <AddPlantSheet open={addOpen} onClose={() => setAddOpen(false)} />
+      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   )
 }

@@ -23,6 +23,7 @@ type app struct {
 	plants   *store.PlantStore
 	envs     *store.EnvironmentStore
 	logs     *store.LogStore
+	settings *store.SettingsStore
 	s3       *s3.Client
 	presign  *s3.PresignClient
 	mediaBkt string
@@ -40,6 +41,7 @@ func main() {
 		plants:   store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
 		envs:     store.NewEnvironmentStore(clients.DDB, os.Getenv("ENVIRONMENTS_TABLE")),
 		logs:     store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI"), os.Getenv("LOGS_LOGTYPE_DATE_GSI")),
+		settings: store.NewSettingsStore(clients.DDB, os.Getenv("SETTINGS_TABLE")),
 		s3:       clients.S3,
 		presign:  s3.NewPresignClient(clients.S3),
 		mediaBkt: os.Getenv("MEDIA_BUCKET"),
@@ -84,6 +86,8 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/media/upload",             a.presignUpload)
 	mux.HandleFunc("GET /api/media/url",                 a.presignDownload)
 
+	mux.HandleFunc("GET /api/settings",                  a.getSettings)
+	mux.HandleFunc("PUT /api/settings",                  a.updateSettings)
 }
 
 // ── Plants ───────────────────────────────────────────────────────────────────
@@ -503,6 +507,31 @@ func (a *app) presignUpload(w http.ResponseWriter, r *http.Request) {
 		"uploadUrl": presigned.URL,
 		"key":       key,
 	})
+}
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+func (a *app) getSettings(w http.ResponseWriter, r *http.Request) {
+	settings, err := a.settings.Get(r.Context(), a.userID)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, settings)
+}
+
+func (a *app) updateSettings(w http.ResponseWriter, r *http.Request) {
+	var req model.UpdateSettingsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	settings, err := a.settings.Update(r.Context(), a.userID, req)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, settings)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
