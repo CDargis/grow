@@ -66,7 +66,9 @@ export function PlantsPage() {
     queryKey: ['settings'],
     queryFn:  api.settings.get,
   })
-  const layoutMode = settings?.plantsLayoutMode ?? 'grid'
+  const layoutMode = settings?.plantsLayoutMode === 'rows' || settings?.plantsLayoutMode === 'fixed'
+    ? settings.plantsLayoutMode
+    : 'grid'
 
   const active   = plants?.filter(p => !PAST_PHASES.includes(p.phase)) ?? []
   const past     = plants?.filter(p =>  PAST_PHASES.includes(p.phase)) ?? []

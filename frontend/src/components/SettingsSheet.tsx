@@ -20,7 +20,9 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
     onSuccess:  () => qc.invalidateQueries({ queryKey: ['settings'] }),
   })
 
-  const layoutMode: PlantsLayoutMode = settings?.plantsLayoutMode ?? 'grid'
+  const layoutMode: PlantsLayoutMode = settings?.plantsLayoutMode === 'rows' || settings?.plantsLayoutMode === 'fixed'
+    ? settings.plantsLayoutMode
+    : 'grid'
 
   return (
     <BottomSheet title="Settings" open={open} onClose={onClose}>
