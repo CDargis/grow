@@ -28,9 +28,14 @@
   for local testing now that Cognito exists.
 - Frontend: `frontend/src/auth/` — `oidc-client-ts`'s `UserManager`, Authorization Code + PKCE
   against Cognito's Hosted UI. `AuthProvider` redirects to login immediately if there's no valid
-  session (no "please log in" landing page — personal app, one user). `GET /api/auth-config`
-  supplies the User Pool authority/client ID at runtime rather than baking them into the build,
-  since those IDs don't exist until after the CDK stack that creates them is deployed.
+  session (no "please log in" landing page — personal app, one user); if the stored access token
+  is just expired (not absent), it tries `signinSilent()` (refresh token, no user interaction)
+  before falling back to a full redirect — `automaticSilentRenew` alone only fires while the tab
+  stays open continuously, so without this a session idle for over an hour (access token TTL)
+  forced a full re-login every time. `RefreshTokenValidity` is 365 days on both App Clients.
+  `GET /api/auth-config` supplies the User Pool authority/client ID at runtime rather than baking
+  them into the build, since those IDs don't exist until after the CDK stack that creates them
+  is deployed.
 - API calls attach the access token as `Authorization: Bearer` (`frontend/src/api/client.ts`);
   a 401 response triggers `signinRedirect()` rather than surfacing an error.
 

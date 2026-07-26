@@ -32,11 +32,10 @@
       `context/plans/complete/cognito-auth-mcp-connector.md`.
 
 ## Follow-ups from the auth/MCP work
-- [ ] Web app forces a full re-login whenever the access token expires (~1h after the tab
-      closes) — `AuthProvider` should try `signinSilent()` (refresh token) before redirecting;
-      also consider raising `RefreshTokenValidity` for fewer password prompts
+- [x] Web app forced a full re-login whenever the access token expired (~1h after the tab
+      closed) — `AuthProvider` now tries `signinSilent()` (refresh token) before redirecting to
+      a full login; `RefreshTokenValidity` raised to 365 days on both Cognito App Clients.
 - [ ] Cognito Hosted UI branding (logo/colors) — cosmetic, cheap, parked
-- [ ] Delete `spikes/mcp-auth/` — superseded by the real implementation
 
 ## Backlog
 - [ ] Height chart per plant

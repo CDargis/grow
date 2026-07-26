@@ -27,6 +27,23 @@ export function AuthProvider({ children }: Props) {
         return
       }
 
+      // The access token is expired or missing, but a refresh token from an
+      // earlier session may still be valid (automaticSilentRenew only fires
+      // while the tab stays open continuously -- closing the browser for
+      // over an hour otherwise forced a full interactive re-login every
+      // time). Try the refresh token first; only redirect to a full login
+      // if that fails (refresh token also expired/revoked, or no prior
+      // session at all).
+      if (user) {
+        try {
+          await manager.signinSilent()
+          if (!cancelled) setReady(true)
+          return
+        } catch (err) {
+          console.warn('silent renew failed, falling back to full login', err)
+        }
+      }
+
       await manager.signinRedirect()
     }).catch(err => {
       console.error('auth init failed', err)

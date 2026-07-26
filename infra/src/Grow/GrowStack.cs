@@ -118,8 +118,9 @@ public class GrowStack : Stack
 
         UserPoolClient userPoolClient = userPool.AddClient("WebClient", new UserPoolClientOptions
         {
-            UserPoolClientName = "grow-web",
-            GenerateSecret     = false, // public SPA client -- PKCE, no client secret
+            UserPoolClientName   = "grow-web",
+            GenerateSecret       = false, // public SPA client -- PKCE, no client secret
+            RefreshTokenValidity = Duration.Days(365), // personal app -- avoid frequent re-logins
             OAuth = new OAuthSettings
             {
                 Flows        = new OAuthFlows { AuthorizationCodeGrant = true },
@@ -138,8 +139,9 @@ public class GrowStack : Stack
         // hold a secret safely, so it stays on its own public/PKCE-only client above.
         UserPoolClient mcpClient = userPool.AddClient("McpClient", new UserPoolClientOptions
         {
-            UserPoolClientName = "grow-mcp",
-            GenerateSecret     = true,
+            UserPoolClientName   = "grow-mcp",
+            GenerateSecret       = true,
+            RefreshTokenValidity = Duration.Days(365),
             OAuth = new OAuthSettings
             {
                 Flows        = new OAuthFlows { AuthorizationCodeGrant = true },
