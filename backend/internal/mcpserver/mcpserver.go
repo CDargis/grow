@@ -28,6 +28,7 @@ type Deps struct {
 	Plants           *store.PlantStore
 	Logs             *store.LogStore
 	PublicBaseURL    string // e.g. https://grow.chrisdargis.com, no trailing slash
+	HostedUIBase     string // e.g. https://grow-chrisdargis.auth.us-east-1.amazoncognito.com, no trailing slash
 	Region           string
 	UserPoolID       string
 	UserPoolClientID string
@@ -39,17 +40,46 @@ func (d Deps) issuer() string {
 
 // ── Well-known metadata (unauthenticated) ───────────────────────────────────
 
-// ProtectedResourceMetadata points MCP clients at Cognito as the
-// authorization server. Cognito is the real OAuth provider -- this server
-// never implements /authorize or /token itself, it only tells clients where
-// to find them.
+// ProtectedResourceMetadata points MCP clients at ourselves as the
+// authorization server (see AuthorizationServerMetadata below for why it's
+// us and not Cognito directly).
 func (d Deps) ProtectedResourceMetadata(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"resource":                 d.PublicBaseURL + "/api/mcp",
-		"authorization_servers":    []string{d.issuer()},
+		"authorization_servers":    []string{d.PublicBaseURL},
 		"scopes_supported":         []string{"openid", "email", "profile"},
 		"bearer_methods_supported": []string{"header"},
+	})
+}
+
+// AuthorizationServerMetadata serves RFC 8414 authorization-server metadata
+// at OUR domain root, with the endpoints pointing at Cognito's real hosted-UI
+// authorize/token endpoints. We do this instead of listing Cognito's issuer
+// in authorization_servers because Cognito's issuer URL has a path component
+// (/{poolId}) and Cognito only serves its discovery document at the OIDC
+// suffix form ({issuer}/.well-known/openid-configuration) -- the RFC 8414
+// path-insertion forms and the oauth-authorization-server forms all return
+// 400 (verified empirically). Claude's connector discovery never finds it and
+// fails with "Authorization with the MCP server failed" before any request
+// reaches the login page, Cognito, or us. Hosting the metadata ourselves at
+// the domain root reproduces the exact topology validated end-to-end in
+// spikes/mcp-auth (metadata at {origin}/.well-known/oauth-authorization-server,
+// no path in the issuer), which a real Claude connector completed successfully.
+// Cognito remains the only real OAuth implementation -- this is a static
+// pointer document, not a proxy: /authorize and /token still go directly to
+// Cognito, and token validation still checks Cognito's issuer.
+func (d Deps) AuthorizationServerMetadata(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"issuer":                                d.PublicBaseURL,
+		"authorization_endpoint":                d.HostedUIBase + "/oauth2/authorize",
+		"token_endpoint":                        d.HostedUIBase + "/oauth2/token",
+		"response_types_supported":              []string{"code"},
+		"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
+		"code_challenge_methods_supported":      []string{"S256"},
+		"token_endpoint_auth_methods_supported": []string{"client_secret_post", "client_secret_basic", "none"},
+		"scopes_supported":                      []string{"openid", "email", "profile"},
 	})
 }
 

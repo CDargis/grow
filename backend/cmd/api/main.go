@@ -71,6 +71,7 @@ func main() {
 		Plants:           a.plants,
 		Logs:             a.logs,
 		PublicBaseURL:    os.Getenv("PUBLIC_BASE_URL"),
+		HostedUIBase:     os.Getenv("COGNITO_HOSTED_UI_BASE"),
 		Region:           os.Getenv("AWS_REGION"),
 		UserPoolID:       os.Getenv("USER_POOL_ID"),
 		UserPoolClientID: os.Getenv("MCP_USER_POOL_CLIENT_ID"),
@@ -123,6 +124,7 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	// from the API Gateway JWT authorizer at the CDK route level.
 	mux.Handle("/api/mcp", a.mcp.Handler())
 	mux.HandleFunc("GET /.well-known/oauth-protected-resource", a.mcp.ProtectedResourceMetadata)
+	mux.HandleFunc("GET /.well-known/oauth-authorization-server", a.mcp.AuthorizationServerMetadata)
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────

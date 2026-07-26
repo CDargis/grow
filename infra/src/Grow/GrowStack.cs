@@ -223,7 +223,8 @@ public class GrowStack : Stack
                 ["USER_POOL_ID"]            = userPool.UserPoolId,
                 ["USER_POOL_CLIENT_ID"]     = userPoolClient.UserPoolClientId,
                 ["MCP_USER_POOL_CLIENT_ID"] = mcpClient.UserPoolClientId,
-                ["PUBLIC_BASE_URL"]         = $"https://{domainName}"
+                ["PUBLIC_BASE_URL"]         = $"https://{domainName}",
+                ["COGNITO_HOSTED_UI_BASE"]  = $"https://grow-chrisdargis.auth.{this.Region}.amazoncognito.com"
             }
         });
 
@@ -277,6 +278,17 @@ public class GrowStack : Stack
         httpApi.AddRoutes(new AddRoutesOptions
         {
             Path        = "/.well-known/oauth-protected-resource",
+            Methods     = new[] { Amazon.CDK.AWS.Apigatewayv2.Alpha.HttpMethod.GET },
+            Integration = apiIntegration
+        });
+
+        // RFC 8414 authorization-server metadata, hosted by us at the domain
+        // root and pointing at Cognito's real endpoints -- Cognito's own
+        // path-bearing issuer URL breaks MCP clients' metadata discovery.
+        // See internal/mcpserver.AuthorizationServerMetadata.
+        httpApi.AddRoutes(new AddRoutesOptions
+        {
+            Path        = "/.well-known/oauth-authorization-server",
             Methods     = new[] { Amazon.CDK.AWS.Apigatewayv2.Alpha.HttpMethod.GET },
             Integration = apiIntegration
         });
