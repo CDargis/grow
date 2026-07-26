@@ -92,7 +92,11 @@
       "Bash(MSYS_NO_PATHCONV=1 aws logs tail /aws/lambda/grow-api --since 60m --format short)",
       "Bash(MSYS_NO_PATHCONV=1 aws cognito-idp describe-user-pool-client *)",
       "Bash(curl -s -i -c /tmp/cookies.txt -b /tmp/cookies.txt -o /tmp/loginresp.html -D /tmp/loginheaders.txt -G --request POST https://__TRACKED_VAR__/login --data-urlencode client_id=__TRACKED_VAR__ --data-urlencode response_type=code --data-urlencode 'scope=openid email profile' --data-urlencode redirect_uri=__TRACKED_VAR__ --data-urlencode code_challenge=__TRACKED_VAR__ --data-urlencode code_challenge_method=S256 --data-urlencode state=test123 --data-urlencode _csrf=__TRACKED_VAR__ --data-urlencode username=dargis.chris@gmail.com --data-urlencode password=Gr0EBDCDFE717Dow2c8d0c)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(MSYS_NO_PATHCONV=1 aws cloudformation describe-stacks *)",
+      "Bash(MSYS_NO_PATHCONV=1 aws logs tail /aws/lambda/grow-api --since 10m --format short)",
+      "Bash(MSYS_NO_PATHCONV=1 aws cognito-idp admin-list-user-auth-events *)",
+      "Bash(gofmt -w internal/mcpserver/mcpserver.go)"
     ]
   }
 }
