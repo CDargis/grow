@@ -66,7 +66,22 @@
       "Bash(dotnet restore *)",
       "Bash(gofmt -d cmd/api/main.go)",
       "Bash(gofmt -w cmd/api/main.go)",
-      "Bash(gofmt -l cmd/api/main.go)"
+      "Bash(gofmt -l cmd/api/main.go)",
+      "Bash(aws codepipeline *)",
+      "Bash(aws cloudformation describe-stacks *)",
+      "Bash(aws cloudformation list-stacks *)",
+      "Bash(curl -s https://grow.chrisdargis.com/api/auth-config)",
+      "Bash(command -v jq)",
+      "Bash(mv /tmp/plantIds2.txt /tmp/plantIds.txt)",
+      "Bash(mv /tmp/envIds2.txt /tmp/envIds.txt)",
+      "Bash(mv /tmp/logKeys2.txt /tmp/logKeys.txt)",
+      "Bash(tasklist //FI \"IMAGENAME eq aws.exe\")",
+      "Bash(xargs -P 20 '-I{}' bash -c ' *)",
+      "Bash(chmod +x /tmp/update_one.sh)",
+      "Bash(go env *)",
+      "Bash(go version *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(gofmt -l cmd/api/main.go internal/mcpserver/mcpserver.go)"
     ]
   }
 }
