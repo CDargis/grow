@@ -99,16 +99,34 @@ as planned.
 7. `spikes/mcp-auth/` can be deleted any time now — superseded by the real thing being wired
    in directly, not a dependency of any later step
 
-## Deploy checklist (not done yet — needs explicit go-ahead, this locks out the live app
-until step 2)
-1. `cdk deploy` — creates the User Pool, wires the JWT authorizer onto every route. **The
-   moment this lands, the live app requires a login and there is no user yet** — the app is
-   inaccessible between this step and the next.
-2. Create the one real user (Chris) via AWS CLI/console — `admin-create-user` +
-   `admin-set-user-password` (permanent), since self-signup is disabled by design.
-3. Log in from the live app, confirm plants/logs/settings all still work end-to-end.
-4. Add the real MCP connector in Claude.ai (`https://grow.chrisdargis.com/api/mcp`, manual
-   Client ID = the `UserPoolClientId` CDK output), verify a tool call actually works.
+## Deploy checklist — everything below this line is done
+1. ~~`cdk deploy`~~ — done. Required a data migration, see incident note below.
+2. ~~Create the one real user~~ — done.
+3. ~~Log in from the live app, confirm plants/logs/settings work end-to-end~~ — done, after
+   the data migration.
+4. ~~Add the real MCP connector in Claude.ai, manual Client ID~~ — attempted twice, both
+   failed (see incidents below); fixed by adding a second Cognito App Client (see the
+   "Separate Cognito App Client for the MCP connector" decision in `decisions.md`). Not yet
+   re-verified against the fix.
+
+## Incident: redirect error on first connector attempt (2026-07-26)
+"An error was encountered with the requested page" when adding the connector. Cause: Cognito
+rejects `/authorize` outright if `redirect_uri` isn't in the App Client's `CallbackUrls`. Claude's
+callback (`https://claude.ai/api/mcp/auth_callback`) wasn't in the list — only the frontend's own
+`/callback` was. Fixed by adding Claude's callback URL to `grow-web`'s `CallbackUrls` (superseded
+by the dedicated `grow-mcp` client below, which has Claude's callback and not the frontend's).
+
+## Incident: "Authorization with the MCP server failed" on second attempt (2026-07-26)
+Got past the redirect this time, but authorization still failed. Diagnosed by manually replaying
+the entire flow with curl against the *real* Cognito endpoints (real login form + CSRF token,
+real code, real token exchange, real call to `/api/mcp`) — every step worked perfectly by hand.
+That isolated the problem to something Cognito advertises rather than anything actually broken:
+its OIDC discovery document's `token_endpoint_auth_methods_supported` only ever lists
+`client_secret_basic`/`client_secret_post`, never `"none"`, even though `grow-web` is a genuinely
+public/PKCE-only client that works fine with no secret in practice. A standards-compliant client
+(Claude) trusting that metadata has no way to know "none" actually works, and likely tries
+secret-based auth it was never given a secret for. Fixed with a second, confidential App Client
+(`grow-mcp`, has a real secret) dedicated to the MCP connector — not yet re-verified.
 
 ## Incident: first deploy broke existing data (2026-07-26)
 Deploying the JWT authorizer switched `userId` from the hardcoded `"default"` to each request's

@@ -122,14 +122,29 @@ public class GrowStack : Stack
             GenerateSecret     = false, // public SPA client -- PKCE, no client secret
             OAuth = new OAuthSettings
             {
-                Flows  = new OAuthFlows { AuthorizationCodeGrant = true },
-                Scopes = new[] { OAuthScope.OPENID, OAuthScope.EMAIL, OAuthScope.PROFILE },
-                // The grow.chrisdargis.com/callback entry is the frontend's own login flow.
-                // The claude.ai entry is Claude's custom-connector OAuth callback -- needed
-                // because the same App Client is reused for the MCP connector rather than
-                // creating a second one, so it has to allow both redirect URIs.
-                CallbackUrls = new[] { $"https://{domainName}/callback", "https://claude.ai/api/mcp/auth_callback" },
+                Flows        = new OAuthFlows { AuthorizationCodeGrant = true },
+                Scopes       = new[] { OAuthScope.OPENID, OAuthScope.EMAIL, OAuthScope.PROFILE },
+                CallbackUrls = new[] { $"https://{domainName}/callback" },
                 LogoutUrls   = new[] { $"https://{domainName}/" }
+            },
+            SupportedIdentityProviders = new[] { UserPoolClientIdentityProvider.COGNITO }
+        });
+
+        // Separate client for Claude's MCP connector, not the browser frontend's WebClient.
+        // Cognito's OIDC discovery document only advertises client_secret_basic/post for
+        // token_endpoint_auth_methods_supported -- never "none", even for genuinely public
+        // clients -- so a standards-compliant OAuth client (Claude) needs an actual secret
+        // to authenticate the way the metadata says it should. The browser frontend can't
+        // hold a secret safely, so it stays on its own public/PKCE-only client above.
+        UserPoolClient mcpClient = userPool.AddClient("McpClient", new UserPoolClientOptions
+        {
+            UserPoolClientName = "grow-mcp",
+            GenerateSecret     = true,
+            OAuth = new OAuthSettings
+            {
+                Flows        = new OAuthFlows { AuthorizationCodeGrant = true },
+                Scopes       = new[] { OAuthScope.OPENID, OAuthScope.EMAIL, OAuthScope.PROFILE },
+                CallbackUrls = new[] { "https://claude.ai/api/mcp/auth_callback" }
             },
             SupportedIdentityProviders = new[] { UserPoolClientIdentityProvider.COGNITO }
         });
@@ -204,10 +219,11 @@ public class GrowStack : Stack
                 ["LOGS_LOGTYPE_DATE_GSI"]   = "user-logtype-date-index",
                 ["SETTINGS_TABLE"]     = settingsTable.TableName,
                 ["MEDIA_BUCKET"]       = mediaBucket.BucketName,
-                ["USER_ID"]            = "default",
-                ["USER_POOL_ID"]        = userPool.UserPoolId,
-                ["USER_POOL_CLIENT_ID"] = userPoolClient.UserPoolClientId,
-                ["PUBLIC_BASE_URL"]     = $"https://{domainName}"
+                ["USER_ID"]                 = "default",
+                ["USER_POOL_ID"]            = userPool.UserPoolId,
+                ["USER_POOL_CLIENT_ID"]     = userPoolClient.UserPoolClientId,
+                ["MCP_USER_POOL_CLIENT_ID"] = mcpClient.UserPoolClientId,
+                ["PUBLIC_BASE_URL"]         = $"https://{domainName}"
             }
         });
 
@@ -397,5 +413,7 @@ public class GrowStack : Stack
         new CfnOutput(this, "UserPoolClientId",        new CfnOutputProps { Value = userPoolClient.UserPoolClientId });
         new CfnOutput(this, "UserPoolDomain",         new CfnOutputProps { Value = $"https://grow-chrisdargis.auth.{this.Region}.amazoncognito.com" });
         new CfnOutput(this, "McpEndpoint",             new CfnOutputProps { Value = $"https://{domainName}/api/mcp" });
+        new CfnOutput(this, "McpClientId",             new CfnOutputProps { Value = mcpClient.UserPoolClientId });
+        new CfnOutput(this, "McpClientSecret",         new CfnOutputProps { Value = mcpClient.UserPoolClientSecret.UnsafeUnwrap() });
     }
 }

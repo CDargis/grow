@@ -73,7 +73,7 @@ func main() {
 		PublicBaseURL:    os.Getenv("PUBLIC_BASE_URL"),
 		Region:           os.Getenv("AWS_REGION"),
 		UserPoolID:       os.Getenv("USER_POOL_ID"),
-		UserPoolClientID: os.Getenv("USER_POOL_CLIENT_ID"),
+		UserPoolClientID: os.Getenv("MCP_USER_POOL_CLIENT_ID"),
 	}
 
 	mux := http.NewServeMux()

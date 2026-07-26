@@ -1,5 +1,16 @@
 # grow — Decisions
 
+## Separate Cognito App Client for the MCP connector (2026-07-26)
+Cognito's OIDC discovery document (`token_endpoint_auth_methods_supported`) only ever lists
+`client_secret_basic`/`client_secret_post` -- never `"none"`, even for genuinely public/PKCE-only
+clients. Confirmed by manually replaying the full login+token exchange against the real Cognito
+endpoints with `grow-web` (public, no secret): it works fine directly, but a standards-compliant
+OAuth client (Claude) reading that discovery doc has no way to know "none" is actually supported,
+so it likely tries secret-based auth it doesn't have. Rather than compromise the browser
+frontend's client (which can't safely hold a secret) to work around this, added a second App
+Client, `grow-mcp`, confidential (has a real secret), used only by Claude's connector. Same user
+pool, same one user -- just two different client "shapes" for two different kinds of caller.
+
 ## /api/mcp validates its own JWT instead of using the API Gateway authorizer (2026-07-26)
 Every other route uses API Gateway's built-in JWT authorizer, which validates the token before
 Lambda is even invoked. `/api/mcp` can't use it: on missing/invalid auth, MCP clients discover
