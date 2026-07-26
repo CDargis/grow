@@ -549,7 +549,8 @@ function getInitPhotoKeys(init?: PhotoData): string[] {
 
 function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: PhotoData }) {
   const qc = useQueryClient()
-  const fileRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const libraryRef = useRef<HTMLInputElement>(null)
   const existingKeys = getInitPhotoKeys(init)
   const [newFiles, setNewFiles]     = useState<File[]>([])
   const [previews, setPreviews]     = useState<string[]>([])
@@ -562,7 +563,7 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
     if (!selected.length) return
     setNewFiles(prev => [...prev, ...selected])
     setPreviews(prev => [...prev, ...selected.map(f => URL.createObjectURL(f))])
-    if (fileRef.current) fileRef.current.value = ''
+    e.target.value = ''
   }
 
   function removeNew(idx: number) {
@@ -604,16 +605,26 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
 
   return (
     <div className="space-y-3 mt-2">
-      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles} />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFiles} />
+      <input ref={libraryRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles} />
 
       {totalCount === 0 ? (
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="w-full h-48 rounded-xl border-2 border-dashed border-border text-muted flex flex-col items-center justify-center gap-2 active:opacity-70"
-        >
-          <ImagePlus size={28} />
-          <span className="text-sm">Tap to select photos</span>
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => cameraRef.current?.click()}
+            className="h-48 rounded-xl border-2 border-dashed border-border text-muted flex flex-col items-center justify-center gap-2 active:opacity-70"
+          >
+            <Camera size={28} />
+            <span className="text-sm">Take Photo</span>
+          </button>
+          <button
+            onClick={() => libraryRef.current?.click()}
+            className="h-48 rounded-xl border-2 border-dashed border-border text-muted flex flex-col items-center justify-center gap-2 active:opacity-70"
+          >
+            <ImagePlus size={28} />
+            <span className="text-sm">Choose from Library</span>
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-3 gap-2">
           {existingKeys.map(key => (
@@ -633,7 +644,13 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
             </div>
           ))}
           <button
-            onClick={() => fileRef.current?.click()}
+            onClick={() => cameraRef.current?.click()}
+            className="aspect-square rounded-lg border-2 border-dashed border-border text-muted flex items-center justify-center active:opacity-70"
+          >
+            <Camera size={20} />
+          </button>
+          <button
+            onClick={() => libraryRef.current?.click()}
             className="aspect-square rounded-lg border-2 border-dashed border-border text-muted flex items-center justify-center active:opacity-70"
           >
             <ImagePlus size={20} />
