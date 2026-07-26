@@ -183,7 +183,7 @@ public class GrowStack : Stack
             {
                 Bundling = new BundlingOptions
                 {
-                    Image   = DockerImage.FromRegistry("public.ecr.aws/docker/library/golang:1.24-alpine"),
+                    Image   = DockerImage.FromRegistry("public.ecr.aws/docker/library/golang:1.25-alpine"),
                     Command = new[]
                     {
                         "sh", "-c",
@@ -202,7 +202,8 @@ public class GrowStack : Stack
                 ["MEDIA_BUCKET"]       = mediaBucket.BucketName,
                 ["USER_ID"]            = "default",
                 ["USER_POOL_ID"]        = userPool.UserPoolId,
-                ["USER_POOL_CLIENT_ID"] = userPoolClient.UserPoolClientId
+                ["USER_POOL_CLIENT_ID"] = userPoolClient.UserPoolClientId,
+                ["PUBLIC_BASE_URL"]     = $"https://{domainName}"
             }
         });
 
@@ -234,6 +235,28 @@ public class GrowStack : Stack
         httpApi.AddRoutes(new AddRoutesOptions
         {
             Path        = "/api/auth-config",
+            Methods     = new[] { Amazon.CDK.AWS.Apigatewayv2.Alpha.HttpMethod.GET },
+            Integration = apiIntegration
+        });
+
+        // MCP: also unauthenticated at the API Gateway level, on purpose --
+        // it validates its own bearer token in Go so it can return the
+        // WWW-Authenticate response shape MCP clients expect, which API
+        // Gateway's built-in JWT authorizer can't be customized to produce.
+        // See internal/mcpserver's package comment.
+        httpApi.AddRoutes(new AddRoutesOptions
+        {
+            Path        = "/api/mcp",
+            Methods     = new[] { Amazon.CDK.AWS.Apigatewayv2.Alpha.HttpMethod.ANY },
+            Integration = apiIntegration
+        });
+
+        // Unauthenticated OAuth resource metadata for MCP clients -- must be
+        // reachable at the domain root, not just under /api/*, so it also
+        // gets its own CloudFront behavior below.
+        httpApi.AddRoutes(new AddRoutesOptions
+        {
+            Path        = "/.well-known/oauth-protected-resource",
             Methods     = new[] { Amazon.CDK.AWS.Apigatewayv2.Alpha.HttpMethod.GET },
             Integration = apiIntegration
         });
@@ -275,6 +298,7 @@ public class GrowStack : Stack
         // ── CloudFront Distribution ───────────────────────────────────────
 
         string apiOriginDomain = $"{httpApi.ApiId}.execute-api.{this.Region}.amazonaws.com";
+        HttpOrigin apiOrigin = new HttpOrigin(apiOriginDomain, new HttpOriginProps { OriginPath = "" });
 
         Distribution distribution = new Distribution(this, "Distribution", new DistributionProps
         {
@@ -289,10 +313,17 @@ public class GrowStack : Stack
             {
                 ["/api/*"] = new BehaviorOptions
                 {
-                    Origin = new HttpOrigin(apiOriginDomain, new HttpOriginProps
-                    {
-                        OriginPath = ""
-                    }),
+                    Origin                = apiOrigin,
+                    ViewerProtocolPolicy  = ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    CachePolicy           = CachePolicy.CACHING_DISABLED,
+                    AllowedMethods        = AllowedMethods.ALLOW_ALL,
+                    OriginRequestPolicy   = OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER
+                },
+                // MCP clients look for OAuth resource metadata at the domain
+                // root, not just under /api/* -- see internal/mcpserver.
+                ["/.well-known/*"] = new BehaviorOptions
+                {
+                    Origin                = apiOrigin,
                     ViewerProtocolPolicy  = ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                     CachePolicy           = CachePolicy.CACHING_DISABLED,
                     AllowedMethods        = AllowedMethods.ALLOW_ALL,
@@ -361,5 +392,6 @@ public class GrowStack : Stack
         new CfnOutput(this, "UserPoolId",             new CfnOutputProps { Value = userPool.UserPoolId });
         new CfnOutput(this, "UserPoolClientId",        new CfnOutputProps { Value = userPoolClient.UserPoolClientId });
         new CfnOutput(this, "UserPoolDomain",         new CfnOutputProps { Value = $"https://grow-chrisdargis.auth.{this.Region}.amazoncognito.com" });
+        new CfnOutput(this, "McpEndpoint",             new CfnOutputProps { Value = $"https://{domainName}/api/mcp" });
     }
 }

@@ -21,14 +21,16 @@
 - [x] Activity/Sort chip strip: long-press to reorder
 - [x] Plants page layout config: Grid (fills screen in columns+rows), Rows (single column, fills screen vertically), or Fixed size — toggle in Settings
 - [x] Camera-direct photo option (Take Photo alongside Library) for photo logs, Training, Trimming, Environment photos
+- [x] Cognito auth (single real user) — deployed, live, confirmed working end-to-end. Required
+      migrating all existing data's `userId` from the old hardcoded `"default"` to the real
+      Cognito `sub` after first deploy — see incident note in the plan doc.
 
 ## In progress
-- [ ] Cognito auth + read-only MCP connector — see `context/plans/active/cognito-auth-mcp-connector.md`.
-      Spike confirmed Cognito's lack of Dynamic Client Registration isn't a blocker for Claude's
-      custom connector. CDK (User Pool + JWT authorizer), backend (`app.userID(r)` from JWT
-      claims), and frontend (`oidc-client-ts` login flow) are all written but **not deployed yet**.
-      Deploying this will require logging in immediately (no bypass) — needs a Cognito user
-      created (admin, not signup) right after deploy or the app is locked out.
+- [ ] Read-only MCP connector — see `context/plans/active/cognito-auth-mcp-connector.md`.
+      `backend/internal/mcpserver/` written (tools: list_plants, get_plant, list_logs_for_plant,
+      get_recent_activity), CDK routes + new CloudFront `/.well-known/*` behavior written,
+      **not deployed yet**. Left to do: deploy, then actually add the connector in Claude.ai
+      (manual Client ID, per the spike finding) and verify a real tool call works.
 
 ## Backlog
 - [ ] Height chart per plant

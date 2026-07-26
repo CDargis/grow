@@ -1,5 +1,30 @@
 # grow — Decisions
 
+## /api/mcp validates its own JWT instead of using the API Gateway authorizer (2026-07-26)
+Every other route uses API Gateway's built-in JWT authorizer, which validates the token before
+Lambda is even invoked. `/api/mcp` can't use it: on missing/invalid auth, MCP clients discover
+where to log in via a 401's `WWW-Authenticate: Bearer resource_metadata="..."` header, and API
+Gateway's authorizer returns a generic 401 with no custom header. So `/api/mcp` is registered
+without the authorizer (like `/api/auth-config`) and validates the bearer token itself in Go
+(`backend/internal/mcpserver`, `lestrrat-go/jwx/v3` against Cognito's JWKS, cached 1h). This
+doesn't reimplement OAuth -- Cognito is still the only issuer/authorization server -- it just
+means this one route checks the token in application code instead of at the gateway.
+
+## Ownership check added at the MCP tool layer, not fixed API-wide (2026-07-26)
+`get_plant` and `list_logs_for_plant` verify `plant.UserID == callerUserID` before returning
+data; the underlying REST handlers (`getPlant` etc.) don't do this anywhere in the existing API
+-- they just fetch by id with no ownership check, a gap that predates this work and is harmless
+today (single real user). Added the check at the MCP layer specifically because an LLM-facing
+tool is a different trust surface worth hardening cheaply, without taking on an API-wide
+authorization refactor that isn't otherwise in scope.
+
+## Bumped Go to 1.25, backend and Lambda build image together (2026-07-26)
+Added `lestrrat-go/jwx/v3` for MCP's JWT verification; jwx/v3 itself requires go 1.25 in its own
+go.mod. Rather than fight that (pin to jwx/v2, deprecated; or a different library), bumped
+`backend/go.mod`'s `go` directive and the CDK Lambda build's pinned Docker image
+(`golang:1.24-alpine` -> `golang:1.25-alpine`) together, keeping local builds and the actual
+Lambda build environment in sync.
+
 ## Cognito confirmed viable for MCP custom connector auth (2026-07-26)
 Spiked (`spikes/mcp-auth/`) whether Claude's custom-connector OAuth flow requires Dynamic Client
 Registration (RFC 7591), which Cognito doesn't support. It doesn't — Claude falls back to a

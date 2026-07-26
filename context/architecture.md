@@ -34,6 +34,26 @@
 - API calls attach the access token as `Authorization: Bearer` (`frontend/src/api/client.ts`);
   a 401 response triggers `signinRedirect()` rather than surfacing an error.
 
+### MCP (read-only Claude custom connector)
+- `backend/internal/mcpserver/` — official `modelcontextprotocol/go-sdk`, Streamable HTTP
+  transport, stateless. Tools: `list_plants`, `get_plant`, `list_logs_for_plant`,
+  `get_recent_activity` — thin wrappers over `internal/store`, plus an explicit
+  `plant.UserID == callerUserID` ownership check at the tool layer (the REST API doesn't have
+  this check either — pre-existing gap, not fixed everywhere, but cheap to add for this new
+  surface).
+- `GET /api/mcp` is excluded from the API Gateway JWT authorizer and validates its own bearer
+  token in Go (`lestrrat-go/jwx/v3` against Cognito's JWKS) — API Gateway's built-in authorizer
+  returns a generic 401 with no `WWW-Authenticate` header, but MCP clients need that header's
+  `resource_metadata` URL to discover where to authenticate. Cognito is still the only OAuth
+  implementation; this only validates tokens Cognito issued, it doesn't reimplement /authorize
+  or /token.
+- `GET /.well-known/oauth-protected-resource` (unauthenticated, own CloudFront behavior since it
+  must be reachable at the domain root, not just under `/api/*`) points MCP clients at Cognito
+  as the authorization server.
+- Validated via `spikes/mcp-auth/` (see `context/plans/active/cognito-auth-mcp-connector.md`):
+  confirmed Cognito's lack of Dynamic Client Registration isn't a blocker — Claude's connector
+  setup falls back to a manually-entered Client ID.
+
 ### Storage
 - DynamoDB: `grow-plants`, `grow-environments`, `grow-logs`, `grow-settings` tables
 - S3 `grow-media` bucket: plant/environment/log photos (private, pre-signed URL access)

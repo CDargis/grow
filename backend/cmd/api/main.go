@@ -15,6 +15,7 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/awslabs/aws-lambda-go-api-proxy/core"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
+	"github.com/cdargis/grow/internal/mcpserver"
 	"github.com/cdargis/grow/internal/model"
 	"github.com/cdargis/grow/internal/store"
 	"github.com/oklog/ulid/v2"
@@ -28,6 +29,7 @@ type app struct {
 	s3       *s3.Client
 	presign  *s3.PresignClient
 	mediaBkt string
+	mcp      mcpserver.Deps
 	// localUserID is only used when running with LOCAL=1, where there's no
 	// API Gateway JWT authorizer in front to supply a real userId.
 	localUserID string
@@ -64,6 +66,14 @@ func main() {
 		presign:     s3.NewPresignClient(clients.S3),
 		mediaBkt:    os.Getenv("MEDIA_BUCKET"),
 		localUserID: getEnvOrDefault("USER_ID", "default"),
+	}
+	a.mcp = mcpserver.Deps{
+		Plants:           a.plants,
+		Logs:             a.logs,
+		PublicBaseURL:    os.Getenv("PUBLIC_BASE_URL"),
+		Region:           os.Getenv("AWS_REGION"),
+		UserPoolID:       os.Getenv("USER_POOL_ID"),
+		UserPoolClientID: os.Getenv("USER_POOL_CLIENT_ID"),
 	}
 
 	mux := http.NewServeMux()
@@ -108,6 +118,11 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/settings", a.updateSettings)
 
 	mux.HandleFunc("GET /api/auth-config", a.getAuthConfig)
+
+	// MCP: authenticates itself (see mcpserver package comment), excluded
+	// from the API Gateway JWT authorizer at the CDK route level.
+	mux.Handle("/api/mcp", a.mcp.Handler())
+	mux.HandleFunc("GET /.well-known/oauth-protected-resource", a.mcp.ProtectedResourceMetadata)
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────

@@ -1,10 +1,12 @@
 # Cognito Auth (Single Real User) + Read-Only MCP Connector
 
 ## Status
-Scoped, not started. Pulled forward from `context/plans/backlog/multi-user.md` Feature 1 — this
-is a smaller slice of that (real login for Chris only, no public signup), taken on now because
-Claude's custom connector needs real OAuth, and building a throwaway auth scheme just for MCP
-would mean redoing this work later anyway.
+Cognito auth is built, deployed, and confirmed working (including a data migration after the
+first deploy — see incident note below). MCP server code is written but not deployed yet.
+Pulled forward from `context/plans/backlog/multi-user.md` Feature 1 — this is a smaller slice of
+that (real login for Chris only, no public signup), taken on because Claude's custom connector
+needs real OAuth, and building a throwaway auth scheme just for MCP would mean redoing this work
+later anyway.
 
 ## Goal
 Claude (mobile app / claude.ai) can read grow's plants/logs via a custom connector, authenticated
@@ -75,23 +77,49 @@ as planned.
    `frontend/src/auth/` (`oidc-client-ts`), `AuthProvider` wraps the app and redirects
    straight to Cognito if there's no valid session (no login-page UI needed, one user).
    `api/client.ts` attaches the access token and redirects to login on 401.
-5. **Not started**: MCP read-only routes + tools (reuse `spikes/mcp-auth`'s validated
-   OAuth-gate + SDK approach, but there's nothing left to build there for auth — Cognito's
-   JWT authorizer already covers `/mcp` once it's added as a route, same as every other
-   endpoint. Just add the route + real read-only tools wrapping `internal/store`.)
+5. ~~MCP read-only routes + tools~~ — written, not deployed. Turned out the plan's original
+   assumption ("Cognito's JWT authorizer already covers /mcp, same as every other endpoint")
+   was wrong: API Gateway's built-in JWT authorizer returns a generic 401 with no
+   `WWW-Authenticate` header, but MCP clients discover where to authenticate from that
+   header's `resource_metadata` URL. So `/api/mcp` is registered *without* the authorizer
+   (like `/api/auth-config`) and does its own JWT verification in Go
+   (`backend/internal/mcpserver/mcpserver.go`, `lestrrat-go/jwx/v3` against Cognito's JWKS),
+   replicating the exact 401 shape that worked in the spike. Cognito itself is still the only
+   OAuth implementation — this doesn't reimplement /authorize or /token, just validates
+   tokens Cognito already issued. `GET /.well-known/oauth-protected-resource` (new CloudFront
+   behavior, domain root) points MCP clients at Cognito as the authorization server. Tools:
+   `list_plants`, `get_plant`, `list_logs_for_plant`, `get_recent_activity`, thin wrappers over
+   `internal/store` with an ownership check (`plant.UserID == callerUserID`) added at the tool
+   layer as defense-in-depth — the REST API doesn't have this check either (pre-existing gap,
+   out of scope to fix everywhere right now), but it's a cheap addition for new attack surface.
+   Also bumped `go.mod` and the Lambda's Docker build image to Go 1.25 (from 1.24) since
+   `jwx/v3` requires it.
 6. **Not started**: register the connector for real (manual Client ID, per the spike
    finding), verify end-to-end from phone
 7. `spikes/mcp-auth/` can be deleted any time now — superseded by the real thing being wired
    in directly, not a dependency of any later step
 
 ## Deploy checklist (not done yet — needs explicit go-ahead, this locks out the live app
-until the last step)
+until step 2)
 1. `cdk deploy` — creates the User Pool, wires the JWT authorizer onto every route. **The
    moment this lands, the live app requires a login and there is no user yet** — the app is
    inaccessible between this step and the next.
 2. Create the one real user (Chris) via AWS CLI/console — `admin-create-user` +
    `admin-set-user-password` (permanent), since self-signup is disabled by design.
 3. Log in from the live app, confirm plants/logs/settings all still work end-to-end.
+4. Add the real MCP connector in Claude.ai (`https://grow.chrisdargis.com/api/mcp`, manual
+   Client ID = the `UserPoolClientId` CDK output), verify a tool call actually works.
+
+## Incident: first deploy broke existing data (2026-07-26)
+Deploying the JWT authorizer switched `userId` from the hardcoded `"default"` to each request's
+real Cognito `sub` claim — but every existing DynamoDB record (6 plants, 3 environments, 577
+logs, 1 settings row) was still tagged `userId="default"`. First login showed zero plants: not
+data loss, a mismatch between old records and the new real user id. Fixed by migrating every
+record's `userId` from `"default"` to the real `sub`, verified against the actual table contents
+(not just exit codes) after a first parallel-update attempt had an argument-ordering bug that
+created 5 garbage log items instead of fixing anything. **Lesson for any future userId/ownership
+change**: existing data needs an explicit migration step, planned *before* deploy, not
+discovered after.
 
 ## Cost
 For a single user, this should land at $0/month for the User Pool itself — Cognito's free tier
