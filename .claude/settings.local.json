@@ -82,7 +82,17 @@
       "Bash(go version *)",
       "Bash(echo \"exit=$?\")",
       "Bash(gofmt -l cmd/api/main.go internal/mcpserver/mcpserver.go)",
-      "Bash(gofmt -l internal/mcpserver/mcpserver.go)"
+      "Bash(gofmt -l internal/mcpserver/mcpserver.go)",
+      "Bash(curl -s https://grow.chrisdargis.com/.well-known/oauth-protected-resource)",
+      "Bash(curl -s -i https://grow.chrisdargis.com/api/mcp -X POST -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(aws logs *)",
+      "Bash(MSYS_NO_PATHCONV=1 aws logs describe-log-groups *)",
+      "Bash(MSYS_NO_PATHCONV=1 aws logs tail /aws/lambda/grow-api --since 20m --format short)",
+      "Bash(MSYS_NO_PATHCONV=1 aws logs tail /aws/lambda/grow-api --since 30m --format short)",
+      "Bash(MSYS_NO_PATHCONV=1 aws logs tail /aws/lambda/grow-api --since 60m --format short)",
+      "Bash(MSYS_NO_PATHCONV=1 aws cognito-idp describe-user-pool-client *)",
+      "Bash(curl -s -i -c /tmp/cookies.txt -b /tmp/cookies.txt -o /tmp/loginresp.html -D /tmp/loginheaders.txt -G --request POST https://__TRACKED_VAR__/login --data-urlencode client_id=__TRACKED_VAR__ --data-urlencode response_type=code --data-urlencode 'scope=openid email profile' --data-urlencode redirect_uri=__TRACKED_VAR__ --data-urlencode code_challenge=__TRACKED_VAR__ --data-urlencode code_challenge_method=S256 --data-urlencode state=test123 --data-urlencode _csrf=__TRACKED_VAR__ --data-urlencode username=dargis.chris@gmail.com --data-urlencode password=Gr0EBDCDFE717Dow2c8d0c)",
+      "Bash(curl *)"
     ]
   }
 }
