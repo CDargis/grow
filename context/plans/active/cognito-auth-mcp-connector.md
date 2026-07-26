@@ -1,8 +1,12 @@
 # Cognito Auth (Single Real User) + Read-Only MCP Connector
 
 ## Status
-Cognito auth is built, deployed, and confirmed working (including a data migration after the
-first deploy — see incident note below). MCP server code is written but not deployed yet.
+**COMPLETE (2026-07-26).** Cognito auth deployed and working; MCP connector registered in
+Claude.ai and confirmed working end-to-end (login + real tool calls) after three incidents,
+each documented below. Remaining cleanup: delete `spikes/mcp-auth/`. Related follow-ups that
+came out of this work but are separate efforts: silent token renewal in the web app
+(`signinSilent` before full redirect — currently every expired session forces a full re-login),
+longer `RefreshTokenValidity`, and Hosted UI branding.
 Pulled forward from `context/plans/backlog/multi-user.md` Feature 1 — this is a smaller slice of
 that (real login for Chris only, no public signup), taken on because Claude's custom connector
 needs real OAuth, and building a throwaway auth scheme just for MCP would mean redoing this work
@@ -94,8 +98,12 @@ as planned.
    out of scope to fix everywhere right now), but it's a cheap addition for new attack surface.
    Also bumped `go.mod` and the Lambda's Docker build image to Go 1.25 (from 1.24) since
    `jwx/v3` requires it.
-6. **Not started**: register the connector for real (manual Client ID, per the spike
-   finding), verify end-to-end from phone
+6. ~~Register the connector for real, verify end-to-end~~ — **DONE, WORKING (2026-07-26)**.
+   Took three failed attempts and three distinct fixes (see incidents below); the final
+   root cause was Cognito's path-bearing issuer URL breaking Claude's OAuth metadata
+   discovery, fixed by hosting the RFC 8414 document ourselves at the domain root.
+   Connector registered with the `grow-mcp` client ID + secret; Claude completes the
+   Cognito login and tool calls work.
 7. `spikes/mcp-auth/` can be deleted any time now — superseded by the real thing being wired
    in directly, not a dependency of any later step
 
@@ -126,7 +134,29 @@ its OIDC discovery document's `token_endpoint_auth_methods_supported` only ever 
 public/PKCE-only client that works fine with no secret in practice. A standards-compliant client
 (Claude) trusting that metadata has no way to know "none" actually works, and likely tries
 secret-based auth it was never given a secret for. Fixed with a second, confidential App Client
-(`grow-mcp`, has a real secret) dedicated to the MCP connector — not yet re-verified.
+(`grow-mcp`, has a real secret) dedicated to the MCP connector — necessary, but turned out not
+to be sufficient on its own (see next incident).
+
+## Incident: still failing with the confidential client — THE actual root cause (2026-07-26)
+Third attempt with the `grow-mcp` client ID + secret still failed. Every server-side combination
+had by then been manually verified working (PKCE and no-PKCE, `client_secret_post`, both
+clients), so the remaining unknown was what Claude's client does before any request reaches us
+or Cognito. Diffing against the spike topology found it: **Cognito's issuer URL has a path
+component (`/{poolId}`), and Cognito serves its discovery document at only 1 of the 4 URL forms
+a standards-compliant OAuth client tries** — the OIDC suffix form
+(`{issuer}/.well-known/openid-configuration`). The RFC 8414 path-insertion forms and both
+`oauth-authorization-server` forms return 400 (verified empirically). Claude's connector
+discovery never found the metadata, so the flow died before the login page, Cognito, or our
+Lambda — matching every symptom, including the total absence of logs anywhere. The spike had
+worked precisely because its metadata lived at `{origin}/.well-known/oauth-authorization-server`
+with a path-free issuer — the first URL Claude tries.
+
+Fix: host the RFC 8414 authorization-server metadata ourselves at
+`grow.chrisdargis.com/.well-known/oauth-authorization-server` (issuer = our origin, endpoints =
+Cognito's real hosted-UI `/oauth2/authorize` and `/oauth2/token`), and point the
+protected-resource metadata's `authorization_servers` at our origin instead of Cognito's issuer.
+Not a proxy — authorize/token still go directly to Cognito, and bearer-token validation still
+checks Cognito's real issuer. **Confirmed working end-to-end with the real Claude connector.**
 
 ## Incident: first deploy broke existing data (2026-07-26)
 Deploying the JWT authorizer switched `userId` from the hardcoded `"default"` to each request's

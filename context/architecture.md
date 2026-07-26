@@ -47,12 +47,19 @@
   `resource_metadata` URL to discover where to authenticate. Cognito is still the only OAuth
   implementation; this only validates tokens Cognito issued, it doesn't reimplement /authorize
   or /token.
-- `GET /.well-known/oauth-protected-resource` (unauthenticated, own CloudFront behavior since it
-  must be reachable at the domain root, not just under `/api/*`) points MCP clients at Cognito
-  as the authorization server.
-- Validated via `spikes/mcp-auth/` (see `context/plans/active/cognito-auth-mcp-connector.md`):
-  confirmed Cognito's lack of Dynamic Client Registration isn't a blocker — Claude's connector
-  setup falls back to a manually-entered Client ID.
+- Two unauthenticated discovery documents at the domain root (own CloudFront `/.well-known/*`
+  behavior, since they can't live under `/api/*`):
+  - `GET /.well-known/oauth-protected-resource` — points MCP clients at **our origin** as the
+    authorization server
+  - `GET /.well-known/oauth-authorization-server` — RFC 8414 document we host ourselves,
+    with endpoints pointing at Cognito's real hosted-UI `/oauth2/authorize` and `/oauth2/token`.
+    Hosted by us because Cognito's path-bearing issuer URL serves discovery at only 1 of the 4
+    standard URL forms, which breaks MCP-client metadata discovery entirely (see decisions.md).
+    Not a proxy — the actual OAuth flow goes straight to Cognito.
+- The connector uses the dedicated confidential `grow-mcp` App Client (ID + secret entered
+  manually in Claude's connector settings — Cognito has no Dynamic Client Registration, and
+  Claude falls back to manual credentials, validated in `spikes/mcp-auth/`).
+- Confirmed working end-to-end with the real Claude.ai connector (2026-07-26).
 
 ### Storage
 - DynamoDB: `grow-plants`, `grow-environments`, `grow-logs`, `grow-settings` tables
@@ -62,6 +69,9 @@
 - CDK (C#) in `infra/`
 - Two stacks: `GrowPipelineStack` → `GrowStack` (via CDK Pipelines)
 - Self-mutating CodePipeline sourced from GitHub (CDargis/grow, main)
+- **Pipeline does not auto-trigger on push** (cause unknown — repo owner/name casing in
+  PipelineStack.cs matches the GitHub remote, which is the usual culprit and was ruled out).
+  Start deploys manually: `aws codepipeline start-pipeline-execution --name GrowPipeline`
 - Docker bundling for Go Lambda (privileged CodeBuild)
 
 ## Data Flow

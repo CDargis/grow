@@ -1,5 +1,18 @@
 # grow — Decisions
 
+## Host OAuth authorization-server metadata ourselves, not Cognito's (2026-07-26)
+Cognito's issuer URL has a path component (`/{poolId}`) and serves its discovery document at
+only the OIDC suffix form — the RFC 8414 path-insertion forms and both
+`oauth-authorization-server` forms return 400. Claude's MCP connector discovery never finds it,
+killing the OAuth flow before any request reaches the login page, Cognito, or the Lambda (no
+logs anywhere — the defining symptom). So `grow.chrisdargis.com/.well-known/oauth-authorization-server`
+serves a static RFC 8414 document (issuer = our origin, endpoints = Cognito's real hosted-UI
+authorize/token), and the protected-resource metadata lists our origin as the authorization
+server. Not a proxy: authorize/token still go straight to Cognito; token validation still checks
+Cognito's real issuer. This reproduces the exact topology the spike validated (metadata at a
+path-free origin root). This was the third and final fix — the callback-URL fix and the
+confidential client were each necessary but not sufficient.
+
 ## Separate Cognito App Client for the MCP connector (2026-07-26)
 Cognito's OIDC discovery document (`token_endpoint_auth_methods_supported`) only ever lists
 `client_secret_basic`/`client_secret_post` -- never `"none"`, even for genuinely public/PKCE-only

@@ -24,13 +24,19 @@
 - [x] Cognito auth (single real user) — deployed, live, confirmed working end-to-end. Required
       migrating all existing data's `userId` from the old hardcoded `"default"` to the real
       Cognito `sub` after first deploy — see incident note in the plan doc.
+- [x] Read-only MCP connector — **live and working in Claude.ai** (tools: list_plants,
+      get_plant, list_logs_for_plant, get_logs_by_date_range). Took three fixes: Claude's
+      callback URL on the App Client, a dedicated confidential `grow-mcp` client, and finally
+      hosting the RFC 8414 discovery metadata ourselves (Cognito's path-bearing issuer breaks
+      MCP client discovery — the actual root cause). Full postmortem in
+      `context/plans/active/cognito-auth-mcp-connector.md`.
 
-## In progress
-- [ ] Read-only MCP connector — see `context/plans/active/cognito-auth-mcp-connector.md`.
-      `backend/internal/mcpserver/` written (tools: list_plants, get_plant, list_logs_for_plant,
-      get_logs_by_date_range), CDK routes + new CloudFront `/.well-known/*` behavior written,
-      **not deployed yet**. Left to do: deploy, then actually add the connector in Claude.ai
-      (manual Client ID, per the spike finding) and verify a real tool call works.
+## Follow-ups from the auth/MCP work
+- [ ] Web app forces a full re-login whenever the access token expires (~1h after the tab
+      closes) — `AuthProvider` should try `signinSilent()` (refresh token) before redirecting;
+      also consider raising `RefreshTokenValidity` for fewer password prompts
+- [ ] Cognito Hosted UI branding (logo/colors) — cosmetic, cheap, parked
+- [ ] Delete `spikes/mcp-auth/` — superseded by the real implementation
 
 ## Backlog
 - [ ] Height chart per plant
