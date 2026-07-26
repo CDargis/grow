@@ -46,8 +46,10 @@ func (d Deps) issuer() string {
 func (d Deps) ProtectedResourceMetadata(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"resource":              d.PublicBaseURL + "/api/mcp",
-		"authorization_servers": []string{d.issuer()},
+		"resource":                 d.PublicBaseURL + "/api/mcp",
+		"authorization_servers":    []string{d.issuer()},
+		"scopes_supported":         []string{"openid", "email", "profile"},
+		"bearer_methods_supported": []string{"header"},
 	})
 }
 
