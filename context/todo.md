@@ -28,7 +28,7 @@
 ## In progress
 - [ ] Read-only MCP connector — see `context/plans/active/cognito-auth-mcp-connector.md`.
       `backend/internal/mcpserver/` written (tools: list_plants, get_plant, list_logs_for_plant,
-      get_recent_activity), CDK routes + new CloudFront `/.well-known/*` behavior written,
+      get_logs_by_date_range), CDK routes + new CloudFront `/.well-known/*` behavior written,
       **not deployed yet**. Left to do: deploy, then actually add the connector in Claude.ai
       (manual Client ID, per the spike finding) and verify a real tool call works.
 

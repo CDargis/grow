@@ -37,7 +37,7 @@
 ### MCP (read-only Claude custom connector)
 - `backend/internal/mcpserver/` — official `modelcontextprotocol/go-sdk`, Streamable HTTP
   transport, stateless. Tools: `list_plants`, `get_plant`, `list_logs_for_plant`,
-  `get_recent_activity` — thin wrappers over `internal/store`, plus an explicit
+  `get_logs_by_date_range` — thin wrappers over `internal/store`, plus an explicit
   `plant.UserID == callerUserID` ownership check at the tool layer (the REST API doesn't have
   this check either — pre-existing gap, not fixed everywhere, but cheap to add for this new
   surface).

@@ -35,7 +35,7 @@ as Chris specifically — not an open/public endpoint, not a one-off API key.
 - Reuse the same Lambda + HTTP API rather than standing up new infra — add MCP routes
   (e.g. `/mcp`) guarded by the same JWT authorizer, reusing the existing `internal/store`
   packages directly (no new data-access code)
-- Tools for v1: `list_plants`, `get_plant`, `list_logs_for_plant`, `get_recent_activity` —
+- Tools for v1: `list_plants`, `get_plant`, `list_logs_for_plant`, `get_logs_by_date_range` —
   thin wrappers over existing store methods, read-only
 - Protocol implementation: use the official MCP Go SDK rather than hand-rolling JSON-RPC/session
   framing — verify current package name/maturity at implementation time, ecosystem is young
@@ -88,7 +88,7 @@ as planned.
    OAuth implementation — this doesn't reimplement /authorize or /token, just validates
    tokens Cognito already issued. `GET /.well-known/oauth-protected-resource` (new CloudFront
    behavior, domain root) points MCP clients at Cognito as the authorization server. Tools:
-   `list_plants`, `get_plant`, `list_logs_for_plant`, `get_recent_activity`, thin wrappers over
+   `list_plants`, `get_plant`, `list_logs_for_plant`, `get_logs_by_date_range`, thin wrappers over
    `internal/store` with an ownership check (`plant.UserID == callerUserID`) added at the tool
    layer as defense-in-depth — the REST API doesn't have this check either (pre-existing gap,
    out of scope to fix everywhere right now), but it's a cheap addition for new attack surface.

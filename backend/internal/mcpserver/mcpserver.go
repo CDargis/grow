@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -219,27 +220,46 @@ func (d Deps) newServer(userID string) *mcp.Server {
 		}{Logs: logs}, nil
 	})
 
-	type recentActivityArgs struct {
-		Days int `json:"days,omitempty" jsonschema:"how many days back to look, default 7"`
+	const maxDateRangeDays = 31
+
+	type logsByDateRangeArgs struct {
+		StartDate string `json:"startDate" jsonschema:"first date to include, inclusive, YYYY-MM-DD"`
+		EndDate   string `json:"endDate" jsonschema:"last date to include, inclusive, YYYY-MM-DD"`
 	}
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "get_recent_activity",
-		Description: "Get recent log entries across all of the user's plants, most recent first.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, args recentActivityArgs) (*mcp.CallToolResult, any, error) {
-		days := args.Days
-		if days <= 0 {
-			days = 7
+		Name:        "get_logs_by_date_range",
+		Description: fmt.Sprintf("Get log entries across all of the user's plants within an inclusive date range (max %d days), most recent first. Use a narrow range to limit how much comes back.", maxDateRangeDays),
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args logsByDateRangeArgs) (*mcp.CallToolResult, any, error) {
+		start, err := time.Parse("2006-01-02", args.StartDate)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid startDate, expected YYYY-MM-DD: %w", err)
 		}
+		end, err := time.Parse("2006-01-02", args.EndDate)
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid endDate, expected YYYY-MM-DD: %w", err)
+		}
+		if end.Before(start) {
+			return nil, nil, fmt.Errorf("endDate must not be before startDate")
+		}
+		numDays := int(end.Sub(start).Hours()/24) + 1
+		if numDays > maxDateRangeDays {
+			return nil, nil, fmt.Errorf("range is %d days, max is %d -- ask for a narrower range", numDays, maxDateRangeDays)
+		}
+
 		var all []model.Log
-		now := time.Now().UTC()
-		for i := 0; i < days; i++ {
-			date := now.AddDate(0, 0, -i).Format("2006-01-02")
-			logs, err := d.Logs.ListForDate(ctx, userID, date)
+		for day := start; !day.After(end); day = day.AddDate(0, 0, 1) {
+			logs, err := d.Logs.ListForDate(ctx, userID, day.Format("2006-01-02"))
 			if err != nil {
 				return nil, nil, err
 			}
 			all = append(all, logs...)
 		}
+		sort.Slice(all, func(i, j int) bool {
+			if all[i].Date != all[j].Date {
+				return all[i].Date > all[j].Date
+			}
+			return all[i].LoggedAt > all[j].LoggedAt
+		})
 		return nil, struct {
 			Logs []model.Log `json:"logs"`
 		}{Logs: all}, nil
