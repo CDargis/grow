@@ -20,12 +20,17 @@
 - [x] PlantDetail shortcut tray: long-press to reorder + choose 3–5 shown (drag-with-divider editor)
 - [x] Activity/Sort chip strip: long-press to reorder
 - [x] Plants page layout config: Grid (fills screen in columns+rows), Rows (single column, fills screen vertically), or Fixed size — toggle in Settings
+- [x] Camera-direct photo option (Take Photo alongside Library) for photo logs, Training, Trimming, Environment photos
 
-## Not yet deployed
-- [ ] `cdk deploy` needed before grow-settings table exists — settings endpoints will 500 until then (verified locally: no AWS creds in this sandbox, so this wasn't smoke-tested end-to-end)
+## In progress
+- [ ] Cognito auth + read-only MCP connector — see `context/plans/active/cognito-auth-mcp-connector.md`.
+      Spike confirmed Cognito's lack of Dynamic Client Registration isn't a blocker for Claude's
+      custom connector. CDK (User Pool + JWT authorizer), backend (`app.userID(r)` from JWT
+      claims), and frontend (`oidc-client-ts` login flow) are all written but **not deployed yet**.
+      Deploying this will require logging in immediately (no bypass) — needs a Cognito user
+      created (admin, not signup) right after deploy or the app is locked out.
 
 ## Backlog
 - [ ] Height chart per plant
 - [ ] Feeding/watering history charts
 - [ ] Environment detail view (plants assigned, light schedule, assigned plants)
-- [ ] Multi-user / auth — see plans/backlog/multi-user.md

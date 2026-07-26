@@ -3,14 +3,23 @@ import type {
   Plant, Environment, Log, LastActivity, Settings,
   CreatePlantRequest, UpdatePlantDetailsRequest, CreateEnvironmentRequest, CreateLogRequest, UpdateSettingsRequest,
 } from '@/types'
+import { getUserManager } from '@/auth/userManager'
 
 const BASE = '/api'
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-    ...init,
-  })
+  const manager = await getUserManager()
+  const user = await manager.getUser()
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...init?.headers as Record<string, string> }
+  if (user && !user.expired) headers['Authorization'] = `Bearer ${user.access_token}`
+
+  const res = await fetch(`${BASE}${path}`, { headers, ...init })
+
+  if (res.status === 401) {
+    await manager.signinRedirect()
+    return new Promise<T>(() => {}) // navigating away -- never resolves
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(err.error ?? res.statusText)

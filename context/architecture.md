@@ -10,9 +10,29 @@
 
 ### Backend
 - Single Go Lambda (`grow-api`), ARM64, provided.al2023
-- API Gateway HTTP API v2 with `/{proxy+}` route
+- API Gateway HTTP API v2 with `/{proxy+}` route, guarded by a Cognito JWT authorizer
+  (`GET /api/auth-config` is the one route excluded from it — see Auth below)
 - CloudFront `/api/*` behavior → API Gateway (cache disabled)
 - Pre-signed S3 URLs for photo uploads/reads (no CloudFront for media)
+
+### Auth
+- Cognito User Pool (`grow-users`), self-signup disabled — one admin-created user (Chris), not a
+  public app. Real login, not a placeholder, but "real multi-user" is still just the data-model
+  readiness (`userId` on every entity) plus this pool, not open signup.
+- API Gateway HTTP API JWT Authorizer validates the token before Lambda is invoked, on every
+  route except `/api/auth-config`. Backend never validates JWTs itself.
+- `app.userID(r)` (`backend/cmd/api/main.go`) reads the Cognito `sub` claim that API Gateway
+  passes through in the request context (via `aws-lambda-go-api-proxy/core`), replacing the old
+  fixed `USER_ID=default` field. Falls back to `USER_ID` env var only when running `LOCAL=1`
+  (no API Gateway in front locally, so no claims to read) — see local-dev.md for what that means
+  for local testing now that Cognito exists.
+- Frontend: `frontend/src/auth/` — `oidc-client-ts`'s `UserManager`, Authorization Code + PKCE
+  against Cognito's Hosted UI. `AuthProvider` redirects to login immediately if there's no valid
+  session (no "please log in" landing page — personal app, one user). `GET /api/auth-config`
+  supplies the User Pool authority/client ID at runtime rather than baking them into the build,
+  since those IDs don't exist until after the CDK stack that creates them is deployed.
+- API calls attach the access token as `Authorization: Bearer` (`frontend/src/api/client.ts`);
+  a 401 response triggers `signinRedirect()` rather than surfacing an error.
 
 ### Storage
 - DynamoDB: `grow-plants`, `grow-environments`, `grow-logs`, `grow-settings` tables

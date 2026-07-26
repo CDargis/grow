@@ -24,6 +24,9 @@ LOGS_LOGTYPE_DATE_GSI=user-logtype-date-index \
 SETTINGS_TABLE=grow-settings \
 MEDIA_BUCKET=grow-media \
 USER_ID=default \
+USER_POOL_ID=<from `cdk deploy` output "UserPoolId">      \
+USER_POOL_CLIENT_ID=<from output "UserPoolClientId">      \
+AWS_REGION=<your region> \
 go run ./cmd/api
 ```
 
@@ -37,6 +40,19 @@ npm run dev
 ```
 
 Vite proxies `/api/*` → `http://localhost:3000`.
+
+## Auth in local dev
+
+`LOCAL=1` mode has no API Gateway in front of it, so the backend never checks the JWT locally —
+`app.userID(r)` falls straight through to `USER_ID=default`, same as before Cognito existed.
+
+The **frontend** doesn't know it's talking to a local backend, though: `AuthProvider` always
+redirects to the real Cognito Hosted UI if there's no valid session, and it needs
+`USER_POOL_ID`/`USER_POOL_CLIENT_ID` (above) to build that login URL via `/api/auth-config`. So
+local frontend dev still requires logging in once, for real, against the deployed User Pool
+(there's no way to mock Cognito locally) — the resulting token gets sent to your local backend,
+which just ignores it. Log in once per browser session; the token persists in `localStorage`
+until it expires.
 
 ## Notes
 

@@ -12,7 +12,9 @@ using LambdaCode          = Amazon.CDK.AWS.Lambda.Code;
 using LambdaRuntime       = Amazon.CDK.AWS.Lambda.Runtime;
 using LambdaArchitecture  = Amazon.CDK.AWS.Lambda.Architecture;
 using Amazon.CDK.AWS.Apigatewayv2.Alpha;
+using Amazon.CDK.AWS.Apigatewayv2.Authorizers.Alpha;
 using Amazon.CDK.AWS.Apigatewayv2.Integrations.Alpha;
+using Amazon.CDK.AWS.Cognito;
 using Amazon.CDK.AWS.Route53;
 using Amazon.CDK.AWS.Route53.Targets;
 using Amazon.CDK.AWS.S3;
@@ -91,6 +93,56 @@ public class GrowStack : Stack
             RemovalPolicy = RemovalPolicy.RETAIN
         });
 
+        // ── Cognito ───────────────────────────────────────────────────────
+
+        UserPool userPool = new UserPool(this, "UserPool", new UserPoolProps
+        {
+            UserPoolName      = "grow-users",
+            SelfSignUpEnabled = false,
+            SignInAliases     = new SignInAliases { Email = true },
+            StandardAttributes = new StandardAttributes
+            {
+                Email = new StandardAttribute { Required = true, Mutable = true }
+            },
+            PasswordPolicy = new PasswordPolicy
+            {
+                MinLength        = 12,
+                RequireLowercase = true,
+                RequireUppercase = true,
+                RequireDigits    = true,
+                RequireSymbols   = false
+            },
+            AccountRecovery = AccountRecovery.EMAIL_ONLY,
+            RemovalPolicy   = RemovalPolicy.RETAIN
+        });
+
+        UserPoolClient userPoolClient = userPool.AddClient("WebClient", new UserPoolClientOptions
+        {
+            UserPoolClientName = "grow-web",
+            GenerateSecret     = false, // public SPA client -- PKCE, no client secret
+            OAuth = new OAuthSettings
+            {
+                Flows  = new OAuthFlows { AuthorizationCodeGrant = true },
+                Scopes = new[] { OAuthScope.OPENID, OAuthScope.EMAIL, OAuthScope.PROFILE },
+                CallbackUrls = new[] { $"https://{domainName}/callback" },
+                LogoutUrls   = new[] { $"https://{domainName}/" }
+            },
+            SupportedIdentityProviders = new[] { UserPoolClientIdentityProvider.COGNITO }
+        });
+
+        userPool.AddDomain("Domain", new UserPoolDomainOptions
+        {
+            CognitoDomain = new CognitoDomainOptions { DomainPrefix = "grow-chrisdargis" }
+        });
+
+        HttpJwtAuthorizer jwtAuthorizer = new HttpJwtAuthorizer(
+            "JwtAuthorizer",
+            $"https://cognito-idp.{this.Region}.amazonaws.com/{userPool.UserPoolId}",
+            new HttpJwtAuthorizerProps
+            {
+                JwtAudience = new[] { userPoolClient.UserPoolClientId }
+            });
+
         // ── S3 Buckets ────────────────────────────────────────────────────
 
         Bucket mediaBucket = new Bucket(this, "MediaBucket", new BucketProps
@@ -148,7 +200,9 @@ public class GrowStack : Stack
                 ["LOGS_LOGTYPE_DATE_GSI"]   = "user-logtype-date-index",
                 ["SETTINGS_TABLE"]     = settingsTable.TableName,
                 ["MEDIA_BUCKET"]       = mediaBucket.BucketName,
-                ["USER_ID"]            = "default"
+                ["USER_ID"]            = "default",
+                ["USER_POOL_ID"]        = userPool.UserPoolId,
+                ["USER_POOL_CLIENT_ID"] = userPoolClient.UserPoolClientId
             }
         });
 
@@ -171,11 +225,25 @@ public class GrowStack : Stack
             }
         });
 
+        HttpLambdaIntegration apiIntegration = new HttpLambdaIntegration("ApiIntegration", apiFunction);
+
+        // Unauthenticated on purpose: the frontend needs these (non-secret)
+        // values to start the Cognito login flow before it has a token.
+        // Registered as a specific path so it takes precedence over the
+        // {proxy+} catch-all below, which requires the JWT authorizer.
+        httpApi.AddRoutes(new AddRoutesOptions
+        {
+            Path        = "/api/auth-config",
+            Methods     = new[] { Amazon.CDK.AWS.Apigatewayv2.Alpha.HttpMethod.GET },
+            Integration = apiIntegration
+        });
+
         httpApi.AddRoutes(new AddRoutesOptions
         {
             Path        = "/{proxy+}",
             Methods     = new[] { Amazon.CDK.AWS.Apigatewayv2.Alpha.HttpMethod.ANY },
-            Integration = new HttpLambdaIntegration("ApiIntegration", apiFunction)
+            Integration = apiIntegration,
+            Authorizer  = jwtAuthorizer
         });
 
         // ── ACM Certificate ───────────────────────────────────────────────
@@ -290,5 +358,8 @@ public class GrowStack : Stack
         new CfnOutput(this, "LogsTableName",          new CfnOutputProps { Value = logsTable.TableName });
         new CfnOutput(this, "SettingsTableName",      new CfnOutputProps { Value = settingsTable.TableName });
         new CfnOutput(this, "MediaBucketName",        new CfnOutputProps { Value = mediaBucket.BucketName });
+        new CfnOutput(this, "UserPoolId",             new CfnOutputProps { Value = userPool.UserPoolId });
+        new CfnOutput(this, "UserPoolClientId",        new CfnOutputProps { Value = userPoolClient.UserPoolClientId });
+        new CfnOutput(this, "UserPoolDomain",         new CfnOutputProps { Value = $"https://grow-chrisdargis.auth.{this.Region}.amazoncognito.com" });
     }
 }

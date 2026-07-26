@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/awslabs/aws-lambda-go-api-proxy/core"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"github.com/cdargis/grow/internal/model"
 	"github.com/cdargis/grow/internal/store"
@@ -27,7 +28,24 @@ type app struct {
 	s3       *s3.Client
 	presign  *s3.PresignClient
 	mediaBkt string
-	userID   string
+	// localUserID is only used when running with LOCAL=1, where there's no
+	// API Gateway JWT authorizer in front to supply a real userId.
+	localUserID string
+}
+
+// userID returns the authenticated user's id (the Cognito "sub" claim) from
+// the JWT that API Gateway's authorizer validated before invoking this
+// Lambda. Falls back to localUserID when running outside API Gateway
+// (LOCAL=1 dev server), since there's no authorizer to supply claims there.
+func (a *app) userID(r *http.Request) string {
+	if reqCtx, ok := core.GetAPIGatewayV2ContextFromContext(r.Context()); ok {
+		if reqCtx.Authorizer != nil && reqCtx.Authorizer.JWT != nil {
+			if sub := reqCtx.Authorizer.JWT.Claims["sub"]; sub != "" {
+				return sub
+			}
+		}
+	}
+	return a.localUserID
 }
 
 func main() {
@@ -38,14 +56,14 @@ func main() {
 	}
 
 	a := &app{
-		plants:   store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
-		envs:     store.NewEnvironmentStore(clients.DDB, os.Getenv("ENVIRONMENTS_TABLE")),
-		logs:     store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI"), os.Getenv("LOGS_LOGTYPE_DATE_GSI")),
-		settings: store.NewSettingsStore(clients.DDB, os.Getenv("SETTINGS_TABLE")),
-		s3:       clients.S3,
-		presign:  s3.NewPresignClient(clients.S3),
-		mediaBkt: os.Getenv("MEDIA_BUCKET"),
-		userID:   getEnvOrDefault("USER_ID", "default"),
+		plants:      store.NewPlantStore(clients.DDB, os.Getenv("PLANTS_TABLE")),
+		envs:        store.NewEnvironmentStore(clients.DDB, os.Getenv("ENVIRONMENTS_TABLE")),
+		logs:        store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI"), os.Getenv("LOGS_LOGTYPE_DATE_GSI")),
+		settings:    store.NewSettingsStore(clients.DDB, os.Getenv("SETTINGS_TABLE")),
+		s3:          clients.S3,
+		presign:     s3.NewPresignClient(clients.S3),
+		mediaBkt:    os.Getenv("MEDIA_BUCKET"),
+		localUserID: getEnvOrDefault("USER_ID", "default"),
 	}
 
 	mux := http.NewServeMux()
@@ -60,40 +78,56 @@ func main() {
 }
 
 func (a *app) registerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/plants",                    a.listPlants)
-	mux.HandleFunc("POST /api/plants",                   a.createPlant)
-	mux.HandleFunc("GET /api/plants/{plantId}",          a.getPlant)
-	mux.HandleFunc("DELETE /api/plants/{plantId}",       a.deletePlant)
+	mux.HandleFunc("GET /api/plants", a.listPlants)
+	mux.HandleFunc("POST /api/plants", a.createPlant)
+	mux.HandleFunc("GET /api/plants/{plantId}", a.getPlant)
+	mux.HandleFunc("DELETE /api/plants/{plantId}", a.deletePlant)
 	mux.HandleFunc("PUT /api/plants/{plantId}/environment", a.assignEnvironment)
-	mux.HandleFunc("PUT /api/plants/{plantId}/phase",       a.updatePhase)
-	mux.HandleFunc("PATCH /api/plants/{plantId}",            a.updatePlant)
-	mux.HandleFunc("PUT /api/plants/{plantId}/avatar",      a.updateAvatar)
+	mux.HandleFunc("PUT /api/plants/{plantId}/phase", a.updatePhase)
+	mux.HandleFunc("PATCH /api/plants/{plantId}", a.updatePlant)
+	mux.HandleFunc("PUT /api/plants/{plantId}/avatar", a.updateAvatar)
 
-	mux.HandleFunc("GET /api/plants/{plantId}/logs",     a.listLogs)
-	mux.HandleFunc("POST /api/plants/{plantId}/logs",    a.createLog)
-	mux.HandleFunc("PATCH /api/plants/{plantId}/logs/{logId}",  a.updateLog)
+	mux.HandleFunc("GET /api/plants/{plantId}/logs", a.listLogs)
+	mux.HandleFunc("POST /api/plants/{plantId}/logs", a.createLog)
+	mux.HandleFunc("PATCH /api/plants/{plantId}/logs/{logId}", a.updateLog)
 	mux.HandleFunc("DELETE /api/plants/{plantId}/logs/{logId}", a.deleteLog)
 
-	mux.HandleFunc("GET /api/logs",                      a.listLogsByDate)
-	mux.HandleFunc("GET /api/logs/last-by-type",          a.listLastByType)
+	mux.HandleFunc("GET /api/logs", a.listLogsByDate)
+	mux.HandleFunc("GET /api/logs/last-by-type", a.listLastByType)
 
-	mux.HandleFunc("GET /api/environments",              a.listEnvironments)
-	mux.HandleFunc("POST /api/environments",             a.createEnvironment)
-	mux.HandleFunc("GET /api/environments/{envId}",      a.getEnvironment)
-	mux.HandleFunc("PATCH /api/environments/{envId}",    a.updateEnvironment)
-	mux.HandleFunc("DELETE /api/environments/{envId}",   a.deleteEnvironment)
+	mux.HandleFunc("GET /api/environments", a.listEnvironments)
+	mux.HandleFunc("POST /api/environments", a.createEnvironment)
+	mux.HandleFunc("GET /api/environments/{envId}", a.getEnvironment)
+	mux.HandleFunc("PATCH /api/environments/{envId}", a.updateEnvironment)
+	mux.HandleFunc("DELETE /api/environments/{envId}", a.deleteEnvironment)
 
-	mux.HandleFunc("POST /api/media/upload",             a.presignUpload)
-	mux.HandleFunc("GET /api/media/url",                 a.presignDownload)
+	mux.HandleFunc("POST /api/media/upload", a.presignUpload)
+	mux.HandleFunc("GET /api/media/url", a.presignDownload)
 
-	mux.HandleFunc("GET /api/settings",                  a.getSettings)
-	mux.HandleFunc("PUT /api/settings",                  a.updateSettings)
+	mux.HandleFunc("GET /api/settings", a.getSettings)
+	mux.HandleFunc("PUT /api/settings", a.updateSettings)
+
+	mux.HandleFunc("GET /api/auth-config", a.getAuthConfig)
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+// getAuthConfig is intentionally unauthenticated (excluded from the JWT
+// authorizer at the API Gateway route level) -- the frontend needs these
+// non-secret values to kick off the Cognito login flow before it has a
+// token to present.
+func (a *app) getAuthConfig(w http.ResponseWriter, r *http.Request) {
+	region := os.Getenv("AWS_REGION")
+	jsonOK(w, map[string]string{
+		"authority": fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s", region, os.Getenv("USER_POOL_ID")),
+		"clientId":  os.Getenv("USER_POOL_CLIENT_ID"),
+	})
 }
 
 // ── Plants ───────────────────────────────────────────────────────────────────
 
 func (a *app) listPlants(w http.ResponseWriter, r *http.Request) {
-	plants, err := a.plants.List(r.Context(), a.userID)
+	plants, err := a.plants.List(r.Context(), a.userID(r))
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -120,7 +154,7 @@ func (a *app) createPlant(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err, http.StatusBadRequest)
 		return
 	}
-	plant, err := a.plants.Create(r.Context(), a.userID, req)
+	plant, err := a.plants.Create(r.Context(), a.userID(r), req)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -184,7 +218,7 @@ func (a *app) updatePhase(w http.ResponseWriter, r *http.Request) {
 		phaseData.FromPhase = fromPhase
 	}
 	dataBytes, _ := json.Marshal(phaseData)
-	if _, err := a.logs.Create(r.Context(), plantID, a.userID, model.CreateLogRequest{
+	if _, err := a.logs.Create(r.Context(), plantID, a.userID(r), model.CreateLogRequest{
 		LogType:  model.LogPhaseChange,
 		Date:     date,
 		LoggedAt: req.LoggedAt,
@@ -214,7 +248,7 @@ func (a *app) assignEnvironment(w http.ResponseWriter, r *http.Request) {
 		data.ToEnvironmentID = *req.EnvironmentID
 	}
 	dataBytes, _ := json.Marshal(data)
-	if _, err := a.logs.Create(r.Context(), plantID, a.userID, model.CreateLogRequest{
+	if _, err := a.logs.Create(r.Context(), plantID, a.userID(r), model.CreateLogRequest{
 		LogType: model.LogEnvironmentChange,
 		Data:    json.RawMessage(dataBytes),
 	}); err != nil {
@@ -247,7 +281,7 @@ func (a *app) listLogsByDate(w http.ResponseWriter, r *http.Request) {
 	if date == "" {
 		date = time.Now().UTC().Format("2006-01-02")
 	}
-	logs, err := a.logs.ListForDate(r.Context(), a.userID, date)
+	logs, err := a.logs.ListForDate(r.Context(), a.userID(r), date)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -261,7 +295,7 @@ func (a *app) listLastByType(w http.ResponseWriter, r *http.Request) {
 		httpError(w, fmt.Errorf("logType required"), http.StatusBadRequest)
 		return
 	}
-	items, err := a.logs.LastByLogType(r.Context(), a.userID, logType)
+	items, err := a.logs.LastByLogType(r.Context(), a.userID(r), logType)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -278,7 +312,7 @@ func (a *app) createLog(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err, http.StatusBadRequest)
 		return
 	}
-	entry, err := a.logs.Create(r.Context(), r.PathValue("plantId"), a.userID, req)
+	entry, err := a.logs.Create(r.Context(), r.PathValue("plantId"), a.userID(r), req)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -293,7 +327,7 @@ func (a *app) updateLog(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err, http.StatusBadRequest)
 		return
 	}
-	entry, err := a.logs.Update(r.Context(), r.PathValue("plantId"), r.PathValue("logId"), a.userID, req)
+	entry, err := a.logs.Update(r.Context(), r.PathValue("plantId"), r.PathValue("logId"), a.userID(r), req)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -361,7 +395,7 @@ func (a *app) deleteMedia(ctx context.Context, keys []string) {
 // ── Environments ──────────────────────────────────────────────────────────────
 
 func (a *app) listEnvironments(w http.ResponseWriter, r *http.Request) {
-	envs, err := a.envs.List(r.Context(), a.userID)
+	envs, err := a.envs.List(r.Context(), a.userID(r))
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -388,7 +422,7 @@ func (a *app) createEnvironment(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err, http.StatusBadRequest)
 		return
 	}
-	env, err := a.envs.Create(r.Context(), a.userID, req)
+	env, err := a.envs.Create(r.Context(), a.userID(r), req)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -411,16 +445,16 @@ func (a *app) updateEnvironment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	lightChanged := old.LightSchedule != env.LightSchedule
-	vpdChanged   := (old.TargetVPD == nil) != (env.TargetVPD == nil) ||
+	vpdChanged := (old.TargetVPD == nil) != (env.TargetVPD == nil) ||
 		(old.TargetVPD != nil && env.TargetVPD != nil && *old.TargetVPD != *env.TargetVPD)
 
 	if lightChanged || vpdChanged {
-		plants, err := a.plants.List(r.Context(), a.userID)
+		plants, err := a.plants.List(r.Context(), a.userID(r))
 		if err != nil {
 			log.Printf("warn: list plants for env change: %v", err)
 		} else {
-			now     := time.Now().UTC()
-			date    := now.Format("2006-01-02")
+			now := time.Now().UTC()
+			date := now.Format("2006-01-02")
 			loggedAt := now.Format(time.RFC3339)
 
 			var lightBytes, vpdBytes []byte
@@ -436,7 +470,7 @@ func (a *app) updateEnvironment(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				if lightChanged {
-					if _, err := a.logs.Create(r.Context(), p.PlantID, a.userID, model.CreateLogRequest{
+					if _, err := a.logs.Create(r.Context(), p.PlantID, a.userID(r), model.CreateLogRequest{
 						LogType: model.LogLightingChange, Date: date, LoggedAt: loggedAt,
 						Data: json.RawMessage(lightBytes),
 					}); err != nil {
@@ -444,7 +478,7 @@ func (a *app) updateEnvironment(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				if vpdChanged {
-					if _, err := a.logs.Create(r.Context(), p.PlantID, a.userID, model.CreateLogRequest{
+					if _, err := a.logs.Create(r.Context(), p.PlantID, a.userID(r), model.CreateLogRequest{
 						LogType: model.LogVPDChange, Date: date, LoggedAt: loggedAt,
 						Data: json.RawMessage(vpdBytes),
 					}); err != nil {
@@ -512,7 +546,7 @@ func (a *app) presignUpload(w http.ResponseWriter, r *http.Request) {
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 func (a *app) getSettings(w http.ResponseWriter, r *http.Request) {
-	settings, err := a.settings.Get(r.Context(), a.userID)
+	settings, err := a.settings.Get(r.Context(), a.userID(r))
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
@@ -526,7 +560,7 @@ func (a *app) updateSettings(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err, http.StatusBadRequest)
 		return
 	}
-	settings, err := a.settings.Update(r.Context(), a.userID, req)
+	settings, err := a.settings.Update(r.Context(), a.userID(r), req)
 	if err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return

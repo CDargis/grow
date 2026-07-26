@@ -72,3 +72,4 @@ cdk.out/
 *.swp
 *.swo
 *~
+spikes/mcp-auth/*.log
