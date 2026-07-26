@@ -81,7 +81,8 @@
       "Bash(go env *)",
       "Bash(go version *)",
       "Bash(echo \"exit=$?\")",
-      "Bash(gofmt -l cmd/api/main.go internal/mcpserver/mcpserver.go)"
+      "Bash(gofmt -l cmd/api/main.go internal/mcpserver/mcpserver.go)",
+      "Bash(gofmt -l internal/mcpserver/mcpserver.go)"
     ]
   }
 }
