@@ -55,7 +55,7 @@ Registration (RFC 7591), which Cognito doesn't support. It doesn't — Claude fa
 manual "enter an OAuth Client ID" field when a server's metadata has no `registration_endpoint`,
 confirmed with a real Claude.ai connector completing the full authorize/token/tool-call flow
 against a throwaway server mimicking Cognito's no-DCR shape. Proceeding with Cognito + API
-Gateway JWT authorizer as planned in `context/plans/active/cognito-auth-mcp-connector.md` —
+Gateway JWT authorizer as planned in `context/plans/complete/cognito-auth-mcp-connector.md` —
 no DCR shim, no swap to a different identity provider.
 
 ## Go for Lambda

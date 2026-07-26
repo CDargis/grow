@@ -29,7 +29,7 @@
       callback URL on the App Client, a dedicated confidential `grow-mcp` client, and finally
       hosting the RFC 8414 discovery metadata ourselves (Cognito's path-bearing issuer breaks
       MCP client discovery — the actual root cause). Full postmortem in
-      `context/plans/active/cognito-auth-mcp-connector.md`.
+      `context/plans/complete/cognito-auth-mcp-connector.md`.
 
 ## Follow-ups from the auth/MCP work
 - [ ] Web app forces a full re-login whenever the access token expires (~1h after the tab
