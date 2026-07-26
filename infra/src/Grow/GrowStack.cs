@@ -124,7 +124,11 @@ public class GrowStack : Stack
             {
                 Flows  = new OAuthFlows { AuthorizationCodeGrant = true },
                 Scopes = new[] { OAuthScope.OPENID, OAuthScope.EMAIL, OAuthScope.PROFILE },
-                CallbackUrls = new[] { $"https://{domainName}/callback" },
+                // The grow.chrisdargis.com/callback entry is the frontend's own login flow.
+                // The claude.ai entry is Claude's custom-connector OAuth callback -- needed
+                // because the same App Client is reused for the MCP connector rather than
+                // creating a second one, so it has to allow both redirect URIs.
+                CallbackUrls = new[] { $"https://{domainName}/callback", "https://claude.ai/api/mcp/auth_callback" },
                 LogoutUrls   = new[] { $"https://{domainName}/" }
             },
             SupportedIdentityProviders = new[] { UserPoolClientIdentityProvider.COGNITO }
