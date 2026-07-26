@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ImagePlus, X } from 'lucide-react'
+import { Camera, ImagePlus, X } from 'lucide-react'
 import { BottomSheet } from './BottomSheet'
 import { api } from '@/api/client'
 import type { Environment, EnvironmentType, CreateEnvironmentRequest } from '@/types'
@@ -21,7 +21,8 @@ interface Props {
 export function AddEnvironmentSheet({ open, onClose, environment }: Props) {
   const qc = useQueryClient()
   const isEdit = !!environment
-  const fileRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const libraryRef = useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState<CreateEnvironmentRequest>(emptyForm)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -71,7 +72,8 @@ export function AddEnvironmentSheet({ open, onClose, environment }: Props) {
     setPhotoFile(null)
     setPhotoPreview(null)
     setForm(f => ({ ...f, photoKey: undefined }))
-    if (fileRef.current) fileRef.current.value = ''
+    if (cameraRef.current) cameraRef.current.value = ''
+    if (libraryRef.current) libraryRef.current.value = ''
   }
 
   const mutation = useMutation({
@@ -117,26 +119,44 @@ export function AddEnvironmentSheet({ open, onClose, environment }: Props) {
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="w-full h-24 rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-1.5 text-muted active:opacity-70"
-              >
-                <ImagePlus size={22} />
-                <span className="text-xs">Add photo</span>
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => cameraRef.current?.click()}
+                  className="h-24 rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-1.5 text-muted active:opacity-70"
+                >
+                  <Camera size={22} />
+                  <span className="text-xs">Take Photo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => libraryRef.current?.click()}
+                  className="h-24 rounded-xl border border-dashed border-border flex flex-col items-center justify-center gap-1.5 text-muted active:opacity-70"
+                >
+                  <ImagePlus size={22} />
+                  <span className="text-xs">Library</span>
+                </button>
+              </div>
             )}
             {displayPhoto && (
               <button
                 type="button"
-                onClick={() => fileRef.current?.click()}
+                onClick={() => libraryRef.current?.click()}
                 className="mt-1.5 text-xs text-fern active:opacity-70"
               >
                 Change photo
               </button>
             )}
             <input
-              ref={fileRef}
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={onFileChange}
+            />
+            <input
+              ref={libraryRef}
               type="file"
               accept="image/*"
               className="hidden"

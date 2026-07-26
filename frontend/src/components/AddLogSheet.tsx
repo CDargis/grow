@@ -387,7 +387,8 @@ const TRAINING_METHODS = ['LST', 'Topping', 'FIM', 'ScrOG', 'Supercropping', 'Ma
 
 function TrainingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: TrainingData }) {
   const qc = useQueryClient()
-  const fileRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const libraryRef = useRef<HTMLInputElement>(null)
   const [method, setMethod] = useState(init?.method ?? '')
   const [notes, setNotes]   = useState(init?.notes ?? '')
   const [file, setFile]     = useState<File | null>(null)
@@ -424,7 +425,8 @@ function TrainingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
 
   return (
     <div className="space-y-3 mt-2">
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
+      <input ref={libraryRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
       <div>
         <label className={labelCls}>Method</label>
         <select className={inputCls} value={method} onChange={e => setMethod(e.target.value)}>
@@ -436,19 +438,36 @@ function TrainingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
         <label className={labelCls}>Notes (optional)</label>
         <textarea className={inputCls} rows={2} placeholder="Any details…" value={notes} onChange={e => setNotes(e.target.value)} />
       </div>
-      <button
-        onClick={() => fileRef.current?.click()}
-        className={`w-full h-36 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors overflow-hidden ${preview || init?.photoKey ? 'border-transparent p-0' : 'border-border text-muted active:opacity-70'}`}
-      >
-        {preview
-          ? <img src={preview} alt="preview" className="w-full h-full object-cover" />
-          : init?.photoKey
-            ? <MediaImage photoKey={init.photoKey} alt="current" className="w-full h-full object-cover" />
-            : <><ImagePlus size={24} /><span className="text-sm">Add photo (optional)</span></>
-        }
-      </button>
+      {preview || init?.photoKey ? (
+        <button
+          onClick={() => libraryRef.current?.click()}
+          className="w-full h-36 rounded-xl border-2 border-transparent flex items-center justify-center overflow-hidden"
+        >
+          {preview
+            ? <img src={preview} alt="preview" className="w-full h-full object-cover" />
+            : <MediaImage photoKey={init!.photoKey!} alt="current" className="w-full h-full object-cover" />
+          }
+        </button>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => cameraRef.current?.click()}
+            className="h-36 rounded-xl border-2 border-dashed border-border text-muted flex flex-col items-center justify-center gap-2 active:opacity-70"
+          >
+            <Camera size={24} />
+            <span className="text-sm">Take Photo</span>
+          </button>
+          <button
+            onClick={() => libraryRef.current?.click()}
+            className="h-36 rounded-xl border-2 border-dashed border-border text-muted flex flex-col items-center justify-center gap-2 active:opacity-70"
+          >
+            <ImagePlus size={24} />
+            <span className="text-sm">Library</span>
+          </button>
+        </div>
+      )}
       {preview && (
-        <button onClick={() => { setFile(null); setPreview(null); if (fileRef.current) fileRef.current.value = '' }} className="text-xs text-muted active:opacity-70 flex items-center gap-1">
+        <button onClick={() => { setFile(null); setPreview(null); if (cameraRef.current) cameraRef.current.value = ''; if (libraryRef.current) libraryRef.current.value = '' }} className="text-xs text-muted active:opacity-70 flex items-center gap-1">
           <X size={12} /> Remove photo
         </button>
       )}
@@ -466,7 +485,8 @@ const TRIMMING_METHODS = ['Defoliation', 'Lollipopping', 'Schwazzing', 'Fan Leaf
 
 function TrimmingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: TrimmingData }) {
   const qc = useQueryClient()
-  const fileRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const libraryRef = useRef<HTMLInputElement>(null)
   const [method, setMethod] = useState(init?.method ?? '')
   const [notes, setNotes]   = useState(init?.notes ?? '')
   const [file, setFile]     = useState<File | null>(null)
@@ -502,7 +522,8 @@ function TrimmingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
 
   return (
     <div className="space-y-3 mt-2">
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
+      <input ref={libraryRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
       <div>
         <label className={labelCls}>Method (optional)</label>
         <select className={inputCls} value={method} onChange={e => setMethod(e.target.value)}>
@@ -514,19 +535,36 @@ function TrimmingForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
         <label className={labelCls}>Notes (optional)</label>
         <textarea className={inputCls} rows={2} placeholder="Any details…" value={notes} onChange={e => setNotes(e.target.value)} />
       </div>
-      <button
-        onClick={() => fileRef.current?.click()}
-        className={`w-full h-36 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors overflow-hidden ${preview || init?.photoKey ? 'border-transparent p-0' : 'border-border text-muted active:opacity-70'}`}
-      >
-        {preview
-          ? <img src={preview} alt="preview" className="w-full h-full object-cover" />
-          : init?.photoKey
-            ? <MediaImage photoKey={init.photoKey} alt="current" className="w-full h-full object-cover" />
-            : <><ImagePlus size={24} /><span className="text-sm">Add photo (optional)</span></>
-        }
-      </button>
+      {preview || init?.photoKey ? (
+        <button
+          onClick={() => libraryRef.current?.click()}
+          className="w-full h-36 rounded-xl border-2 border-transparent flex items-center justify-center overflow-hidden"
+        >
+          {preview
+            ? <img src={preview} alt="preview" className="w-full h-full object-cover" />
+            : <MediaImage photoKey={init!.photoKey!} alt="current" className="w-full h-full object-cover" />
+          }
+        </button>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => cameraRef.current?.click()}
+            className="h-36 rounded-xl border-2 border-dashed border-border text-muted flex flex-col items-center justify-center gap-2 active:opacity-70"
+          >
+            <Camera size={24} />
+            <span className="text-sm">Take Photo</span>
+          </button>
+          <button
+            onClick={() => libraryRef.current?.click()}
+            className="h-36 rounded-xl border-2 border-dashed border-border text-muted flex flex-col items-center justify-center gap-2 active:opacity-70"
+          >
+            <ImagePlus size={24} />
+            <span className="text-sm">Library</span>
+          </button>
+        </div>
+      )}
       {preview && (
-        <button onClick={() => { setFile(null); setPreview(null); if (fileRef.current) fileRef.current.value = '' }} className="text-xs text-muted active:opacity-70 flex items-center gap-1">
+        <button onClick={() => { setFile(null); setPreview(null); if (cameraRef.current) cameraRef.current.value = ''; if (libraryRef.current) libraryRef.current.value = '' }} className="text-xs text-muted active:opacity-70 flex items-center gap-1">
           <X size={12} /> Remove photo
         </button>
       )}
