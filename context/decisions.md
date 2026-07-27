@@ -1,5 +1,15 @@
 # grow — Decisions
 
+## Multi-photo batches sort by EXIF capture time, not upload order (2026-07-27)
+First fix used `File.lastModified` (filesystem attribute) to sort a multi-photo upload into
+chronological order. That's only a proxy -- it drifts from the real capture time on edits, cloud
+sync, or device transfers, unlike EXIF `DateTimeOriginal`, which is the camera's own record and
+survives all of that. Switched to reading real EXIF (`exifr`, client-side, no server round trip)
+with `CreateDate`/`ModifyDate`/`lastModified` as fallbacks for images with no EXIF at all
+(screenshots, some PNGs). Explicitly confirmed with the user this should be actual capture time
+rather than upload/selection order -- consistent with how every other log type already works
+(`loggedAt` = when it happened, editable/backdatable, not when it was entered into the app).
+
 ## Denormalize plantName onto MCP log entries (2026-07-26)
 Live use surfaced a real failure: asked about a log entry, Claude quoted back the tool's raw
 JSON but misattributed it to the wrong plant -- two plants' ids differ by only a couple of
