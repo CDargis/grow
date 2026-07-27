@@ -46,6 +46,10 @@
   `plant.UserID == callerUserID` ownership check at the tool layer (the REST API doesn't have
   this check either — pre-existing gap, not fixed everywhere, but cheap to add for this new
   surface).
+- Log-listing tools denormalize `plantName` onto every entry (`logWithPlantName` wraps
+  `model.Log`) rather than leaving Claude to cross-reference `plantId` back to a name itself —
+  two plants' ids can look nearly identical, and a live conversation showed Claude misattributing
+  a log to the wrong plant by eye when only the raw id was available.
 - `GET /api/mcp` is excluded from the API Gateway JWT authorizer and validates its own bearer
   token in Go (`lestrrat-go/jwx/v3` against Cognito's JWKS) — API Gateway's built-in authorizer
   returns a generic 401 with no `WWW-Authenticate` header, but MCP clients need that header's

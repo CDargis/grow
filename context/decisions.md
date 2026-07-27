@@ -1,5 +1,15 @@
 # grow — Decisions
 
+## Denormalize plantName onto MCP log entries (2026-07-26)
+Live use surfaced a real failure: asked about a log entry, Claude quoted back the tool's raw
+JSON but misattributed it to the wrong plant -- two plants' ids differ by only a couple of
+characters (`...9KK9...` vs `...9KM9...`), and matching an opaque id back to a name had been left
+entirely to the model's in-context recall of an earlier `list_plants` call. Verified the tool and
+data were correct (direct DB scan confirmed the entry's real plantId) -- this was a model
+transcription error, not a server bug, but it's a completely avoidable failure mode: `logWithPlantName`
+now wraps every log entry from `list_logs_for_plant`/`get_logs_by_date_range` with the plant's
+name directly, so there's no id-matching step left for a model to get wrong.
+
 ## Host OAuth authorization-server metadata ourselves, not Cognito's (2026-07-26)
 Cognito's issuer URL has a path component (`/{poolId}`) and serves its discovery document at
 only the OIDC suffix form — the RFC 8414 path-insertion forms and both

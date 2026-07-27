@@ -187,6 +187,28 @@ func (d Deps) Handler() http.Handler {
 }
 
 // ── Tools ────────────────────────────────────────────────────────────────────
+//
+// Log-listing tools denormalize the plant's name onto every entry rather
+// than leaving the caller to cross-reference plantId back to a name itself.
+// Two plant ids in this app can look nearly identical (e.g. two different
+// plants both starting "01KT9K...", differing only a few characters in),
+// and leaving that match up to an LLM's in-context recall of an earlier
+// list_plants call is exactly the kind of exact-string-match task a model
+// can get subtly wrong -- confirmed happening in practice. Giving the name
+// directly removes the failure mode instead of hoping it doesn't recur.
+
+type logWithPlantName struct {
+	model.Log
+	PlantName string `json:"plantName"`
+}
+
+func withPlantNames(logs []model.Log, names map[string]string) []logWithPlantName {
+	out := make([]logWithPlantName, len(logs))
+	for i, l := range logs {
+		out[i] = logWithPlantName{Log: l, PlantName: names[l.PlantID]}
+	}
+	return out
+}
 
 func (d Deps) newServer(userID string) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "grow", Version: "1.0.0"}, nil)
@@ -248,8 +270,8 @@ func (d Deps) newServer(userID string) *mcp.Server {
 			logs = logs[:limit]
 		}
 		return nil, struct {
-			Logs []model.Log `json:"logs"`
-		}{Logs: logs}, nil
+			Logs []logWithPlantName `json:"logs"`
+		}{Logs: withPlantNames(logs, map[string]string{plant.PlantID: plant.Name})}, nil
 	})
 
 	const maxDateRangeDays = 31
@@ -292,9 +314,19 @@ func (d Deps) newServer(userID string) *mcp.Server {
 			}
 			return all[i].LoggedAt > all[j].LoggedAt
 		})
+
+		plants, err := d.Plants.List(ctx, userID)
+		if err != nil {
+			return nil, nil, err
+		}
+		names := make(map[string]string, len(plants))
+		for _, p := range plants {
+			names[p.PlantID] = p.Name
+		}
+
 		return nil, struct {
-			Logs []model.Log `json:"logs"`
-		}{Logs: all}, nil
+			Logs []logWithPlantName `json:"logs"`
+		}{Logs: withPlantNames(all, names)}, nil
 	})
 
 	return s
