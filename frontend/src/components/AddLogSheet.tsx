@@ -1,26 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Droplets, Ruler, MessageSquare, Camera, GitBranch, Scissors, ImagePlus, X } from 'lucide-react'
-import exifr from 'exifr'
 import { BottomSheet } from './BottomSheet'
 import { MediaImage } from './MediaImage'
 import { api } from '@/api/client'
 import type { Plant, Log, LogType, WateringData, TrainingData, TrimmingData, NoteData, PhotoData, TransplantData, HeightData } from '@/types'
-
-// EXIF DateTimeOriginal is the camera's own record of when the shot was
-// actually taken -- unlike the file's filesystem lastModified, it survives
-// edits, cloud sync, and device transfers. Only fall back to lastModified
-// for images with no EXIF date at all (screenshots, some PNGs, etc).
-async function photoTakenAt(file: File): Promise<number> {
-  try {
-    const exif = await exifr.parse(file, ['DateTimeOriginal', 'CreateDate', 'ModifyDate'])
-    const takenAt: Date | undefined = exif?.DateTimeOriginal ?? exif?.CreateDate ?? exif?.ModifyDate
-    if (takenAt instanceof Date && !isNaN(takenAt.getTime())) return takenAt.getTime()
-  } catch {
-    // Not a format exifr understands, or no EXIF present -- fall through.
-  }
-  return file.lastModified
-}
 
 // ── Types config ─────────────────────────────────────────────────────────────
 
@@ -606,27 +590,18 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
   const cameraRef = useRef<HTMLInputElement>(null)
   const libraryRef = useRef<HTMLInputElement>(null)
   const existingKeys = getInitPhotoKeys(init)
-  // file+preview+takenAt kept as one array (not parallel arrays) so a
-  // re-sort by capture time can never leave them out of sync.
-  const [items, setItems]           = useState<{ file: File; preview: string; takenAt: number }[]>([])
+  // file+preview kept as one array (not two parallel ones) so adding more
+  // photos later can never desync which preview belongs to which file.
+  const [items, setItems]           = useState<{ file: File; preview: string }[]>([])
   const [caption, setCaption]       = useState(init?.caption ?? '')
   const [uploading, setUploading]   = useState(false)
   const [error, setError]           = useState<string | null>(null)
 
-  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? [])
     if (!selected.length) return
+    setItems(prev => [...prev, ...selected.map(file => ({ file, preview: URL.createObjectURL(file) }))])
     e.target.value = ''
-    // Multi-selecting from the library returns files in tap order, not
-    // capture order -- read each photo's real EXIF timestamp and sort by
-    // that, so the lightbox (which just walks photoKeys in stored order)
-    // actually plays back oldest-to-newest regardless of selection order.
-    const withTimestamps = await Promise.all(selected.map(async file => ({
-      file,
-      preview: URL.createObjectURL(file),
-      takenAt: await photoTakenAt(file),
-    })))
-    setItems(prev => [...prev, ...withTimestamps].sort((a, b) => a.takenAt - b.takenAt))
   }
 
   function removeNew(idx: number) {

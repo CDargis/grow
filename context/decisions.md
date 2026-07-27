@@ -1,14 +1,14 @@
 # grow — Decisions
 
-## Multi-photo batches sort by EXIF capture time, not upload order (2026-07-27)
-First fix used `File.lastModified` (filesystem attribute) to sort a multi-photo upload into
-chronological order. That's only a proxy -- it drifts from the real capture time on edits, cloud
-sync, or device transfers, unlike EXIF `DateTimeOriginal`, which is the camera's own record and
-survives all of that. Switched to reading real EXIF (`exifr`, client-side, no server round trip)
-with `CreateDate`/`ModifyDate`/`lastModified` as fallbacks for images with no EXIF at all
-(screenshots, some PNGs). Explicitly confirmed with the user this should be actual capture time
-rather than upload/selection order -- consistent with how every other log type already works
-(`loggedAt` = when it happened, editable/backdatable, not when it was entered into the app).
+## Multi-photo batches keep selection/upload order, not capture time (2026-07-27)
+Went back and forth on this. Tried sorting by `File.lastModified`, then by real EXIF
+`DateTimeOriginal` (via `exifr`) when that proved to be only a filesystem-attribute proxy for
+capture time. User then explicitly reversed course: whatever order the photos were
+selected/uploaded in is what should be shown, including when uploading an older batch later --
+that upload should appear last, not interleaved back into the timeline by capture time. Reverted
+to plain selection order, no sorting; `exifr` removed as a dependency again. The other half of
+the original bug -- two *different* log entries tying on same-minute `loggedAt` -- is unrelated
+to this reversal and stays fixed (`logId` tiebreak in `photoItems`, `PlantDetail/index.tsx`).
 
 ## Denormalize plantName onto MCP log entries (2026-07-26)
 Live use surfaced a real failure: asked about a log entry, Claude quoted back the tool's raw
