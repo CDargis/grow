@@ -113,11 +113,8 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
       const d = log.data as any
       const parts: string[] = []
       if (d.amount != null) parts.push(`${d.amount} ${d.unit}`)
-      const nuts = (d.nutrients as Array<{ name: string; amount: number; unit: string }> ?? [])
-        .filter(n => n.name)
-        .map(n => `${n.name} ${n.amount}${n.unit}`)
-        .join(' · ')
-      if (nuts)                  parts.push(nuts)
+      // Nutrients get their own multi-line breakdown (see NutrientList) --
+      // excluded here so they're not also crammed into this one line.
       if (d.ph        != null)   parts.push(`pH ${d.ph}`)
       if (d.tds       != null)   parts.push(`TDS ${d.tds}`)
       if (d.runoff    != null)   parts.push(`runoff ${d.runoff}`)
@@ -127,18 +124,52 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
     }
     case 'feeding': {
       const d = log.data as any
-      const nutrients = (d.nutrients as Array<{ name: string; amount: number; unit: string }> ?? [])
-        .filter(n => n.name)
-        .map(n => `${n.name} ${n.amount}${n.unit}`)
-        .join(' · ')
-      const ph    = d.ph       != null ? ` · pH ${d.ph}`       : ''
-      const total = d.totalVol != null ? ` · ${d.totalVol}ml`  : ''
-      return nutrients ? `${nutrients}${ph}${total}` : null
+      const ph    = d.ph       != null ? `pH ${d.ph}`       : null
+      const total = d.totalVol != null ? `${d.totalVol}ml`  : null
+      const parts = [total, ph].filter((p): p is string => p != null)
+      return parts.length ? parts.join(' · ') : null
     }
     case 'transplant': { const d = log.data as any; return d.medium ? `${d.potSize} · ${d.medium}` : d.potSize }
     case 'photo':      return (log.data as any).caption ?? null
     default:         return null
   }
+}
+
+interface NutrientEntry { name: string; amount: number; unit: string }
+
+// Nutrients on a watering/feeding entry are broken out into their own
+// multi-line list rather than crammed into the one-line summary -- with
+// several items mixed into one string (name, amount, and unit all run
+// together for each) it was hard to tell them apart at a glance.
+function logNutrients(log: Log): NutrientEntry[] | null {
+  if (log.logType !== 'watering' && log.logType !== 'feeding') return null
+  const nutrients = ((log.data as any).nutrients as NutrientEntry[] | undefined ?? []).filter(n => n.name)
+  return nutrients.length ? nutrients : null
+}
+
+// A small fixed palette, deterministically assigned per nutrient name (hash
+// of the name, not insertion order) so the same nutrient reads as the same
+// color across every log entry and every plant, not just within one list.
+const NUTRIENT_COLORS = ['#4A9E50', '#facc15', '#c084fc', '#fb923c', '#38bdf8', '#f87171', '#a3e635', '#f472b6']
+
+function nutrientColor(name: string): string {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0
+  return NUTRIENT_COLORS[hash % NUTRIENT_COLORS.length]
+}
+
+function NutrientList({ nutrients }: { nutrients: NutrientEntry[] }) {
+  return (
+    <div className="mt-1 flex flex-col gap-0.5">
+      {nutrients.map((n, i) => (
+        <div key={i} className="flex items-center gap-1.5 text-xs">
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: nutrientColor(n.name) }} />
+          <span className="text-dim truncate">{n.name}</span>
+          <span className="text-muted ml-auto flex-shrink-0">{n.amount}{n.unit}</span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function elapsed(dateStr: string): string {
@@ -270,6 +301,7 @@ function PhaseLogEntry({ log, color, envMap, onDelete, onEdit, onOpenPhoto }: {
   onOpenPhoto: (log: Log, photoKey: string) => void
 }) {
   const summary   = logSummary(log, envMap)
+  const nutrients = logNutrients(log)
   const photoKeys = getPhotoKeys(log.data)
 
   return (
@@ -301,6 +333,7 @@ function PhaseLogEntry({ log, color, envMap, onDelete, onEdit, onOpenPhoto }: {
           </div>
         </div>
         {summary && <p className="text-[11px] text-dim mt-0.5 break-words">{summary}</p>}
+        {nutrients && <NutrientList nutrients={nutrients} />}
         <PhotoGrid photoKeys={photoKeys} size="sm" onPhotoTap={key => onOpenPhoto(log, key)} />
       </div>
     </div>
@@ -411,6 +444,7 @@ function TimelineView({ plant, logs, envMap, onDelete, onEdit, onOpenPhoto }: {
 
 function LogEntry({ log, envMap, onDelete, onEdit, onOpenPhoto }: { log: Log; envMap: Map<string, string>; onDelete: (logId: string) => void; onEdit: (log: Log) => void; onOpenPhoto: (log: Log, photoKey: string) => void }) {
   const summary   = logSummary(log, envMap)
+  const nutrients = logNutrients(log)
   const photoKeys = getPhotoKeys(log.data)
   return (
     <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
@@ -437,6 +471,7 @@ function LogEntry({ log, envMap, onDelete, onEdit, onOpenPhoto }: { log: Log; en
           </div>
         </div>
         {summary && <p className="text-xs text-dim mt-0.5 break-words">{summary}</p>}
+        {nutrients && <NutrientList nutrients={nutrients} />}
         <PhotoGrid photoKeys={photoKeys} size="md" onPhotoTap={key => onOpenPhoto(log, key)} />
       </div>
     </div>
