@@ -745,7 +745,11 @@ export function PlantDetailPage() {
     if (!plant || !logs) return []
     const periods = buildPhasePeriods(plant, logs)
     return [...logs]
-      .sort((a, b) => a.date.localeCompare(b.date) || a.loggedAt.localeCompare(b.loggedAt))
+      // loggedAt is only minute-precision, so two entries logged in the same
+      // minute tie -- logId (a ULID, time-sortable to the millisecond) breaks
+      // the tie correctly instead of leaving it to array order, which comes
+      // back newest-first from the API and would otherwise land backwards.
+      .sort((a, b) => a.date.localeCompare(b.date) || a.loggedAt.localeCompare(b.loggedAt) || a.logId.localeCompare(b.logId))
       .flatMap(log =>
         getPhotoKeys(log.data).map(photoKey => {
           const period = periods.find(p => log.date >= p.startDate && (p.endDate === null || log.date < p.endDate))

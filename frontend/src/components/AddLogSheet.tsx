@@ -590,8 +590,9 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
   const cameraRef = useRef<HTMLInputElement>(null)
   const libraryRef = useRef<HTMLInputElement>(null)
   const existingKeys = getInitPhotoKeys(init)
-  const [newFiles, setNewFiles]     = useState<File[]>([])
-  const [previews, setPreviews]     = useState<string[]>([])
+  // file+preview kept as one array (not two parallel ones) so a re-sort by
+  // capture time can never leave the two out of sync with each other.
+  const [items, setItems]           = useState<{ file: File; preview: string }[]>([])
   const [caption, setCaption]       = useState(init?.caption ?? '')
   const [uploading, setUploading]   = useState(false)
   const [error, setError]           = useState<string | null>(null)
@@ -599,17 +600,22 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
   function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? [])
     if (!selected.length) return
-    setNewFiles(prev => [...prev, ...selected])
-    setPreviews(prev => [...prev, ...selected.map(f => URL.createObjectURL(f))])
+    setItems(prev => {
+      const combined = [...prev, ...selected.map(file => ({ file, preview: URL.createObjectURL(file) }))]
+      // Multi-selecting from the library returns files in tap order, not
+      // capture order -- sort by the file's own timestamp so the lightbox
+      // (which just walks photoKeys in stored order) actually plays back
+      // oldest-to-newest regardless of selection order.
+      return combined.slice().sort((a, b) => a.file.lastModified - b.file.lastModified)
+    })
     e.target.value = ''
   }
 
   function removeNew(idx: number) {
-    setNewFiles(prev => prev.filter((_, i) => i !== idx))
-    setPreviews(prev => prev.filter((_, i) => i !== idx))
+    setItems(prev => prev.filter((_, i) => i !== idx))
   }
 
-  const totalCount = existingKeys.length + newFiles.length
+  const totalCount = existingKeys.length + items.length
   const canSave    = totalCount > 0
 
   async function handleSubmit() {
@@ -618,7 +624,7 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
     setError(null)
     try {
       const uploadedKeys = await Promise.all(
-        newFiles.map(f => api.media.uploadFile(f, `plants/${plantId}/logs`))
+        items.map(({ file }) => api.media.uploadFile(file, `plants/${plantId}/logs`))
       )
       const photoKeys = [...existingKeys, ...uploadedKeys]
       const body = {
@@ -670,9 +676,9 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
               <MediaImage photoKey={key} alt="photo" className="w-full h-full object-cover" />
             </div>
           ))}
-          {previews.map((src, i) => (
+          {items.map(({ preview }, i) => (
             <div key={i} className="relative aspect-square rounded-lg overflow-hidden">
-              <img src={src} alt="preview" className="w-full h-full object-cover" />
+              <img src={preview} alt="preview" className="w-full h-full object-cover" />
               <button
                 onClick={() => removeNew(i)}
                 className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center"
@@ -714,7 +720,7 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
         className="w-full py-3 bg-fern text-base font-semibold rounded-xl active:opacity-80 disabled:opacity-50"
       >
         {uploading
-          ? `Uploading ${newFiles.length > 1 ? `${newFiles.length} photos` : 'photo'}…`
+          ? `Uploading ${items.length > 1 ? `${items.length} photos` : 'photo'}…`
           : logId ? 'Save Changes' : `Save ${totalCount > 1 ? `${totalCount} Photos` : 'Photo'}`
         }
       </button>
