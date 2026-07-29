@@ -211,7 +211,7 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
     if (n.productId) entry.productId = n.productId
     if (n.npk) entry.npk = n.npk
     if (n.productId && n.referenceDose) {
-      const pct = computePctOfDose(Number(n.amount), n.referenceDose, batchAmount, unit)
+      const pct = computePctOfDose(Number(n.amount), n.unit, n.referenceDose, batchAmount, unit)
       if (pct !== undefined) entry.pctOfDose = pct
     }
     return entry

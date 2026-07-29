@@ -96,6 +96,23 @@ func scaledFullDose(rd referenceDose, batchAmount float64, batchUnit string) flo
 	return rd.Max * (inProductUnits / rd.PerVolume)
 }
 
+// Dose units (ml/oz/g/tsp/tbsp), distinct from the batch/perVolume units
+// above. "g" is mass, not volume -- converting it against the others needs
+// the product's density, which we don't have, so it's refused, not guessed.
+var doseMlPerUnit = map[string]float64{"ml": 1, "oz": 29.5735, "tsp": 4.92892, "tbsp": 14.7868}
+
+func convertDoseAmount(amount float64, from, to string) (float64, bool) {
+	if from == to {
+		return amount, true
+	}
+	fv, fok := doseMlPerUnit[from]
+	tv, tok := doseMlPerUnit[to]
+	if !fok || !tok {
+		return 0, false
+	}
+	return amount * fv / tv, true
+}
+
 func normalize(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
 }
@@ -282,8 +299,8 @@ func main() {
 			n.NPK = &npkCopy
 			if wd.Amount != nil && wd.Unit != "" {
 				full := scaledFullDose(m.product.ReferenceDose, *wd.Amount, wd.Unit)
-				if full > 0 {
-					pct := (n.Amount / full) * 100
+				if converted, ok := convertDoseAmount(n.Amount, n.Unit, m.product.ReferenceDose.Unit); ok && full > 0 {
+					pct := (converted / full) * 100
 					n.PctOfDose = &pct
 				}
 			}

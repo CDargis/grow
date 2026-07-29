@@ -7,6 +7,18 @@ export function convertVolume(amount: number, from: string, to: string): number 
   return amount * ML_PER_UNIT[from] / ML_PER_UNIT[to]
 }
 
+// Dose units (as opposed to batch/perVolume units above). "g" is mass, not
+// volume -- converting it against ml/oz/tsp/tbsp needs the product's density,
+// which we don't have, so that conversion is refused rather than guessed.
+const DOSE_ML_PER_UNIT: Record<string, number> = { ml: 1, oz: 29.5735, tsp: 4.92892, tbsp: 14.7868 }
+
+export function convertDoseAmount(amount: number, from: string, to: string): number | undefined {
+  if (from === to) return amount
+  if (from === 'g' || to === 'g') return undefined
+  if (!(from in DOSE_ML_PER_UNIT) || !(to in DOSE_ML_PER_UNIT)) return undefined
+  return amount * DOSE_ML_PER_UNIT[from] / DOSE_ML_PER_UNIT[to]
+}
+
 // "Full strength" is always the reference dose's max (== its only value for a
 // fixed, non-range dose), scaled from the label's perVolume basis to the
 // batch amount actually being mixed.
@@ -19,8 +31,13 @@ export function scaledFullDose(referenceDose: ReferenceDose, batchAmount: number
 
 // Uncapped -- can exceed 100% (pushing past label rate) or fall under it
 // (e.g. dosing below a range's own labeled minimum), both real use cases.
-export function pctOfDose(amount: number, referenceDose: ReferenceDose, batchAmount: number, batchUnit: string): number | undefined {
+// `unit` is the dose's own unit, which may differ from referenceDose.unit
+// (e.g. logged in ml against a label given in oz) -- must be converted to
+// the same unit as `full` before dividing, or the ratio is meaningless.
+export function pctOfDose(amount: number, unit: string, referenceDose: ReferenceDose, batchAmount: number, batchUnit: string): number | undefined {
   const full = scaledFullDose(referenceDose, batchAmount, batchUnit)
   if (!full) return undefined
-  return (amount / full) * 100
+  const converted = convertDoseAmount(amount, unit, referenceDose.unit)
+  if (converted === undefined) return undefined
+  return (converted / full) * 100
 }
