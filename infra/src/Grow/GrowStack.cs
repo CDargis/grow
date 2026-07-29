@@ -93,6 +93,21 @@ public class GrowStack : Stack
             RemovalPolicy = RemovalPolicy.RETAIN
         });
 
+        Table productsTable = new Table(this, "ProductsTable", new TableProps
+        {
+            TableName     = "grow-products",
+            PartitionKey  = new DynamoAttribute { Name = "productId", Type = AttributeType.STRING },
+            BillingMode   = BillingMode.PAY_PER_REQUEST,
+            RemovalPolicy = RemovalPolicy.RETAIN
+        });
+        productsTable.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
+        {
+            IndexName      = "user-index",
+            PartitionKey   = new DynamoAttribute { Name = "userId",    Type = AttributeType.STRING },
+            SortKey        = new DynamoAttribute { Name = "productId", Type = AttributeType.STRING },
+            ProjectionType = ProjectionType.ALL
+        });
+
         // ── Cognito ───────────────────────────────────────────────────────
 
         UserPool userPool = new UserPool(this, "UserPool", new UserPoolProps
@@ -220,6 +235,7 @@ public class GrowStack : Stack
                 ["LOGS_DATE_GSI"]           = "user-date-index",
                 ["LOGS_LOGTYPE_DATE_GSI"]   = "user-logtype-date-index",
                 ["SETTINGS_TABLE"]     = settingsTable.TableName,
+                ["PRODUCTS_TABLE"]     = productsTable.TableName,
                 ["MEDIA_BUCKET"]       = mediaBucket.BucketName,
                 ["USER_ID"]                 = "default",
                 ["USER_POOL_ID"]            = userPool.UserPoolId,
@@ -234,6 +250,7 @@ public class GrowStack : Stack
         environmentsTable.GrantReadWriteData(apiFunction);
         logsTable.GrantReadWriteData(apiFunction);
         settingsTable.GrantReadWriteData(apiFunction);
+        productsTable.GrantReadWriteData(apiFunction);
         mediaBucket.GrantReadWrite(apiFunction);
 
         // ── API Gateway ───────────────────────────────────────────────────
@@ -422,6 +439,7 @@ public class GrowStack : Stack
         new CfnOutput(this, "EnvironmentsTableName",  new CfnOutputProps { Value = environmentsTable.TableName });
         new CfnOutput(this, "LogsTableName",          new CfnOutputProps { Value = logsTable.TableName });
         new CfnOutput(this, "SettingsTableName",      new CfnOutputProps { Value = settingsTable.TableName });
+        new CfnOutput(this, "ProductsTableName",      new CfnOutputProps { Value = productsTable.TableName });
         new CfnOutput(this, "MediaBucketName",        new CfnOutputProps { Value = mediaBucket.BucketName });
         new CfnOutput(this, "UserPoolId",             new CfnOutputProps { Value = userPool.UserPoolId });
         new CfnOutput(this, "UserPoolClientId",        new CfnOutputProps { Value = userPoolClient.UserPoolClientId });

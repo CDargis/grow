@@ -26,6 +26,7 @@ type app struct {
 	envs     *store.EnvironmentStore
 	logs     *store.LogStore
 	settings *store.SettingsStore
+	products *store.ProductStore
 	s3       *s3.Client
 	presign  *s3.PresignClient
 	mediaBkt string
@@ -62,6 +63,7 @@ func main() {
 		envs:        store.NewEnvironmentStore(clients.DDB, os.Getenv("ENVIRONMENTS_TABLE")),
 		logs:        store.NewLogStore(clients.DDB, os.Getenv("LOGS_TABLE"), os.Getenv("LOGS_DATE_GSI"), os.Getenv("LOGS_LOGTYPE_DATE_GSI")),
 		settings:    store.NewSettingsStore(clients.DDB, os.Getenv("SETTINGS_TABLE")),
+		products:    store.NewProductStore(clients.DDB, os.Getenv("PRODUCTS_TABLE")),
 		s3:          clients.S3,
 		presign:     s3.NewPresignClient(clients.S3),
 		mediaBkt:    os.Getenv("MEDIA_BUCKET"),
@@ -117,6 +119,12 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /api/settings", a.getSettings)
 	mux.HandleFunc("PUT /api/settings", a.updateSettings)
+
+	mux.HandleFunc("GET /api/products", a.listProducts)
+	mux.HandleFunc("POST /api/products", a.createProduct)
+	mux.HandleFunc("GET /api/products/{productId}", a.getProduct)
+	mux.HandleFunc("PATCH /api/products/{productId}", a.updateProduct)
+	mux.HandleFunc("DELETE /api/products/{productId}", a.deleteProduct)
 
 	mux.HandleFunc("GET /api/auth-config", a.getAuthConfig)
 
@@ -510,6 +518,67 @@ func (a *app) updateEnvironment(w http.ResponseWriter, r *http.Request) {
 
 func (a *app) deleteEnvironment(w http.ResponseWriter, r *http.Request) {
 	if err := a.envs.Delete(r.Context(), r.PathValue("envId")); err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Products ──────────────────────────────────────────────────────────────────
+
+func (a *app) listProducts(w http.ResponseWriter, r *http.Request) {
+	products, err := a.products.List(r.Context(), a.userID(r))
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, products)
+}
+
+func (a *app) getProduct(w http.ResponseWriter, r *http.Request) {
+	product, err := a.products.Get(r.Context(), r.PathValue("productId"))
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	if product == nil {
+		http.NotFound(w, r)
+		return
+	}
+	jsonOK(w, product)
+}
+
+func (a *app) createProduct(w http.ResponseWriter, r *http.Request) {
+	var req model.CreateProductRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	product, err := a.products.Create(r.Context(), a.userID(r), req)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, product)
+}
+
+func (a *app) updateProduct(w http.ResponseWriter, r *http.Request) {
+	var req model.CreateProductRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	product, err := a.products.Update(r.Context(), r.PathValue("productId"), req)
+	if err != nil {
+		httpError(w, err, http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, product)
+}
+
+func (a *app) deleteProduct(w http.ResponseWriter, r *http.Request) {
+	if err := a.products.Delete(r.Context(), r.PathValue("productId")); err != nil {
 		httpError(w, err, http.StatusInternalServerError)
 		return
 	}

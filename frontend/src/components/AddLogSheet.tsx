@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Droplets, Ruler, MessageSquare, Camera, GitBranch, Scissors, ImagePlus, X } from 'lucide-react'
 import { BottomSheet } from './BottomSheet'
 import { MediaImage } from './MediaImage'
+import { NutrientAutocomplete } from './NutrientAutocomplete'
 import { api } from '@/api/client'
-import type { Plant, Log, LogType, WateringData, TrainingData, TrimmingData, NoteData, PhotoData, TransplantData, HeightData } from '@/types'
+import { scaledFullDose, pctOfDose as computePctOfDose } from '@/lib/nutrientDose'
+import type { Plant, Log, LogType, WateringData, TrainingData, TrimmingData, NoteData, PhotoData, TransplantData, HeightData, Product, ReferenceDose, NPK } from '@/types'
 
 // ── Types config ─────────────────────────────────────────────────────────────
 
@@ -56,7 +58,77 @@ const labelCls = 'block text-xs text-dim mb-1'
 
 // ── Watering / feeding form ───────────────────────────────────────────────────
 
-type NutrientRow = { name: string; amount: string; unit: string }
+type NutrientRow = {
+  name: string
+  amount: string
+  unit: string
+  productId?: string
+  npk?: NPK
+  // Client-side only (not part of the submitted Nutrient shape) -- kept on
+  // the row so we can compute pctOfDose at submit time from whatever batch
+  // amount is entered.
+  referenceDose?: ReferenceDose
+}
+
+function WizardDoseRow({
+  row, batchAmount, batchUnit, onAmountChange, onRemove,
+}: {
+  row: NutrientRow
+  batchAmount: number
+  batchUnit: string
+  onAmountChange: (v: string) => void
+  onRemove: () => void
+}) {
+  const rd = row.referenceDose!
+  const isRange = rd.min !== rd.max
+  const full = scaledFullDose(rd, batchAmount, batchUnit)
+  const presets = [
+    { label: 'Full', pct: 100 },
+    { label: '3/4',  pct: 75 },
+    { label: '1/2',  pct: 50 },
+    { label: '1/4',  pct: 25 },
+  ]
+  const pct = full > 0 && row.amount ? (Number(row.amount) / full) * 100 : null
+
+  return (
+    <div className="p-3 bg-raised rounded-lg border border-border space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-primary">{row.name}</span>
+        <button type="button" onClick={onRemove} className="text-muted active:opacity-60">✕</button>
+      </div>
+      <p className="text-xs text-muted">
+        Labeled: {isRange ? `${rd.min}–${rd.max}` : rd.min} {rd.unit} / {rd.perVolume} {rd.perVolumeUnit}
+      </p>
+      <div className="flex gap-1.5 flex-wrap">
+        {presets.map(({ label, pct: p }) => (
+          <button
+            key={label}
+            type="button"
+            disabled={!full}
+            onClick={() => onAmountChange((full * p / 100).toFixed(2))}
+            className="px-2.5 py-1 text-xs rounded-full border border-border text-dim active:bg-surface disabled:opacity-40"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-2 items-center">
+        <input
+          type="number"
+          className="w-24 bg-surface border border-border rounded-lg px-2 py-1.5 text-sm text-primary focus:outline-none focus:border-fern"
+          placeholder={full ? full.toFixed(2) : '0'}
+          value={row.amount}
+          onChange={e => onAmountChange(e.target.value)}
+        />
+        <span className="text-xs text-muted">{rd.unit}</span>
+        {pct !== null && <span className="text-xs text-fern ml-auto">{pct.toFixed(0)}%</span>}
+      </div>
+      {!batchAmount && (
+        <p className="text-[11px] text-amber-400">Enter a water amount above to compute suggested doses.</p>
+      )}
+    </div>
+  )
+}
 
 function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: WateringData }) {
   const qc = useQueryClient()
@@ -70,16 +142,80 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
   const [showNutrients, setShowNutrients] = useState((init?.nutrients?.length ?? 0) > 0)
   const [nutrients, setNutrients] = useState<NutrientRow[]>(
     init?.nutrients?.length
-      ? init.nutrients.map(n => ({ name: n.name, amount: String(n.amount), unit: n.unit }))
+      ? init.nutrients.map(n => ({ name: n.name, amount: String(n.amount), unit: n.unit, productId: n.productId, npk: n.npk }))
       : [{ name: '', amount: '', unit: 'ml' }]
   )
+  const [wizardSearch, setWizardSearch] = useState('')
 
-  function updateNutrient(i: number, field: keyof NutrientRow, value: string) {
+  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: api.settings.get })
+  const [mode, setMode] = useState<'wizard' | 'manual'>(logId ? 'manual' : 'wizard')
+  const [modeTouched, setModeTouched] = useState(false)
+  useEffect(() => {
+    if (!logId && !modeTouched && settings?.nutrientEntryMode === 'manual') setMode('manual')
+  }, [settings, modeTouched, logId])
+
+  function setModeManually(m: 'wizard' | 'manual') {
+    setMode(m)
+    setModeTouched(true)
+  }
+
+  const batchAmount = Number(amount) || 0
+
+  function updateNutrient(i: number, field: 'name' | 'amount' | 'unit', value: string) {
     setNutrients(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: value } : r))
+  }
+
+  function selectProductForRow(i: number, product: Product | null) {
+    setNutrients(rows => rows.map((r, idx) => {
+      if (idx !== i) return r
+      if (!product) return { ...r, productId: undefined, npk: undefined, referenceDose: undefined }
+      return { ...r, name: product.name, productId: product.productId, npk: product.npk, referenceDose: product.referenceDose }
+    }))
+  }
+
+  function addBlankRow() {
+    setNutrients(rows => [...rows, { name: '', amount: '', unit: 'ml' }])
+  }
+
+  function addWizardProduct(product: Product) {
+    const full = scaledFullDose(product.referenceDose, batchAmount, unit)
+    const isRange = product.referenceDose.min !== product.referenceDose.max
+    const prefillAmount = !isRange && full > 0 ? full.toFixed(2) : ''
+    setNutrients(rows => {
+      const withoutBlank = rows.length === 1 && !rows[0].name && !rows[0].amount ? [] : rows
+      return [...withoutBlank, {
+        name: product.name,
+        amount: prefillAmount,
+        unit: product.referenceDose.unit,
+        productId: product.productId,
+        npk: product.npk,
+        referenceDose: product.referenceDose,
+      }]
+    })
+  }
+
+  function removeNutrientRow(i: number) {
+    if (nutrients.length === 1) { setShowNutrients(false); setNutrients([{ name: '', amount: '', unit: 'ml' }]) }
+    else setNutrients(rows => rows.filter((_, idx) => idx !== i))
   }
 
   const activeNutrients = showNutrients ? nutrients.filter(n => n.name && n.amount) : []
   const valid = Boolean(amount) || activeNutrients.length > 0
+
+  const nutrientEntries = activeNutrients.map(n => {
+    const entry: { name: string; amount: number; unit: string; productId?: string; npk?: NPK; pctOfDose?: number } = {
+      name: n.name.trim(),
+      amount: Number(n.amount),
+      unit: n.unit,
+    }
+    if (n.productId) entry.productId = n.productId
+    if (n.npk) entry.npk = n.npk
+    if (n.productId && n.referenceDose) {
+      const pct = computePctOfDose(Number(n.amount), n.referenceDose, batchAmount, unit)
+      if (pct !== undefined) entry.pctOfDose = pct
+    }
+    return entry
+  })
 
   const body = {
     logType: 'watering' as const,
@@ -92,9 +228,7 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
       ...(runoff    ? { runoff: Number(runoff) }       : {}),
       ...(tds       ? { tds: Number(tds) }             : {}),
       ...(runoffTds ? { runoffTds: Number(runoffTds) } : {}),
-      ...(activeNutrients.length
-        ? { nutrients: activeNutrients.map(n => ({ name: n.name.trim(), amount: Number(n.amount), unit: n.unit })) }
-        : {}),
+      ...(nutrientEntries.length ? { nutrients: nutrientEntries } : {}),
       ...(note   ? { note }                   : {}),
     } as WateringData,
   }
@@ -163,47 +297,87 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
         </button>
       ) : (
         <div>
-          <label className={labelCls}>Nutrients / amendments</label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className={labelCls + ' mb-0'}>Nutrients / amendments</label>
+            <div className="flex gap-0.5 bg-raised rounded-full p-0.5 border border-border">
+              {(['wizard', 'manual'] as const).map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setModeManually(m)}
+                  className={`px-2.5 py-1 text-[11px] rounded-full transition-colors ${
+                    mode === m ? 'bg-fern/20 text-fern' : 'text-muted'
+                  }`}
+                >
+                  {m === 'wizard' ? 'Wizard' : 'Manual'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-2">
             {nutrients.map((n, i) => (
-              <div key={i} className="flex gap-2 items-center">
-                <input
-                  className={inputCls + ' flex-1'}
-                  placeholder="Name"
-                  value={n.name}
-                  onChange={e => updateNutrient(i, 'name', e.target.value)}
+              mode === 'wizard' && n.productId && n.referenceDose ? (
+                <WizardDoseRow
+                  key={i}
+                  row={n}
+                  batchAmount={batchAmount}
+                  batchUnit={unit}
+                  onAmountChange={v => updateNutrient(i, 'amount', v)}
+                  onRemove={() => removeNutrientRow(i)}
                 />
-                <input
-                  type="number"
-                  className="w-20 bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary focus:outline-none focus:border-fern"
-                  placeholder="0"
-                  value={n.amount}
-                  onChange={e => updateNutrient(i, 'amount', e.target.value)}
-                />
-                <select
-                  className="bg-raised border border-border rounded-lg px-2 py-2.5 text-sm text-primary focus:outline-none focus:border-fern"
-                  value={n.unit}
-                  onChange={e => updateNutrient(i, 'unit', e.target.value)}
-                >
-                  {['ml','oz','g','tsp','tbsp'].map(u => <option key={u} value={u} className="bg-raised">{u}</option>)}
-                </select>
-                <button
-                  onClick={() => {
-                    if (nutrients.length === 1) { setShowNutrients(false); setNutrients([{ name: '', amount: '', unit: 'ml' }]) }
-                    else setNutrients(rows => rows.filter((_, idx) => idx !== i))
-                  }}
-                  className="text-muted active:opacity-60 flex-shrink-0"
-                >✕</button>
-              </div>
+              ) : (
+                <div key={i} className="flex gap-2 items-center">
+                  <NutrientAutocomplete
+                    value={n.name}
+                    onChange={v => updateNutrient(i, 'name', v)}
+                    onSelectProduct={p => selectProductForRow(i, p)}
+                    placeholder="Name"
+                    inputClassName={inputCls}
+                  />
+                  <input
+                    type="number"
+                    className="w-20 bg-raised border border-border rounded-lg px-3 py-2.5 text-sm text-primary focus:outline-none focus:border-fern"
+                    placeholder="0"
+                    value={n.amount}
+                    onChange={e => updateNutrient(i, 'amount', e.target.value)}
+                  />
+                  <select
+                    className="bg-raised border border-border rounded-lg px-2 py-2.5 text-sm text-primary focus:outline-none focus:border-fern"
+                    value={n.unit}
+                    onChange={e => updateNutrient(i, 'unit', e.target.value)}
+                  >
+                    {['ml','oz','g','tsp','tbsp'].map(u => <option key={u} value={u} className="bg-raised">{u}</option>)}
+                  </select>
+                  <button
+                    onClick={() => removeNutrientRow(i)}
+                    className="text-muted active:opacity-60 flex-shrink-0"
+                  >✕</button>
+                </div>
+              )
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => setNutrients(rows => [...rows, { name: '', amount: '', unit: 'ml' }])}
-            className="mt-2 text-xs text-fern active:opacity-70"
-          >
-            + Add nutrient
-          </button>
+
+          {mode === 'manual' ? (
+            <button
+              type="button"
+              onClick={addBlankRow}
+              className="mt-2 text-xs text-fern active:opacity-70"
+            >
+              + Add nutrient
+            </button>
+          ) : (
+            <div className="mt-2">
+              <NutrientAutocomplete
+                value={wizardSearch}
+                onChange={setWizardSearch}
+                onSelectProduct={p => { if (p) { addWizardProduct(p); setWizardSearch('') } }}
+                placeholder="Search products to add…"
+                inputClassName={inputCls}
+                wrapperClassName="relative"
+              />
+            </div>
+          )}
         </div>
       )}
 

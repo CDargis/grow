@@ -72,6 +72,11 @@ func (s *SettingsStore) Update(ctx context.Context, userID string, req model.Upd
 		values[":plm"] = &types.AttributeValueMemberS{Value: req.PlantsLayoutMode}
 		sets = append(sets, "#plm = :plm")
 	}
+	if req.NutrientEntryMode != "" {
+		names["#nem"] = "nutrientEntryMode"
+		values[":nem"] = &types.AttributeValueMemberS{Value: req.NutrientEntryMode}
+		sets = append(sets, "#nem = :nem")
+	}
 
 	if len(sets) == 0 {
 		return s.Get(ctx, userID)

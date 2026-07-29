@@ -52,7 +52,16 @@ export interface Log {
   data: LogData
 }
 
-export interface Nutrient { name: string; amount: number; unit: string }
+export interface Nutrient {
+  name: string
+  amount: number
+  unit: string
+  // Snapshotted at log-creation time from the linked Product -- not
+  // recomputed later, so editing/deleting the product doesn't rewrite history.
+  productId?: string
+  npk?: NPK
+  pctOfDose?: number
+}
 
 // Unified water/feed/top-dress entry. Nutrients present = feed; nutrients with
 // no amount = dry top-dress. See lib/logDisplay.ts for the derived labels.
@@ -120,18 +129,63 @@ export interface LastActivity {
 }
 
 export type PlantsLayoutMode = 'grid' | 'rows' | 'fixed'
+export type NutrientEntryMode = 'wizard' | 'manual'
 
 export interface Settings {
   userId: string
   shortcutLogTypes?: LogType[]
   sortChipOrder?: LogType[]
   plantsLayoutMode?: PlantsLayoutMode
+  nutrientEntryMode?: NutrientEntryMode
 }
 
 export interface UpdateSettingsRequest {
   shortcutLogTypes?: LogType[]
   sortChipOrder?: LogType[]
   plantsLayoutMode?: PlantsLayoutMode
+  nutrientEntryMode?: NutrientEntryMode
+}
+
+// ── Inventory / Products ──────────────────────────────────────────────────────
+
+export type ProductForm = 'liquid' | 'dry'
+
+export interface NPK { n: number; p: number; k: number }
+
+// Label dosing instruction: Amount (min-max) of the product per perVolume of
+// water (liquid) or container/pot size (dry). min === max for a single
+// labeled dose rather than a range.
+export interface ReferenceDose {
+  min: number
+  max: number
+  unit: 'ml' | 'oz' | 'g' | 'tsp' | 'tbsp'
+  perVolume: number
+  perVolumeUnit: 'gal' | 'l'
+}
+
+export interface Product {
+  productId: string
+  userId: string
+  name: string
+  brand?: string
+  form: ProductForm
+  npk: NPK
+  referenceDose: ReferenceDose
+  stockQty?: number
+  stockUnit?: string
+  notes?: string
+  createdAt: string
+}
+
+export interface CreateProductRequest {
+  name: string
+  brand?: string
+  form: ProductForm
+  npk: NPK
+  referenceDose: ReferenceDose
+  stockQty?: number
+  stockUnit?: string
+  notes?: string
 }
 
 export interface CreateEnvironmentRequest {

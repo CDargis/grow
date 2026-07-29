@@ -4,6 +4,7 @@ import { PlantsPage } from '@/pages/Plants'
 import { EnvironmentsPage } from '@/pages/Environments'
 import { PlantDetailPage } from '@/pages/PlantDetail'
 import { OverviewPage } from '@/pages/Overview'
+import { InventoryPage } from '@/pages/Inventory'
 import { AuthProvider } from '@/auth/AuthProvider'
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
             <Route path="/plants/:id"     element={<PlantDetailPage />} />
             <Route path="/environments"   element={<EnvironmentsPage />} />
             <Route path="/overview"       element={<OverviewPage />} />
+            <Route path="/inventory"      element={<InventoryPage />} />
           </Routes>
         </main>
 

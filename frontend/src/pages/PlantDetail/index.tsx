@@ -135,7 +135,16 @@ function logSummary(log: Log, envMap: Map<string, string>): string | null {
   }
 }
 
-interface NutrientEntry { name: string; amount: number; unit: string }
+interface NutrientEntry {
+  name: string
+  amount: number
+  unit: string
+  // Snapshotted from the linked Product at log-creation time -- absent for
+  // free-typed nutrients with no matching product.
+  productId?: string
+  npk?: { n: number; p: number; k: number }
+  pctOfDose?: number
+}
 
 // Nutrients on a watering/feeding entry are broken out into their own
 // multi-line list rather than crammed into the one-line summary -- with
@@ -158,16 +167,41 @@ function nutrientColor(name: string): string {
   return NUTRIENT_COLORS[hash % NUTRIENT_COLORS.length]
 }
 
+// A comparative strength number, not a lab-accurate nutrient mass: each
+// linked product's NPK weighted by its own %-of-full-dose, summed. Entries
+// missing either npk or pctOfDose (unlinked/free-typed nutrients, or no
+// batch amount to compute a % against) are left out rather than guessed at.
+function totalNPK(nutrients: NutrientEntry[]): { n: number; p: number; k: number } | null {
+  const weighted = nutrients.filter(n => n.npk && n.pctOfDose !== undefined)
+  if (!weighted.length) return null
+  return weighted.reduce((acc, n) => {
+    const w = n.pctOfDose! / 100
+    return { n: acc.n + n.npk!.n * w, p: acc.p + n.npk!.p * w, k: acc.k + n.npk!.k * w }
+  }, { n: 0, p: 0, k: 0 })
+}
+
 function NutrientList({ nutrients }: { nutrients: NutrientEntry[] }) {
+  const total = totalNPK(nutrients)
   return (
     <div className="mt-1 flex flex-col gap-0.5">
       {nutrients.map((n, i) => (
         <div key={i} className="flex items-center gap-1.5 text-xs">
           <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: nutrientColor(n.name) }} />
           <span className="text-dim truncate">{n.name}</span>
+          {n.npk && <span className="text-muted flex-shrink-0">{n.npk.n}-{n.npk.p}-{n.npk.k}</span>}
+          {n.pctOfDose !== undefined && <span className="text-muted flex-shrink-0">{n.pctOfDose.toFixed(0)}%</span>}
           <span className="text-muted ml-auto flex-shrink-0">{n.amount}{n.unit}</span>
         </div>
       ))}
+      {total && (
+        <div className="flex items-center gap-1.5 text-xs pt-1 mt-0.5 border-t border-border/50">
+          <span className="w-1.5 h-1.5 flex-shrink-0" />
+          <span className="text-dim font-medium">Total NPK</span>
+          <span className="text-fern ml-auto font-medium">
+            {total.n.toFixed(1)}-{total.p.toFixed(1)}-{total.k.toFixed(1)}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

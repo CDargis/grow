@@ -55,9 +55,12 @@ type WateringData struct {
 }
 
 type NutrientEntry struct {
-	Name   string  `json:"name"`
-	Amount float64 `json:"amount"`
-	Unit   string  `json:"unit"`
+	Name      string   `json:"name"`
+	Amount    float64  `json:"amount"`
+	Unit      string   `json:"unit"`
+	ProductID string   `json:"productId,omitempty"`
+	NPK       *NPK     `json:"npk,omitempty"`
+	PctOfDose *float64 `json:"pctOfDose,omitempty"`
 }
 
 type FeedingData struct {

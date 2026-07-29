@@ -1,7 +1,8 @@
 import imageCompression from 'browser-image-compression'
 import type {
-  Plant, Environment, Log, LastActivity, Settings,
+  Plant, Environment, Log, LastActivity, Settings, Product,
   CreatePlantRequest, UpdatePlantDetailsRequest, CreateEnvironmentRequest, CreateLogRequest, UpdateSettingsRequest,
+  CreateProductRequest,
 } from '@/types'
 import { getUserManager } from '@/auth/userManager'
 
@@ -68,6 +69,15 @@ export const api = {
   settings: {
     get:    ()                              => request<Settings>('/settings'),
     update: (body: UpdateSettingsRequest)   => request<Settings>('/settings', { method: 'PUT', body: JSON.stringify(body) }),
+  },
+
+  products: {
+    list:   ()                          => request<Product[]>('/products'),
+    get:    (id: string)                => request<Product>(`/products/${id}`),
+    create: (body: CreateProductRequest) => request<Product>('/products', { method: 'POST', body: JSON.stringify(body) }),
+    update: (id: string, body: CreateProductRequest) =>
+      request<Product>(`/products/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    delete: (id: string)                => request<void>(`/products/${id}`, { method: 'DELETE' }),
   },
 
   media: {
