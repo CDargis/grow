@@ -180,11 +180,13 @@ func (s *PlantStore) UpdateDetails(ctx context.Context, plantID string, req mode
 	if plant == nil {
 		return nil, fmt.Errorf("plant not found: %s", plantID)
 	}
-	plant.Name      = req.Name
-	plant.Strain    = req.Strain
-	plant.Genetics  = req.Genetics
-	plant.SeedBank  = req.SeedBank
-	plant.PlantType = req.PlantType
+	plant.Name              = req.Name
+	plant.Strain            = req.Strain
+	plant.Genetics          = req.Genetics
+	plant.SeedBank          = req.SeedBank
+	plant.PlantType         = req.PlantType
+	plant.PotSizeGal        = req.PotSizeGal
+	plant.PotSizeDiameterIn = req.PotSizeDiameterIn
 	item, err := attributevalue.MarshalMap(plant)
 	if err != nil {
 		return nil, fmt.Errorf("marshal plant: %w", err)

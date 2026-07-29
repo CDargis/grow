@@ -47,8 +47,15 @@ type referenceDose struct {
 type product struct {
 	ProductID     string        `dynamodbav:"productId"`
 	Name          string        `dynamodbav:"name"`
+	Form          string        `dynamodbav:"form"`
 	NPK           npk           `dynamodbav:"npk"`
 	ReferenceDose referenceDose `dynamodbav:"referenceDose"`
+}
+
+type plant struct {
+	PlantID           string  `dynamodbav:"plantId"`
+	PotSizeGal        float64 `dynamodbav:"potSizeGal"`
+	PotSizeDiameterIn float64 `dynamodbav:"potSizeDiameterIn"`
 }
 
 type nutrient struct {
@@ -144,17 +151,49 @@ func levenshtein(a, b string) int {
 	return prev[lb]
 }
 
-// similarity is a 0..1 score (1 = identical) over normalized names.
+func stripPunct(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		switch r {
+		case ' ', '-', '_', '.', '\'':
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// similarity is a 0..1 score (1 = identical) over normalized names. Beyond
+// plain edit distance, a short label fully embedded in a longer retail name
+// once spaces/punctuation are stripped (e.g. "Calmag" inside "Bush Doctor
+// Cal-mag") is a strong signal on its own, so that's boosted independently --
+// true initialisms ("CN" for "Cultivation Nation") aren't caught by this or
+// by edit distance; those need -alias.
 func similarity(a, b string) float64 {
 	na, nb := normalize(a), normalize(b)
 	if na == nb {
 		return 1
 	}
 	maxLen := max(len(na), len(nb))
-	if maxLen == 0 {
-		return 1
+	score := 0.0
+	if maxLen > 0 {
+		score = 1 - float64(levenshtein(na, nb))/float64(maxLen)
 	}
-	return 1 - float64(levenshtein(na, nb))/float64(maxLen)
+	sa, sb := stripPunct(na), stripPunct(nb)
+	if len(sa) >= 3 && len(sb) >= 3 && sa != sb && (strings.Contains(sa, sb) || strings.Contains(sb, sa)) {
+		score = max(score, 0.9)
+	}
+	return score
+}
+
+func findProductByName(name string, products []product) (product, bool) {
+	n := normalize(name)
+	for _, p := range products {
+		if normalize(p.Name) == n {
+			return p, true
+		}
+	}
+	return product{}, false
 }
 
 type match struct {
@@ -175,10 +214,46 @@ func bestMatch(name string, products []product) (match, bool) {
 	return best, found
 }
 
+// resolveBatch mirrors the frontend wizard's logic: liquid products scale
+// off the log's own water amount; dry amendments are labeled per pot size,
+// not water volume, so they scale off the owning plant's pot size instead.
+// Returns ok=false when the needed number (water amount, or the plant's pot
+// size in whichever unit the product's label uses) isn't available.
+func resolveBatch(form string, rd referenceDose, waterAmount float64, waterUnit string, p plant) (amount float64, unit string, ok bool) {
+	if form != "dry" {
+		if waterAmount > 0 {
+			return waterAmount, waterUnit, true
+		}
+		return 0, "", false
+	}
+	if rd.PerVolumeUnit == "in" {
+		if p.PotSizeDiameterIn > 0 {
+			return p.PotSizeDiameterIn, "in", true
+		}
+		return 0, "", false
+	}
+	if p.PotSizeGal > 0 {
+		return p.PotSizeGal, "gal", true
+	}
+	return 0, "", false
+}
+
 func main() {
 	apply := flag.Bool("apply", false, "execute the migration (default is dry run)")
 	minSimilarity := flag.Float64("min-similarity", 0.75, "minimum similarity (0-1) for a fuzzy match to be applied")
+	alias := flag.String("alias", "", "comma-separated logName=productName pairs to force-match regardless of similarity -- for true synonyms no string metric can catch (e.g. \"Worm castings=Worm Tea\", \"CN Bloom=Cultivation Nation Bloom\")")
 	flag.Parse()
+
+	aliasMap := map[string]string{}
+	if *alias != "" {
+		for pair := range strings.SplitSeq(*alias, ",") {
+			parts := strings.SplitN(pair, "=", 2)
+			if len(parts) != 2 {
+				log.Fatalf("bad -alias pair %q", pair)
+			}
+			aliasMap[normalize(parts[0])] = parts[1]
+		}
+	}
 
 	productsTable := os.Getenv("PRODUCTS_TABLE")
 	if productsTable == "" {
@@ -187,6 +262,10 @@ func main() {
 	logsTable := os.Getenv("LOGS_TABLE")
 	if logsTable == "" {
 		logsTable = "grow-logs"
+	}
+	plantsTable := os.Getenv("PLANTS_TABLE")
+	if plantsTable == "" {
+		plantsTable = "grow-plants"
 	}
 	region := os.Getenv("AWS_REGION")
 	if region == "" {
@@ -235,6 +314,32 @@ func main() {
 	}
 	fmt.Printf("found %d products in Inventory\n\n", len(products))
 
+	plantsByID := map[string]plant{}
+	{
+		var lastKey map[string]types.AttributeValue
+		for {
+			input := &dynamodb.ScanInput{TableName: aws.String(plantsTable)}
+			if lastKey != nil {
+				input.ExclusiveStartKey = lastKey
+			}
+			out, err := ddb.Scan(ctx, input)
+			if err != nil {
+				log.Fatalf("scan plants: %v", err)
+			}
+			var page []plant
+			if err := attributevalue.UnmarshalListOfMaps(out.Items, &page); err != nil {
+				log.Fatalf("unmarshal plants: %v", err)
+			}
+			for _, p := range page {
+				plantsByID[p.PlantID] = p
+			}
+			lastKey = out.LastEvaluatedKey
+			if lastKey == nil {
+				break
+			}
+		}
+	}
+
 	var logs []logItem
 	{
 		var lastKey map[string]types.AttributeValue
@@ -281,25 +386,41 @@ func main() {
 			if n.ProductID != "" || n.Name == "" {
 				continue
 			}
-			m, found := bestMatch(n.Name, products)
-			if !found || m.similarity < *minSimilarity {
-				unmatchedNames[n.Name] = true
-				continue
-			}
+			var matched product
+			var tier string
+			var simPct float64
 
-			tier := "fuzzy"
-			if m.similarity >= 0.999 {
-				tier = "exact"
+			if targetName, ok := aliasMap[normalize(n.Name)]; ok {
+				p, found := findProductByName(targetName, products)
+				if !found {
+					log.Fatalf("-alias: no product named %q found (for log name %q)", targetName, n.Name)
+				}
+				matched, tier, simPct = p, "alias", 100
 			} else {
-				fuzzyCount++
+				m, found := bestMatch(n.Name, products)
+				if !found || m.similarity < *minSimilarity {
+					unmatchedNames[n.Name] = true
+					continue
+				}
+				matched, simPct = m.product, m.similarity*100
+				if m.similarity >= 0.999 {
+					tier = "exact"
+				} else {
+					tier = "fuzzy"
+					fuzzyCount++
+				}
 			}
 
-			n.ProductID = m.product.ProductID
-			npkCopy := m.product.NPK
+			n.ProductID = matched.ProductID
+			npkCopy := matched.NPK
 			n.NPK = &npkCopy
-			if wd.Amount != nil && wd.Unit != "" {
-				full := scaledFullDose(m.product.ReferenceDose, *wd.Amount, wd.Unit)
-				if converted, ok := convertDoseAmount(n.Amount, n.Unit, m.product.ReferenceDose.Unit); ok && full > 0 {
+			waterAmount, waterUnit := 0.0, ""
+			if wd.Amount != nil {
+				waterAmount, waterUnit = *wd.Amount, wd.Unit
+			}
+			if batchAmount, batchUnit, ok := resolveBatch(matched.Form, matched.ReferenceDose, waterAmount, waterUnit, plantsByID[l.PlantID]); ok {
+				full := scaledFullDose(matched.ReferenceDose, batchAmount, batchUnit)
+				if converted, ok := convertDoseAmount(n.Amount, n.Unit, matched.ReferenceDose.Unit); ok && full > 0 {
 					pct := (converted / full) * 100
 					n.PctOfDose = &pct
 				}
@@ -307,7 +428,7 @@ func main() {
 			changed = true
 			touchedNutrients++
 
-			fmt.Printf("%s  %s/%s  %q -> %q (%s, %.0f%% similar)", l.Date, l.PlantID[:8], l.LogID[:8], n.Name, m.product.Name, tier, m.similarity*100)
+			fmt.Printf("%s  %s/%s  %q -> %q (%s, %.0f%% similar)", l.Date, l.PlantID[:8], l.LogID[:8], n.Name, matched.Name, tier, simPct)
 			if n.PctOfDose != nil {
 				fmt.Printf("  [%.0f%% dose]", *n.PctOfDose)
 			}

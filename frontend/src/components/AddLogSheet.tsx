@@ -6,7 +6,7 @@ import { MediaImage } from './MediaImage'
 import { NutrientAutocomplete } from './NutrientAutocomplete'
 import { api } from '@/api/client'
 import { scaledFullDose, pctOfDose as computePctOfDose } from '@/lib/nutrientDose'
-import type { Plant, Log, LogType, WateringData, TrainingData, TrimmingData, NoteData, PhotoData, TransplantData, HeightData, Product, ReferenceDose, NPK } from '@/types'
+import type { Plant, Log, LogType, WateringData, TrainingData, TrimmingData, NoteData, PhotoData, TransplantData, HeightData, Product, ProductForm, ReferenceDose, NPK } from '@/types'
 
 // ── Types config ─────────────────────────────────────────────────────────────
 
@@ -68,20 +68,44 @@ type NutrientRow = {
   // the row so we can compute pctOfDose at submit time from whatever batch
   // amount is entered.
   referenceDose?: ReferenceDose
+  form?: ProductForm
+}
+
+// Liquid products scale off the log's own water amount, same as always.
+// Dry amendments are labeled per pot/container size, not per water volume
+// -- using the day's water amount for those was silently wrong (e.g. a
+// light 2L watering next to a full-strength dry topdress reads as a
+// nonsense 900%+ dose), so they scale off the plant's own pot size instead.
+function resolveBatch(
+  form: ProductForm | undefined,
+  referenceDose: ReferenceDose,
+  waterAmount: number,
+  waterUnit: string,
+  plant: Plant,
+): { amount: number; unit: string } | null {
+  if (form !== 'dry') {
+    return waterAmount > 0 ? { amount: waterAmount, unit: waterUnit } : null
+  }
+  if (referenceDose.perVolumeUnit === 'in') {
+    return plant.potSizeDiameterIn ? { amount: plant.potSizeDiameterIn, unit: 'in' } : null
+  }
+  return plant.potSizeGal ? { amount: plant.potSizeGal, unit: 'gal' } : null
 }
 
 function WizardDoseRow({
-  row, batchAmount, batchUnit, onAmountChange, onRemove,
+  row, plant, waterAmount, waterUnit, onAmountChange, onRemove,
 }: {
   row: NutrientRow
-  batchAmount: number
-  batchUnit: string
+  plant: Plant
+  waterAmount: number
+  waterUnit: string
   onAmountChange: (v: string) => void
   onRemove: () => void
 }) {
   const rd = row.referenceDose!
   const isRange = rd.min !== rd.max
-  const full = scaledFullDose(rd, batchAmount, batchUnit)
+  const batch = resolveBatch(row.form, rd, waterAmount, waterUnit, plant)
+  const full = batch ? scaledFullDose(rd, batch.amount, batch.unit) : 0
   const presets = [
     { label: 'Full', pct: 100 },
     { label: '3/4',  pct: 75 },
@@ -97,7 +121,7 @@ function WizardDoseRow({
         <button type="button" onClick={onRemove} className="text-muted active:opacity-60">✕</button>
       </div>
       <p className="text-xs text-muted">
-        Labeled: {isRange ? `${rd.min}–${rd.max}` : rd.min} {rd.unit} / {rd.perVolume} {rd.perVolumeUnit}
+        Labeled: {isRange ? `${rd.min}–${rd.max}` : rd.min} {rd.unit} / {rd.perVolume}{rd.perVolumeUnit === 'in' ? 'in pot diameter' : ` ${rd.perVolumeUnit}`}
       </p>
       <div className="flex gap-1.5 flex-wrap">
         {presets.map(({ label, pct: p }) => (
@@ -123,14 +147,19 @@ function WizardDoseRow({
         <span className="text-xs text-muted">{rd.unit}</span>
         {pct !== null && <span className="text-xs text-fern ml-auto">{pct.toFixed(0)}%</span>}
       </div>
-      {!batchAmount && (
-        <p className="text-[11px] text-amber-400">Enter a water amount above to compute suggested doses.</p>
+      {!batch && (
+        <p className="text-[11px] text-amber-400">
+          {row.form === 'dry'
+            ? "Set this plant's pot size (Edit Plant) to compute suggested doses."
+            : 'Enter a water amount above to compute suggested doses.'}
+        </p>
       )}
     </div>
   )
 }
 
-function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: string; datetime: string; onSuccess: () => void; logId?: string; init?: WateringData }) {
+function WateringForm({ plant, datetime, onSuccess, logId, init }: { plant: Plant; datetime: string; onSuccess: () => void; logId?: string; init?: WateringData }) {
+  const plantId = plant.plantId
   const qc = useQueryClient()
   const [amount, setAmount]  = useState(init?.amount?.toString() ?? '')
   const [unit, setUnit]      = useState<WateringData['unit']>(init?.unit ?? 'ml')
@@ -168,8 +197,8 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
   function selectProductForRow(i: number, product: Product | null) {
     setNutrients(rows => rows.map((r, idx) => {
       if (idx !== i) return r
-      if (!product) return { ...r, productId: undefined, npk: undefined, referenceDose: undefined }
-      return { ...r, name: product.name, productId: product.productId, npk: product.npk, referenceDose: product.referenceDose }
+      if (!product) return { ...r, productId: undefined, npk: undefined, referenceDose: undefined, form: undefined }
+      return { ...r, name: product.name, productId: product.productId, npk: product.npk, referenceDose: product.referenceDose, form: product.form }
     }))
   }
 
@@ -178,7 +207,8 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
   }
 
   function addWizardProduct(product: Product) {
-    const full = scaledFullDose(product.referenceDose, batchAmount, unit)
+    const batch = resolveBatch(product.form, product.referenceDose, batchAmount, unit, plant)
+    const full = batch ? scaledFullDose(product.referenceDose, batch.amount, batch.unit) : 0
     const isRange = product.referenceDose.min !== product.referenceDose.max
     const prefillAmount = !isRange && full > 0 ? full.toFixed(2) : ''
     setNutrients(rows => {
@@ -190,6 +220,7 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
         productId: product.productId,
         npk: product.npk,
         referenceDose: product.referenceDose,
+        form: product.form,
       }]
     })
   }
@@ -211,7 +242,8 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
     if (n.productId) entry.productId = n.productId
     if (n.npk) entry.npk = n.npk
     if (n.productId && n.referenceDose) {
-      const pct = computePctOfDose(Number(n.amount), n.unit, n.referenceDose, batchAmount, unit)
+      const batch = resolveBatch(n.form, n.referenceDose, batchAmount, unit, plant)
+      const pct = batch ? computePctOfDose(Number(n.amount), n.unit, n.referenceDose, batch.amount, batch.unit) : undefined
       if (pct !== undefined) entry.pctOfDose = pct
     }
     return entry
@@ -321,8 +353,9 @@ function WateringForm({ plantId, datetime, onSuccess, logId, init }: { plantId: 
                 <WizardDoseRow
                   key={i}
                   row={n}
-                  batchAmount={batchAmount}
-                  batchUnit={unit}
+                  plant={plant}
+                  waterAmount={batchAmount}
+                  waterUnit={unit}
                   onAmountChange={v => updateNutrient(i, 'amount', v)}
                   onRemove={() => removeNutrientRow(i)}
                 />
@@ -978,7 +1011,7 @@ export function AddLogSheet({ open, onClose, plant, defaultDate, editLog, defaul
       {!selected ? (
         <TypePicker onSelect={setSelected} />
       ) : selected === 'watering' ? (
-        <WateringForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as WateringData | undefined} />
+        <WateringForm plant={plant} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as WateringData | undefined} />
       ) : selected === 'note' ? (
         <NoteForm plantId={plant.plantId} datetime={datetime} onSuccess={handleClose} logId={editLog?.logId} init={editLog?.data as NoteData | undefined} />
       ) : selected === 'height' ? (

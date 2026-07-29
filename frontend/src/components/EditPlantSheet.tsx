@@ -26,6 +26,8 @@ export function EditPlantSheet({ open, onClose, plant }: Props) {
   const [genetics,  setGenetics]  = useState(plant.genetics ?? '')
   const [seedBank,  setSeedBank]  = useState(plant.seedBank ?? '')
   const [plantType, setPlantType] = useState<PlantType | ''>(plant.plantType ?? '')
+  const [potSizeGal,        setPotSizeGal]        = useState(plant.potSizeGal?.toString() ?? '')
+  const [potSizeDiameterIn, setPotSizeDiameterIn] = useState(plant.potSizeDiameterIn?.toString() ?? '')
 
   useEffect(() => {
     if (open) {
@@ -34,6 +36,8 @@ export function EditPlantSheet({ open, onClose, plant }: Props) {
       setGenetics(plant.genetics ?? '')
       setSeedBank(plant.seedBank ?? '')
       setPlantType(plant.plantType ?? '')
+      setPotSizeGal(plant.potSizeGal?.toString() ?? '')
+      setPotSizeDiameterIn(plant.potSizeDiameterIn?.toString() ?? '')
     }
   }, [open, plant])
 
@@ -44,6 +48,8 @@ export function EditPlantSheet({ open, onClose, plant }: Props) {
       genetics:  genetics.trim() || undefined,
       seedBank:  seedBank.trim() || undefined,
       plantType: plantType || undefined,
+      potSizeGal:        potSizeGal ? Number(potSizeGal) : undefined,
+      potSizeDiameterIn: potSizeDiameterIn ? Number(potSizeDiameterIn) : undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['plant', plant.plantId] })
@@ -114,6 +120,31 @@ export function EditPlantSheet({ open, onClose, plant }: Props) {
               <option key={t} value={t} className="bg-raised">{PLANT_TYPE_LABELS[t]}</option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label className={labelCls}>Pot size</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex gap-2 items-center">
+              <input
+                type="number" step="0.1" className={inputCls} placeholder="5"
+                value={potSizeGal}
+                onChange={e => setPotSizeGal(e.target.value)}
+              />
+              <span className="text-xs text-muted flex-shrink-0">gal</span>
+            </div>
+            <div className="flex gap-2 items-center">
+              <input
+                type="number" step="0.1" className={inputCls} placeholder="12"
+                value={potSizeDiameterIn}
+                onChange={e => setPotSizeDiameterIn(e.target.value)}
+              />
+              <span className="text-xs text-muted flex-shrink-0">in diameter</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted mt-1">
+            Either or both — used to scale dry amendment doses in the feed wizard, since those are labeled per pot size, not per water amount.
+          </p>
         </div>
 
         {mutation.isError && (

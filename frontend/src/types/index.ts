@@ -27,6 +27,11 @@ export interface Plant {
   environmentId?: string
   archivedAt?: string
   createdAt: string
+  // Used to scale dry-amendment doses in the feed wizard -- independent
+  // fields (not a derived conversion), since pot shape makes diameter <->
+  // volume unreliable and product labels use whichever the maker chose.
+  potSizeGal?: number
+  potSizeDiameterIn?: number
 }
 
 export interface Environment {
@@ -102,6 +107,8 @@ export interface UpdatePlantDetailsRequest {
   genetics?: string
   seedBank?: string
   plantType?: PlantType
+  potSizeGal?: number
+  potSizeDiameterIn?: number
 }
 
 export interface CreatePlantRequest {
@@ -160,7 +167,9 @@ export interface ReferenceDose {
   max: number
   unit: 'ml' | 'oz' | 'g' | 'tsp' | 'tbsp'
   perVolume: number
-  perVolumeUnit: 'gal' | 'l'
+  // 'in' = pot diameter, for dry amendments labeled that way (e.g. Dr
+  // Earth's dosing tiers by pot diameter rather than by volume).
+  perVolumeUnit: 'gal' | 'l' | 'in'
 }
 
 export interface Product {

@@ -8,7 +8,8 @@ const inputCls = 'w-full bg-raised border border-border rounded-lg px-3 py-2.5 t
 const labelCls = 'block text-xs text-dim mb-1'
 
 const DOSE_UNITS = ['ml', 'oz', 'g', 'tsp', 'tbsp'] as const
-const VOLUME_UNITS = ['gal', 'l'] as const
+const LIQUID_VOLUME_UNITS = ['gal', 'l'] as const
+const DRY_VOLUME_UNITS = ['gal', 'l', 'in'] as const
 
 const emptyForm: CreateProductRequest = {
   name: '',
@@ -100,7 +101,16 @@ export function AddProductSheet({ open, onClose, product }: Props) {
           <select
             className={inputCls}
             value={form.form}
-            onChange={e => setForm(f => ({ ...f, form: e.target.value as ProductForm }))}
+            onChange={e => {
+              const nextForm = e.target.value as ProductForm
+              setForm(f => ({
+                ...f,
+                form: nextForm,
+                referenceDose: nextForm === 'liquid' && f.referenceDose.perVolumeUnit === 'in'
+                  ? { ...f.referenceDose, perVolumeUnit: 'gal' }
+                  : f.referenceDose,
+              }))
+            }}
           >
             <option value="liquid" className="bg-raised">Liquid</option>
             <option value="dry"    className="bg-raised">Dry / powder</option>
@@ -186,12 +196,16 @@ export function AddProductSheet({ open, onClose, product }: Props) {
                 value={form.referenceDose.perVolumeUnit}
                 onChange={e => setForm(f => ({ ...f, referenceDose: { ...f.referenceDose, perVolumeUnit: e.target.value as typeof form.referenceDose.perVolumeUnit } }))}
               >
-                {VOLUME_UNITS.map(u => <option key={u} value={u} className="bg-raised">{u}</option>)}
+                {(form.form === 'dry' ? DRY_VOLUME_UNITS : LIQUID_VOLUME_UNITS).map(u => (
+                  <option key={u} value={u} className="bg-raised">{u === 'in' ? 'in (pot diameter)' : u}</option>
+                ))}
               </select>
             </div>
           </div>
           <p className="text-[11px] text-muted mt-1">
-            e.g. {form.referenceDose.min}{isRange ? `-${form.referenceDose.max}` : ''} {form.referenceDose.unit} per {form.referenceDose.perVolume} {form.referenceDose.perVolumeUnit} of {volumeLabel}
+            {form.referenceDose.perVolumeUnit === 'in'
+              ? <>e.g. {form.referenceDose.min}{isRange ? `-${form.referenceDose.max}` : ''} {form.referenceDose.unit} per {form.referenceDose.perVolume}in pot diameter</>
+              : <>e.g. {form.referenceDose.min}{isRange ? `-${form.referenceDose.max}` : ''} {form.referenceDose.unit} per {form.referenceDose.perVolume} {form.referenceDose.perVolumeUnit} of {volumeLabel}</>}
           </p>
         </div>
 

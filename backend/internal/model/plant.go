@@ -36,6 +36,13 @@ type Plant struct {
 	EnvironmentID string `dynamodbav:"environmentId" json:"environmentId,omitempty"`
 	ArchivedAt    string `dynamodbav:"archivedAt"    json:"archivedAt,omitempty"`
 	CreatedAt     string `dynamodbav:"createdAt"     json:"createdAt"`
+	// Used to scale dry-amendment doses (which are labeled per pot size, not
+	// per water volume) in the feed wizard. Independent fields, not a
+	// derived conversion -- pot shape varies enough that diameter <-> volume
+	// isn't reliable, and product labels give doses in whichever the
+	// manufacturer chose.
+	PotSizeGal        float64 `dynamodbav:"potSizeGal"        json:"potSizeGal,omitempty"`
+	PotSizeDiameterIn float64 `dynamodbav:"potSizeDiameterIn" json:"potSizeDiameterIn,omitempty"`
 }
 
 type CreatePlantRequest struct {
@@ -49,11 +56,13 @@ type CreatePlantRequest struct {
 }
 
 type UpdatePlantDetailsRequest struct {
-	Name      string    `json:"name"`
-	Strain    string    `json:"strain"`
-	Genetics  string    `json:"genetics,omitempty"`
-	SeedBank  string    `json:"seedBank,omitempty"`
-	PlantType PlantType `json:"plantType,omitempty"`
+	Name              string    `json:"name"`
+	Strain            string    `json:"strain"`
+	Genetics          string    `json:"genetics,omitempty"`
+	SeedBank          string    `json:"seedBank,omitempty"`
+	PlantType         PlantType `json:"plantType,omitempty"`
+	PotSizeGal        float64   `json:"potSizeGal,omitempty"`
+	PotSizeDiameterIn float64   `json:"potSizeDiameterIn,omitempty"`
 }
 
 type UpdatePlantRequest struct {
