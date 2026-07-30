@@ -5,7 +5,7 @@ import { BottomSheet } from './BottomSheet'
 import { MediaImage } from './MediaImage'
 import { NutrientAutocomplete } from './NutrientAutocomplete'
 import { api } from '@/api/client'
-import { scaledFullDose, pctOfDose as computePctOfDose } from '@/lib/nutrientDose'
+import { scaledFullDose, pctOfDose as computePctOfDose, deliveredGrams } from '@/lib/nutrientDose'
 import type { Plant, Log, LogType, WateringData, TrainingData, TrimmingData, NoteData, PhotoData, TransplantData, HeightData, Product, ProductForm, ReferenceDose, NPK } from '@/types'
 
 // ── Types config ─────────────────────────────────────────────────────────────
@@ -65,10 +65,12 @@ type NutrientRow = {
   productId?: string
   npk?: NPK
   // Client-side only (not part of the submitted Nutrient shape) -- kept on
-  // the row so we can compute pctOfDose at submit time from whatever batch
-  // amount is entered.
+  // the row so we can compute pctOfDose/deliveredN-P-K at submit time from
+  // whatever batch amount is entered.
   referenceDose?: ReferenceDose
   form?: ProductForm
+  elementalNpk?: NPK
+  density?: number
 }
 
 // Liquid products scale off the log's own water amount, same as always.
@@ -197,8 +199,19 @@ function WateringForm({ plant, datetime, onSuccess, logId, init }: { plant: Plan
   function selectProductForRow(i: number, product: Product | null) {
     setNutrients(rows => rows.map((r, idx) => {
       if (idx !== i) return r
-      if (!product) return { ...r, productId: undefined, npk: undefined, referenceDose: undefined, form: undefined }
-      return { ...r, name: product.name, productId: product.productId, npk: product.npk, referenceDose: product.referenceDose, form: product.form }
+      if (!product) {
+        return { ...r, productId: undefined, npk: undefined, referenceDose: undefined, form: undefined, elementalNpk: undefined, density: undefined }
+      }
+      return {
+        ...r,
+        name: product.name,
+        productId: product.productId,
+        npk: product.npk,
+        referenceDose: product.referenceDose,
+        form: product.form,
+        elementalNpk: product.elementalNpk,
+        density: product.density,
+      }
     }))
   }
 
@@ -221,6 +234,8 @@ function WateringForm({ plant, datetime, onSuccess, logId, init }: { plant: Plan
         npk: product.npk,
         referenceDose: product.referenceDose,
         form: product.form,
+        elementalNpk: product.elementalNpk,
+        density: product.density,
       }]
     })
   }
@@ -234,7 +249,11 @@ function WateringForm({ plant, datetime, onSuccess, logId, init }: { plant: Plan
   const valid = Boolean(amount) || activeNutrients.length > 0
 
   const nutrientEntries = activeNutrients.map(n => {
-    const entry: { name: string; amount: number; unit: string; productId?: string; npk?: NPK; pctOfDose?: number } = {
+    const entry: {
+      name: string; amount: number; unit: string
+      productId?: string; npk?: NPK; pctOfDose?: number
+      deliveredN?: number; deliveredP?: number; deliveredK?: number
+    } = {
       name: n.name.trim(),
       amount: Number(n.amount),
       unit: n.unit,
@@ -245,6 +264,14 @@ function WateringForm({ plant, datetime, onSuccess, logId, init }: { plant: Plan
       const batch = resolveBatch(n.form, n.referenceDose, batchAmount, unit, plant)
       const pct = batch ? computePctOfDose(Number(n.amount), n.unit, n.referenceDose, batch.amount, batch.unit) : undefined
       if (pct !== undefined) entry.pctOfDose = pct
+      if (n.elementalNpk && n.density) {
+        const delivered = deliveredGrams(Number(n.amount), n.unit, n.referenceDose.unit, n.elementalNpk, n.density)
+        if (delivered) {
+          entry.deliveredN = delivered.n
+          entry.deliveredP = delivered.p
+          entry.deliveredK = delivered.k
+        }
+      }
     }
     return entry
   })

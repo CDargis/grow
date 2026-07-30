@@ -11,6 +11,12 @@ const DOSE_UNITS = ['ml', 'oz', 'g', 'tsp', 'tbsp'] as const
 const LIQUID_VOLUME_UNITS = ['gal', 'l'] as const
 const DRY_VOLUME_UNITS = ['gal', 'l', 'in'] as const
 
+// Mirrors backend model.DefaultDensity -- ml/oz/g get a trustworthy default
+// (specific gravity ~1.0, or exact for g); tbsp/tsp bulk density genuinely
+// varies per product, so those need the user to actually weigh one.
+const DOSE_DENSITY_DEFAULTS: Record<string, number> = { ml: 1.0, oz: 29.5735, g: 1.0, tbsp: 14.0, tsp: 14.0 / 3 }
+const NEEDS_CALIBRATION_UNITS = new Set(['tbsp', 'tsp'])
+
 const emptyForm: CreateProductRequest = {
   name: '',
   form: 'liquid',
@@ -40,6 +46,8 @@ export function AddProductSheet({ open, onClose, product }: Props) {
           form:          product.form,
           npk:           product.npk,
           referenceDose: product.referenceDose,
+          density:           product.density,
+          densityCalibrated: product.densityCalibrated,
           stockQty:      product.stockQty,
           stockUnit:     product.stockUnit,
           notes:         product.notes,
@@ -180,7 +188,14 @@ export function AddProductSheet({ open, onClose, product }: Props) {
             <select
               className={inputCls}
               value={form.referenceDose.unit}
-              onChange={e => setForm(f => ({ ...f, referenceDose: { ...f.referenceDose, unit: e.target.value as typeof form.referenceDose.unit } }))}
+              onChange={e => setForm(f => ({
+                ...f,
+                referenceDose: { ...f.referenceDose, unit: e.target.value as typeof form.referenceDose.unit },
+                // Density is per-unit -- a value calibrated for tbsp doesn't
+                // carry over to tsp, so switching units resets calibration.
+                density: undefined,
+                densityCalibrated: false,
+              }))}
             >
               {DOSE_UNITS.map(u => <option key={u} value={u} className="bg-raised">{u}</option>)}
             </select>
@@ -208,6 +223,28 @@ export function AddProductSheet({ open, onClose, product }: Props) {
               : <>e.g. {form.referenceDose.min}{isRange ? `-${form.referenceDose.max}` : ''} {form.referenceDose.unit} per {form.referenceDose.perVolume} {form.referenceDose.perVolumeUnit} of {volumeLabel}</>}
           </p>
         </div>
+
+        {NEEDS_CALIBRATION_UNITS.has(form.referenceDose.unit) && (
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className={labelCls + ' mb-0'}>Density (weighed)</label>
+              {!form.densityCalibrated && (
+                <span className="text-[11px] text-amber-400">Estimated — calibrate</span>
+              )}
+            </div>
+            <div className="flex gap-2 items-center">
+              <input
+                type="number" step="0.1" className={inputCls}
+                value={form.density ?? DOSE_DENSITY_DEFAULTS[form.referenceDose.unit]}
+                onChange={e => setForm(f => ({ ...f, density: Number(e.target.value) || 0, densityCalibrated: true }))}
+              />
+              <span className="text-xs text-muted flex-shrink-0">g / {form.referenceDose.unit}</span>
+            </div>
+            <p className="text-[11px] text-muted mt-1">
+              Weigh a level {form.referenceDose.unit} of this product on a scale and enter the real value — used to convert doses into delivered grams of N/P/K. The estimate works fine until then.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div>

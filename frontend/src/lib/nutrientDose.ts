@@ -1,4 +1,4 @@
-import type { ReferenceDose } from '@/types'
+import type { ReferenceDose, NPK } from '@/types'
 
 const ML_PER_UNIT: Record<string, number> = { ml: 1, l: 1000, oz: 29.5735, gal: 3785.41 }
 
@@ -40,4 +40,26 @@ export function pctOfDose(amount: number, unit: string, referenceDose: Reference
   const converted = convertDoseAmount(amount, unit, referenceDose.unit)
   if (converted === undefined) return undefined
   return (converted / full) * 100
+}
+
+// Delivered elemental grams -- amount is already the real applied dose (not
+// a full-label reference), so this is a straight mass x concentration
+// conversion, not scaled by pctOfDose again. Returns undefined when the
+// dose's unit can't be converted to the product's own dose unit (e.g. a
+// mass/volume mismatch with no density path -- see convertDoseAmount).
+export function deliveredGrams(
+  amount: number,
+  unit: string,
+  productDoseUnit: string,
+  elementalNpk: NPK,
+  density: number,
+): { n: number; p: number; k: number } | undefined {
+  const converted = convertDoseAmount(amount, unit, productDoseUnit)
+  if (converted === undefined) return undefined
+  const massGrams = converted * density
+  return {
+    n: massGrams * (elementalNpk.n / 100),
+    p: massGrams * (elementalNpk.p / 100),
+    k: massGrams * (elementalNpk.k / 100),
+  }
 }

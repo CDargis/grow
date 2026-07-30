@@ -144,6 +144,11 @@ interface NutrientEntry {
   productId?: string
   npk?: { n: number; p: number; k: number }
   pctOfDose?: number
+  // Delivered elemental grams (amount x product density x elemental%/100).
+  // Additive across products/feeds, unlike the label NPK ratio above.
+  deliveredN?: number
+  deliveredP?: number
+  deliveredK?: number
 }
 
 // Nutrients on a watering/feeding entry are broken out into their own
@@ -167,21 +172,27 @@ function nutrientColor(name: string): string {
   return NUTRIENT_COLORS[hash % NUTRIENT_COLORS.length]
 }
 
-// A comparative strength number, not a lab-accurate nutrient mass: each
-// linked product's NPK weighted by its own %-of-full-dose, summed. Entries
-// missing either npk or pctOfDose (unlinked/free-typed nutrients, or no
-// batch amount to compute a % against) are left out rather than guessed at.
-function totalNPK(nutrients: NutrientEntry[]): { n: number; p: number; k: number } | null {
-  const weighted = nutrients.filter(n => n.npk && n.pctOfDose !== undefined)
-  if (!weighted.length) return null
-  return weighted.reduce((acc, n) => {
-    const w = n.pctOfDose! / 100
-    return { n: acc.n + n.npk!.n * w, p: acc.p + n.npk!.p * w, k: acc.k + n.npk!.k * w }
-  }, { n: 0, p: 0, k: 0 })
+// Delivered elemental grams, summed across products -- unlike the label NPK
+// ratio (a percentage, not additive across different masses of different
+// products), grams of actual N/P/K really do add up. Entries missing
+// delivered values (unlinked/free-typed nutrients, or a product whose
+// density/elemental data isn't computable for this dose) are left out
+// rather than guessed at.
+function deliveredTotal(nutrients: NutrientEntry[]): { n: number; p: number; k: number } | null {
+  const withDelivered = nutrients.filter(n => n.deliveredN !== undefined)
+  if (!withDelivered.length) return null
+  return withDelivered.reduce((acc, n) => ({
+    n: acc.n + (n.deliveredN ?? 0),
+    p: acc.p + (n.deliveredP ?? 0),
+    k: acc.k + (n.deliveredK ?? 0),
+  }), { n: 0, p: 0, k: 0 })
 }
 
 function NutrientList({ nutrients }: { nutrients: NutrientEntry[] }) {
-  const total = totalNPK(nutrients)
+  const [expanded, setExpanded] = useState(false)
+  const total = deliveredTotal(nutrients)
+  const contributors = nutrients.filter(n => n.deliveredN !== undefined)
+
   return (
     <div className="mt-1 flex flex-col gap-0.5">
       {nutrients.map((n, i) => (
@@ -194,12 +205,31 @@ function NutrientList({ nutrients }: { nutrients: NutrientEntry[] }) {
         </div>
       ))}
       {total && (
-        <div className="flex items-center gap-1.5 text-xs pt-1 mt-0.5 border-t border-border/50">
-          <span className="w-1.5 h-1.5 flex-shrink-0" />
-          <span className="text-dim font-medium">Total NPK</span>
-          <span className="text-fern ml-auto font-medium">
-            {total.n.toFixed(1)}-{total.p.toFixed(1)}-{total.k.toFixed(1)}
-          </span>
+        <div className="pt-1 mt-0.5 border-t border-border/50">
+          <button
+            type="button"
+            onClick={() => setExpanded(e => !e)}
+            className="flex items-center gap-1.5 text-xs w-full active:opacity-70"
+          >
+            <span className="w-1.5 h-1.5 flex-shrink-0" />
+            <span className="text-dim font-medium">Delivered</span>
+            <span className="text-fern ml-auto font-medium">
+              N {total.n.toFixed(2)}g · P {total.p.toFixed(2)}g · K {total.k.toFixed(2)}g
+            </span>
+            {expanded ? <ChevronUp size={12} className="text-muted flex-shrink-0" /> : <ChevronDown size={12} className="text-muted flex-shrink-0" />}
+          </button>
+          {expanded && (
+            <div className="mt-1 flex flex-col gap-0.5 pl-3">
+              {contributors.map((n, i) => (
+                <div key={i} className="flex items-center gap-1.5 text-xs">
+                  <span className="text-dim truncate">{n.name}</span>
+                  <span className="text-muted ml-auto flex-shrink-0">
+                    N {n.deliveredN!.toFixed(2)} · P {n.deliveredP!.toFixed(2)} · K {n.deliveredK!.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

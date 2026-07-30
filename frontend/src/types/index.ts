@@ -66,6 +66,12 @@ export interface Nutrient {
   productId?: string
   npk?: NPK
   pctOfDose?: number
+  // Delivered elemental grams, snapshotted at log-creation time (amount x
+  // product density x elemental%/100 -- amount is already the real applied
+  // dose, so no separate partial-dose multiply).
+  deliveredN?: number
+  deliveredP?: number
+  deliveredK?: number
 }
 
 // Unified water/feed/top-dress entry. Nutrients present = feed; nutrients with
@@ -179,7 +185,15 @@ export interface Product {
   brand?: string
   form: ProductForm
   npk: NPK
+  // Derived from npk server-side (P as P2O5, K as K2O on the label -- these
+  // are the actual elemental percentages). Never edited directly.
+  elementalNpk: NPK
   referenceDose: ReferenceDose
+  // Grams per one referenceDose.unit. Defaulted server-side by unit when
+  // omitted; densityCalibrated is false until the user has actually
+  // weighed a dry (tbsp/tsp) product -- ml/oz/g get a trustworthy default.
+  density?: number
+  densityCalibrated: boolean
   stockQty?: number
   stockUnit?: string
   notes?: string
@@ -192,6 +206,8 @@ export interface CreateProductRequest {
   form: ProductForm
   npk: NPK
   referenceDose: ReferenceDose
+  density?: number
+  densityCalibrated?: boolean
   stockQty?: number
   stockUnit?: string
   notes?: string

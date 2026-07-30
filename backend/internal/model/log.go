@@ -61,6 +61,13 @@ type NutrientEntry struct {
 	ProductID string   `json:"productId,omitempty"`
 	NPK       *NPK     `json:"npk,omitempty"`
 	PctOfDose *float64 `json:"pctOfDose,omitempty"`
+	// Delivered elemental grams, snapshotted at log-creation time from the
+	// linked product's ElementalNPK/Density (amount x density x
+	// elementalPercent/100 -- amount is already the real applied dose, not
+	// a full-label reference, so no separate partial-dose multiply).
+	DeliveredN *float64 `json:"deliveredN,omitempty"`
+	DeliveredP *float64 `json:"deliveredP,omitempty"`
+	DeliveredK *float64 `json:"deliveredK,omitempty"`
 }
 
 type FeedingData struct {

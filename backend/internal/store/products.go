@@ -62,20 +62,34 @@ func (s *ProductStore) Get(ctx context.Context, productID string) (*model.Produc
 	return product, nil
 }
 
+// resolveDensity uses the caller-supplied density/calibration when given,
+// otherwise falls back to the unit-appropriate default -- centralizing this
+// here means the conversion constants live in exactly one place.
+func resolveDensity(req model.CreateProductRequest) (float64, bool) {
+	if req.Density > 0 {
+		return req.Density, req.DensityCalibrated
+	}
+	return model.DefaultDensity(req.ReferenceDose.Unit)
+}
+
 func (s *ProductStore) Create(ctx context.Context, userID string, req model.CreateProductRequest) (*model.Product, error) {
 	now := time.Now().UTC()
+	density, calibrated := resolveDensity(req)
 	product := model.Product{
-		ProductID:     ulid.Make().String(),
-		UserID:        userID,
-		Name:          req.Name,
-		Brand:         req.Brand,
-		Form:          req.Form,
-		NPK:           req.NPK,
-		ReferenceDose: req.ReferenceDose,
-		StockQty:      req.StockQty,
-		StockUnit:     req.StockUnit,
-		Notes:         req.Notes,
-		CreatedAt:     now.Format(time.RFC3339),
+		ProductID:         ulid.Make().String(),
+		UserID:            userID,
+		Name:              req.Name,
+		Brand:             req.Brand,
+		Form:              req.Form,
+		NPK:               req.NPK,
+		ElementalNPK:      model.ElementalFromLabel(req.NPK),
+		ReferenceDose:     req.ReferenceDose,
+		Density:           density,
+		DensityCalibrated: calibrated,
+		StockQty:          req.StockQty,
+		StockUnit:         req.StockUnit,
+		Notes:             req.Notes,
+		CreatedAt:         now.Format(time.RFC3339),
 	}
 	item, err := attributevalue.MarshalMap(product)
 	if err != nil {
@@ -98,11 +112,15 @@ func (s *ProductStore) Update(ctx context.Context, productID string, req model.C
 	if existing == nil {
 		return nil, fmt.Errorf("product not found: %s", productID)
 	}
+	density, calibrated := resolveDensity(req)
 	existing.Name = req.Name
 	existing.Brand = req.Brand
 	existing.Form = req.Form
 	existing.NPK = req.NPK
+	existing.ElementalNPK = model.ElementalFromLabel(req.NPK)
 	existing.ReferenceDose = req.ReferenceDose
+	existing.Density = density
+	existing.DensityCalibrated = calibrated
 	existing.StockQty = req.StockQty
 	existing.StockUnit = req.StockUnit
 	existing.Notes = req.Notes
