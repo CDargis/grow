@@ -31,6 +31,13 @@
       MCP client discovery — the actual root cause). Full postmortem in
       `context/plans/complete/cognito-auth-mcp-connector.md`.
 
+- [x] Nutrient Inventory tab + feed wizard (wizard/manual toggle, product-search
+      autocomplete, dose scaling by water amount or plant pot size) — see decisions.md.
+- [x] Delivered elemental NPK grams (Phase 1) — replaces the old percentage-based
+      "Total NPK" with additive grams; density/elemental fields on Product; migration
+      backfilled historical products and log entries. Phase 2 (trend/timeline view) is
+      spec'd but deferred — `context/plans/backlog/delivered-npk-trend-view.md`.
+
 ## Follow-ups from the auth/MCP work
 - [x] Web app forced a full re-login whenever the access token expired (~1h after the tab
       closed) — `AuthProvider` now tries `signinSilent()` (refresh token) before redirecting to
@@ -39,5 +46,5 @@
 
 ## Backlog
 - [ ] Height chart per plant
-- [ ] Feeding/watering history charts
+- [ ] Delivered-NPK trend/timeline view (Phase 2) — `context/plans/backlog/delivered-npk-trend-view.md`
 - [ ] Environment detail view (plants assigned, light schedule, assigned plants)

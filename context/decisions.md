@@ -1,5 +1,55 @@
 # grow — Decisions
 
+## Delivered elemental NPK grams replace the percentage-based "Total NPK" (2026-07-30)
+The old total summed each linked product's guaranteed-analysis percentage weighted by
+dose strength -- meaningless, since percentages of different masses (4 tbsp dry vs 8 ml
+liquid) aren't comparable or additive. Delivered grams of actual N/P/K *are* additive
+across products, feeds, and the whole grow. `Product` gains `ElementalNPK` (derived
+server-side from the label's P2O5/K2O oxide values: P x0.436, K x0.83, N unchanged --
+conversion lives in exactly one place, `model.ElementalFromLabel`) and `Density` (grams
+per dose unit; ml/oz/g get a trustworthy default, tbsp/tsp default to an estimated 14
+g/tbsp flagged "estimated -- calibrate" until weighed). `NutrientEntry` gains
+`deliveredN/P/K`, computed as `amount x density x elemental% / 100` -- amount is
+already the real applied dose, not a full-label reference, so no extra %-of-dose
+multiply (this was confirmed with the user, since the source spec's formula could be
+misread as double-applying the partial-dose fraction). Phase 2 (trend/timeline view,
+depends on these stored grams) is spec'd in `context/plans/backlog/delivered-npk-trend-view.md`
+but deliberately not built yet.
+
+## Dry amendments scale by plant pot size, not the day's water amount (2026-07-30)
+The feed wizard originally reused the log's water-amount field as the scaling
+denominator for every product, dry or liquid. Wrong for dry amendments -- they're
+labeled per pot/container size (e.g. "4 tbsp per 5 gal pot"), not per water volume, so
+a light 2L watering next to a full-strength dry topdress produced a nonsense 900%+
+"dose". Added `potSizeGal`/`potSizeDiameterIn` as independent Plant fields (pot shape
+makes one an unreliable proxy for the other, and product labels use whichever the
+manufacturer chose) and a `ReferenceDose.perVolumeUnit` value of `'in'` for
+diameter-based dry labels (e.g. Dr Earth). `resolveBatch()` picks water amount for
+liquid products, plant pot size for dry ones, mirrored in the wizard and the
+nutrient-products migration script.
+
+## Nutrient inventory: products, feed wizard, dose math (2026-07-29/30)
+Added an Inventory tab tracking on-hand nutrient products (NPK, labeled dose or dose
+range, stock) plus a wizard mode in the feeding log form that computes scaled doses
+from a batch water amount, alongside manual entry (both share a product-search
+autocomplete; picking a suggestion links `productId`, free-typed names stay
+unlinked). Log entries snapshot `productId`/`npk`/`pctOfDose` at creation time rather
+than joining live against Inventory, so editing/deleting a product later doesn't
+rewrite history. A labeled dose can be a range (min < max) with no single "designated"
+dose -- % strength is always anchored to `max` as "full strength" (uncapped, so
+under-range or over-range doses both just read as an honest percentage) rather than
+interpolating min-to-max, since real usage showed doses going below a range's own
+labeled minimum. Caught and fixed a real bug during a migration dry-run: % dose math
+divided the raw logged amount by a full-dose value expressed in the product's own
+label unit without converting the amount's unit first (a Fish Emulsion entry logged in
+ml against an oz/gal label came out as 757% instead of ~26%) -- added
+`convertDoseAmount` (ml/oz/tsp/tbsp; refuses g <-> volume since that needs density) in
+both `frontend/src/lib/nutrientDose.ts` and its migration-script mirror.
+`backend/cmd/migrate-nutrient-products` fuzzy-matches (normalized Levenshtein +
+substring-containment for brand-prefixed names) historical free-text nutrient names
+against Inventory products, plus a `-alias` override for true synonyms no string
+metric can catch (e.g. "Worm castings" = "Worm Tea").
+
 ## Multi-photo batches keep selection/upload order, not capture time (2026-07-27)
 Went back and forth on this. Tried sorting by `File.lastModified`, then by real EXIF
 `DateTimeOriginal` (via `exifr`) when that proved to be only a filesystem-attribute proxy for
