@@ -12,6 +12,14 @@ export function convertVolume(amount: number, from: string, to: string): number 
 // which we don't have, so that conversion is refused rather than guessed.
 const DOSE_ML_PER_UNIT: Record<string, number> = { ml: 1, oz: 29.5735, tsp: 4.92892, tbsp: 14.7868 }
 
+// Units a dose amount can be freely re-entered in, regardless of which unit
+// the product's label happened to be entered in.
+export const CONVERTIBLE_DOSE_UNITS = Object.keys(DOSE_ML_PER_UNIT)
+
+export function isConvertibleDoseUnit(unit: string): boolean {
+  return unit in DOSE_ML_PER_UNIT
+}
+
 export function convertDoseAmount(amount: number, from: string, to: string): number | undefined {
   if (from === to) return amount
   if (from === 'g' || to === 'g') return undefined

@@ -5,7 +5,7 @@ import { BottomSheet } from './BottomSheet'
 import { MediaImage } from './MediaImage'
 import { NutrientAutocomplete } from './NutrientAutocomplete'
 import { api } from '@/api/client'
-import { scaledFullDose, pctOfDose as computePctOfDose, deliveredGrams } from '@/lib/nutrientDose'
+import { scaledFullDose, pctOfDose as computePctOfDose, deliveredGrams, convertDoseAmount, isConvertibleDoseUnit, CONVERTIBLE_DOSE_UNITS } from '@/lib/nutrientDose'
 import type { Plant, Log, LogType, WateringData, TrainingData, TrimmingData, NoteData, PhotoData, TransplantData, HeightData, Product, ProductForm, ReferenceDose, NPK } from '@/types'
 
 // ── Types config ─────────────────────────────────────────────────────────────
@@ -95,26 +95,39 @@ function resolveBatch(
 }
 
 function WizardDoseRow({
-  row, plant, waterAmount, waterUnit, onAmountChange, onRemove,
+  row, plant, waterAmount, waterUnit, onAmountChange, onUnitChange, onRemove,
 }: {
   row: NutrientRow
   plant: Plant
   waterAmount: number
   waterUnit: string
   onAmountChange: (v: string) => void
+  onUnitChange: (unit: string) => void
   onRemove: () => void
 }) {
   const rd = row.referenceDose!
   const isRange = rd.min !== rd.max
   const batch = resolveBatch(row.form, rd, waterAmount, waterUnit, plant)
   const full = batch ? scaledFullDose(rd, batch.amount, batch.unit) : 0
+  // full is always computed in the product's own labeled unit (rd.unit) --
+  // convert it into whatever unit this row is currently displayed in.
+  const fullInRowUnit = convertDoseAmount(full, rd.unit, row.unit) ?? full
   const presets = [
     { label: 'Full', pct: 100 },
     { label: '3/4',  pct: 75 },
     { label: '1/2',  pct: 50 },
     { label: '1/4',  pct: 25 },
   ]
-  const pct = full > 0 && row.amount ? (Number(row.amount) / full) * 100 : null
+  const amountInRdUnit = row.amount ? convertDoseAmount(Number(row.amount), row.unit, rd.unit) : undefined
+  const pct = full > 0 && amountInRdUnit !== undefined ? (amountInRdUnit / full) * 100 : null
+
+  function changeUnit(nextUnit: string) {
+    if (row.amount) {
+      const converted = convertDoseAmount(Number(row.amount), row.unit, nextUnit)
+      if (converted !== undefined) onAmountChange(converted.toFixed(2))
+    }
+    onUnitChange(nextUnit)
+  }
 
   return (
     <div className="p-3 bg-raised rounded-lg border border-border space-y-2">
@@ -130,8 +143,8 @@ function WizardDoseRow({
           <button
             key={label}
             type="button"
-            disabled={!full}
-            onClick={() => onAmountChange((full * p / 100).toFixed(2))}
+            disabled={!fullInRowUnit}
+            onClick={() => onAmountChange((fullInRowUnit * p / 100).toFixed(2))}
             className="px-2.5 py-1 text-xs rounded-full border border-border text-dim active:bg-surface disabled:opacity-40"
           >
             {label}
@@ -142,11 +155,21 @@ function WizardDoseRow({
         <input
           type="number"
           className="w-24 bg-surface border border-border rounded-lg px-2 py-1.5 text-sm text-primary focus:outline-none focus:border-fern"
-          placeholder={full ? full.toFixed(2) : '0'}
+          placeholder={fullInRowUnit ? fullInRowUnit.toFixed(2) : '0'}
           value={row.amount}
           onChange={e => onAmountChange(e.target.value)}
         />
-        <span className="text-xs text-muted">{rd.unit}</span>
+        {isConvertibleDoseUnit(rd.unit) ? (
+          <select
+            className="bg-surface border border-border rounded-lg px-2 py-1.5 text-sm text-primary focus:outline-none focus:border-fern"
+            value={row.unit}
+            onChange={e => changeUnit(e.target.value)}
+          >
+            {CONVERTIBLE_DOSE_UNITS.map(u => <option key={u} value={u} className="bg-raised">{u}</option>)}
+          </select>
+        ) : (
+          <span className="text-xs text-muted">{rd.unit}</span>
+        )}
         {pct !== null && <span className="text-xs text-fern ml-auto">{pct.toFixed(0)}%</span>}
       </div>
       {!batch && (
@@ -223,13 +246,18 @@ function WateringForm({ plant, datetime, onSuccess, logId, init }: { plant: Plan
     const batch = resolveBatch(product.form, product.referenceDose, batchAmount, unit, plant)
     const full = batch ? scaledFullDose(product.referenceDose, batch.amount, batch.unit) : 0
     const isRange = product.referenceDose.min !== product.referenceDose.max
-    const prefillAmount = !isRange && full > 0 ? full.toFixed(2) : ''
+    // Default to mL when the label's own unit can be freely converted --
+    // mL is the preferred entry unit regardless of how the product was
+    // labeled; grams stays grams since there's no density-free conversion.
+    const doseUnit = isConvertibleDoseUnit(product.referenceDose.unit) ? 'ml' : product.referenceDose.unit
+    const fullInDoseUnit = convertDoseAmount(full, product.referenceDose.unit, doseUnit) ?? full
+    const prefillAmount = !isRange && fullInDoseUnit > 0 ? fullInDoseUnit.toFixed(2) : ''
     setNutrients(rows => {
       const withoutBlank = rows.length === 1 && !rows[0].name && !rows[0].amount ? [] : rows
       return [...withoutBlank, {
         name: product.name,
         amount: prefillAmount,
-        unit: product.referenceDose.unit,
+        unit: doseUnit,
         productId: product.productId,
         npk: product.npk,
         referenceDose: product.referenceDose,
@@ -384,6 +412,7 @@ function WateringForm({ plant, datetime, onSuccess, logId, init }: { plant: Plan
                   waterAmount={batchAmount}
                   waterUnit={unit}
                   onAmountChange={v => updateNutrient(i, 'amount', v)}
+                  onUnitChange={u => updateNutrient(i, 'unit', u)}
                   onRemove={() => removeNutrientRow(i)}
                 />
               ) : (
