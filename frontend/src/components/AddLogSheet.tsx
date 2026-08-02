@@ -202,6 +202,23 @@ function WateringForm({ plant, datetime, onSuccess, logId, init }: { plant: Plan
   const [wizardSearch, setWizardSearch] = useState('')
 
   const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: api.settings.get })
+  const { data: products = [] } = useQuery({ queryKey: ['products'], queryFn: api.products.list })
+
+  // Editing an existing log only round-trips the fields stored on the log
+  // itself (name/amount/unit/productId/npk) -- referenceDose/form/elementalNpk/
+  // density are client-side-only (see NutrientRow), needed to recompute
+  // pctOfDose/deliveredN-P-K on save. Without this, re-saving an edited feed
+  // silently dropped delivered NPK for every linked product in that log, not
+  // just whichever row was actually being edited.
+  useEffect(() => {
+    if (!products.length) return
+    setNutrients(rows => rows.map(r => {
+      if (!r.productId || r.referenceDose) return r
+      const product = products.find(p => p.productId === r.productId)
+      if (!product) return r
+      return { ...r, npk: product.npk, referenceDose: product.referenceDose, form: product.form, elementalNpk: product.elementalNpk, density: product.density }
+    }))
+  }, [products])
   const [mode, setMode] = useState<'wizard' | 'manual'>(logId ? 'manual' : 'wizard')
   const [modeTouched, setModeTouched] = useState(false)
   useEffect(() => {
