@@ -922,7 +922,12 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
 
   return (
     <div className="space-y-3 mt-2">
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFiles} />
+      {/* `capture` is mobile-only -- on desktop it's ignored and this just opens the
+          normal OS file picker, same as the library input. Without `multiple` here
+          too, a laptop user who taps this icon instead of the (visually similar,
+          unlabeled) library icon in the "already has photos" grid below silently
+          loses multi-select, which read as "the picker won't let me multi-select". */}
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={handleFiles} />
       <input ref={libraryRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles} />
 
       {totalCount === 0 ? (
@@ -962,12 +967,14 @@ function PhotoForm({ plantId, datetime, onSuccess, logId, init }: { plantId: str
           ))}
           <button
             onClick={() => cameraRef.current?.click()}
+            title="Take photo"
             className="aspect-square rounded-lg border-2 border-dashed border-border text-muted flex items-center justify-center active:opacity-70"
           >
             <Camera size={20} />
           </button>
           <button
             onClick={() => libraryRef.current?.click()}
+            title="Choose from library"
             className="aspect-square rounded-lg border-2 border-dashed border-border text-muted flex items-center justify-center active:opacity-70"
           >
             <ImagePlus size={20} />
