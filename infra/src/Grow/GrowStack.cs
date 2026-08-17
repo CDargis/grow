@@ -351,6 +351,29 @@ public class GrowStack : Stack
         string apiOriginDomain = $"{httpApi.ApiId}.execute-api.{this.Region}.amazonaws.com";
         HttpOrigin apiOrigin = new HttpOrigin(apiOriginDomain, new HttpOriginProps { OriginPath = "" });
 
+        // Share pages live at s3://grow-site/p/<code>/index.html. CloudFront's
+        // DefaultRootObject only applies at the distribution root, not in
+        // subdirectories, so /p/<code> finds no object, 404s, and gets rewritten
+        // to the SPA by ErrorResponses below -- which then bounces a stranger
+        // scanning a label to the Cognito login. Rewrite extensionless /p/ paths
+        // to their index.html before the origin ever sees them.
+        Amazon.CDK.AWS.CloudFront.Function shareIndexRewrite =
+            new Amazon.CDK.AWS.CloudFront.Function(this, "ShareIndexRewrite",
+                new Amazon.CDK.AWS.CloudFront.FunctionProps
+        {
+            Runtime = FunctionRuntime.JS_2_0,
+            Code    = FunctionCode.FromInline(@"
+function handler(event) {
+    var request = event.request;
+    var uri = request.uri;
+    // Only extensionless paths: /p/A7K2M9/1.jpg and /p/_fonts/x.woff2 pass through.
+    if (uri.indexOf('/p/') === 0 && uri.indexOf('.') === -1) {
+        request.uri = uri.replace(/\/$/, '') + '/index.html';
+    }
+    return request;
+}")
+        });
+
         Distribution distribution = new Distribution(this, "Distribution", new DistributionProps
         {
             DefaultBehavior = new BehaviorOptions
@@ -379,6 +402,23 @@ public class GrowStack : Stack
                     CachePolicy           = CachePolicy.CACHING_DISABLED,
                     AllowedMethods        = AllowedMethods.ALLOW_ALL,
                     OriginRequestPolicy   = OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER
+                },
+                // Public grow-record pages behind the QR codes on printed labels.
+                // Same S3 origin as the SPA -- they ship in frontend/public/.
+                ["/p/*"] = new BehaviorOptions
+                {
+                    Origin               = new S3Origin(siteBucket),
+                    ViewerProtocolPolicy = ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                    CachePolicy          = CachePolicy.CACHING_OPTIMIZED,
+                    AllowedMethods       = AllowedMethods.ALLOW_GET_HEAD,
+                    FunctionAssociations = new[]
+                    {
+                        new FunctionAssociation
+                        {
+                            Function     = shareIndexRewrite,
+                            EventType    = FunctionEventType.VIEWER_REQUEST
+                        }
+                    }
                 }
             },
             ErrorResponses = new[]
