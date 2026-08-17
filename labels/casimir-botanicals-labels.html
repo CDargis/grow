@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Casimir Botanicals — Label System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1E3126; --paper:#E9E0CA; --oxblood:#8A3324; --brass:#A6802B; --sage:#8B9A7C;
+    --pine:#17281E; --gold:#C9A24B; --cream:#EDE4CC;
+    --script:'Pinyon Script', cursive; --caps:'Cinzel', serif;
+    --serif:'Cormorant Garamond', serif; --mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;font-family:var(--serif);color:var(--ink);background-color:var(--paper);
+    background-image:
+      radial-gradient(120% 120% at 50% -10%, rgba(255,255,255,.35), transparent 55%),
+      radial-gradient(140% 100% at 100% 110%, rgba(23,40,30,.10), transparent 60%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.05'/></svg>");
+    line-height:1.5;
+  }
+
+  .controls{position:sticky;top:0;z-index:50;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center;padding:14px 20px;background:rgba(30,49,38,.94);backdrop-filter:blur(6px);border-bottom:1px solid var(--brass);}
+  .controls span{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--paper);opacity:.7;}
+  .btn{font-family:var(--caps);letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--paper);background:transparent;border:1px solid var(--brass);border-radius:2px;padding:9px 18px;cursor:pointer;transition:background .18s,color .18s;}
+  .btn:hover,.btn:focus-visible{background:var(--brass);color:var(--pine);outline:none;}
+  .btn:focus-visible{box-shadow:0 0 0 3px rgba(201,162,75,.4);}
+
+  .wrap{max-width:1080px;margin:0 auto;padding:52px 24px 96px;}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--oxblood);margin:0 0 10px;}
+  h2.section{font-family:var(--caps);font-weight:500;letter-spacing:.06em;font-size:clamp(22px,3.4vw,30px);margin:0 0 6px;color:var(--ink);}
+  .section-lede{font-family:var(--serif);font-size:17px;font-style:italic;color:#43503f;max-width:60ch;margin:0 0 30px;}
+  .divider{display:flex;align-items:center;gap:16px;margin:70px 0 32px;}
+  .divider::before,.divider::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,transparent,var(--brass),transparent);}
+  .divider span{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--brass);white-space:nowrap;}
+
+  .hero{text-align:center;padding:20px 0 8px;}
+  .hero .seal-lg{width:200px;height:200px;margin:0 auto 2px;color:var(--ink);}
+  .wordmark{font-family:var(--script);font-size:clamp(62px,11vw,102px);line-height:.9;color:var(--ink);margin:4px 0 0;text-shadow:0 1px 0 rgba(255,255,255,.4);}
+  .subwordmark{font-family:var(--caps);letter-spacing:.44em;text-transform:uppercase;font-size:clamp(13px,2.4vw,18px);color:var(--oxblood);padding-left:.44em;margin:2px 0 14px;}
+  .tagline{font-family:var(--serif);font-style:italic;font-size:19px;color:#43503f;margin:0 auto;max-width:46ch;}
+  .flourish{color:var(--brass);font-size:18px;letter-spacing:.4em;margin-top:16px;}
+
+  .label-grid{display:flex;flex-wrap:wrap;gap:26px;}
+
+  .field{display:flex;flex-direction:column;}
+  .field small{font-family:var(--mono);letter-spacing:.16em;text-transform:uppercase;}
+  .line{border-bottom:1px solid;border-radius:3px 3px 0 0;outline:none;cursor:text;font-size:12px;line-height:1.15;padding:2px 4px 1px;}
+
+  .grade{display:flex;gap:.14in;align-items:center;flex-wrap:wrap;}
+  .grade.vert{flex-direction:column;align-items:flex-start;gap:3px;}
+  .grade .g{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:8px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;user-select:none;white-space:nowrap;}
+  .grade .g .mk{width:.1in;height:.1in;border:1px solid;display:inline-block;flex:0 0 auto;transition:background .12s;}
+  .grade.round .g .mk{border-radius:50%;}
+
+  /* ---------- JAR 3.5 x 2.5 ---------- */
+  .jar{
+    width:3.5in;height:2.5in;flex:0 0 auto;overflow:hidden;color:var(--ink);
+    background:radial-gradient(130% 130% at 15% 0%, rgba(255,255,255,.5), transparent 60%), var(--paper);
+    border:1px solid var(--ink);border-radius:5px;padding:.13in .16in .15in;position:relative;display:flex;flex-direction:column;
+    box-shadow:0 8px 22px rgba(30,49,38,.16);transition:transform .2s ease,box-shadow .2s ease;
+  }
+  .jar::before{content:"";position:absolute;inset:.055in;border:1px solid var(--brass);border-radius:3px;pointer-events:none;}
+  .jar:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(30,49,38,.22);}
+  .jar-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.12in;position:relative;z-index:1;}
+  .jar-head-left{display:flex;align-items:center;gap:.1in;}
+  .jar-head .seal-sm{width:.5in;height:.5in;color:var(--ink);flex:0 0 auto;}
+  .jar-brand .s{font-family:var(--script);font-size:22px;color:var(--ink);display:block;line-height:.8;}
+  .jar-brand .c{font-family:var(--caps);font-size:7.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--oxblood);padding-left:.06em;}
+  .gradewrap{text-align:left;flex:0 0 auto;}
+  .gradewrap small{font-family:var(--mono);font-size:6.5px;letter-spacing:.16em;text-transform:uppercase;color:#7a8272;display:block;margin-bottom:3px;}
+  .jar .grade .g .mk{border-color:rgba(30,49,38,.7);}
+  .jar .grade .g .mk.on{background:var(--ink);}
+  .rule{height:1px;background:linear-gradient(90deg,transparent,var(--brass),transparent);margin:.06in 0;}
+  .jar .stack{display:flex;flex-direction:column;gap:.05in;flex:1;}
+  .jar .field small{font-size:7px;color:#7a8272;margin-bottom:1px;}
+  .jar .line{min-height:.2in;border-color:rgba(30,49,38,.55);background:rgba(30,49,38,.045);}
+  .jar .line:focus{background:rgba(166,128,43,.16);}
+  .jar .row2{display:flex;gap:.18in;}
+  .jar .row2 .field{flex:1;}
+  .burp{margin-top:.04in;}
+  .burp small{font-family:var(--mono);font-size:7px;letter-spacing:.14em;text-transform:uppercase;color:#7a8272;display:block;margin-bottom:2px;}
+  .burp-track{display:flex;gap:3px;}
+  .burp-track i{width:.13in;height:.13in;border:1px solid rgba(30,49,38,.5);border-radius:2px;font-family:var(--mono);font-size:6px;font-style:normal;display:flex;align-items:center;justify-content:center;color:#98a08f;cursor:pointer;transition:background .12s,color .12s;}
+  .burp-track i.on{background:var(--sage);border-color:var(--sage);color:var(--pine);}
+
+  /* ---------- MYLAR 2.75 x 4 ---------- */
+  .mylar{
+    width:2.75in;height:4in;flex:0 0 auto;overflow:hidden;color:var(--cream);
+    background:radial-gradient(120% 90% at 50% 0%, #20362a, var(--pine) 70%);
+    border:1px solid #0d1a12;border-radius:6px;padding:.2in .2in .18in;position:relative;text-align:center;
+    display:flex;flex-direction:column;align-items:center;box-shadow:0 10px 26px rgba(13,26,18,.4);
+    transition:transform .2s ease,box-shadow .2s ease;
+  }
+  .mylar::before{content:"";position:absolute;inset:.09in;border:1px solid rgba(201,162,75,.55);border-radius:4px;pointer-events:none;}
+  .mylar::after{content:"";position:absolute;inset:.12in;border:1px solid rgba(201,162,75,.22);border-radius:3px;pointer-events:none;}
+  .mylar:hover{transform:translateY(-4px);box-shadow:0 16px 34px rgba(13,26,18,.5);}
+  .mylar>*{position:relative;z-index:1;width:100%;}
+  .mylar .seal-md{height:.62in;color:var(--gold);margin:0 auto .02in;}
+  .my-rule{width:58%;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:.03in auto .01in;}
+  .mylar .field{margin-top:.04in;text-align:left;}
+  .mylar .field small{font-size:7.5px;color:var(--sage);margin-bottom:4px;line-height:1;}
+  .mylar .line{min-height:.2in;border-color:rgba(237,228,204,.5);background:rgba(237,228,204,.06);}
+  .mylar .line.big{min-height:.22in;}
+  .mylar .line:focus{background:rgba(201,162,75,.18);}
+  .mylar .grade{justify-content:flex-start;margin-top:.05in;}
+  .mylar .grade .g{color:var(--cream);}
+  .mylar .grade .g .mk{border-color:var(--gold);}
+  .mylar .grade .g .mk.on{background:var(--gold);}
+  .mylar .row2{display:flex;gap:.18in;margin-top:.02in;}
+  .mylar .row2 .field{flex:1;}
+  .my-foot{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:.13in;padding-top:.06in;}
+  .qr{width:1in;height:1in;flex:0 0 auto;background:var(--paper);border:1.5px solid var(--gold);border-radius:4px;padding:0;}
+  .qr svg{display:block;width:100%;height:100%;}
+  .my-foot-txt{text-align:left;}
+  .qr-url{font-family:var(--mono);font-size:6.5px;letter-spacing:.04em;color:var(--sage);line-height:1.35;margin-top:4px;}
+  .qr-cap{font-family:var(--caps);font-size:7.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--sage);margin-bottom:3px;line-height:1.15;}
+  .mylar .grade .g,.my-foot .place{line-height:1;}
+  .my-foot .place{font-family:var(--caps);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);line-height:1.3;text-align:left;}
+
+  .note{font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:#5a6353;margin-top:24px;padding:14px 16px;border-left:2px solid var(--brass);background:rgba(166,128,43,.08);border-radius:0 4px 4px 0;max-width:70ch;line-height:1.7;}
+  .note b{color:var(--oxblood);}
+
+  @media (max-width:520px){.wordmark{font-size:56px;}.jar{transform:scale(.9);transform-origin:left top;}}
+  @media (prefers-reduced-motion:reduce){*{transition:none !important;}}
+
+  @media print{
+    @page{margin:.4in;}
+    body{background:#fff;}
+    .controls,.divider,.eyebrow,.section-lede,h2.section,.hero .tagline,.hero .flourish,.hero .wordmark,.hero .subwordmark,.hero .seal-lg,.note,.printhide{display:none !important;}
+    .wrap{padding:0;max-width:none;}
+    .label-grid{gap:.25in;}
+    .line{background:transparent !important;}
+    .jar,.mylar{box-shadow:none;break-inside:avoid;page-break-inside:avoid;transform:none;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  }
+</style>
+</head>
+<body>
+
+<div class="controls printhide">
+  <span>Casimir Botanicals · blank label templates</span>
+  <button class="btn" onclick="window.print()">Print labels</button>
+</div>
+
+<div class="wrap">
+
+  <section class="hero">
+    <div class="seal-lg" data-seal></div>
+    <div class="wordmark">Casimir Botanicals</div>
+    <div class="subwordmark">Cultivated &amp; Cured</div>
+    <p class="tagline">Tap a field to type — or print blank and fill it in by hand.</p>
+    <div class="flourish">✦ &nbsp; ✦ &nbsp; ✦</div>
+  </section>
+
+  <div class="divider"><span>Your Jars — Personal Storage</span></div>
+  <p class="eyebrow">Wide-mouth mason · 3.5″ × 2.5″</p>
+  <h2 class="section">Cure &amp; storage labels</h2>
+  <p class="section-lede">Grade sits up top with the mark; plant, cultivar, and dates below, and a 14-day burp log you can mark off as the cure runs.</p>
+  <div class="label-grid" id="jarGrid"></div>
+
+  <div class="divider"><span>For Friends — Mylar Bags</span></div>
+  <p class="eyebrow">Gift front · 2.75″ × 4″ · reads on black or kraft</p>
+  <h2 class="section">Gift labels</h2>
+  <p class="section-lede">Plant and strain up front, grade, then harvest and weight. Fill by hand — a silver, white, or gold paint pen shows up best on dark bags.</p>
+  <div class="label-grid" id="mylarGrid"></div>
+
+  <p class="note printhide"><b>How to use →</b> Everything is tappable: click a line to type, click a grade marker to select, click a burp-day box to mark it. Or leave them blank, hit <b>Print labels</b>, and pen them in — sizes print true (jars 3.5×2.5, mylar 2.75×4). Want a round top-lid version, a different count per sheet, or a QR that links a bag to its Pheno.ai page? Say the word.</p>
+
+</div>
+
+<script>
+  const seal = `
+  <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" role="img" aria-label="Casimir Botanicals seal">
+    <defs>
+      <path id="arcTop" d="M 30 110 A 80 80 0 0 1 190 110"/>
+      <path id="arcBot" d="M 34 110 A 76 76 0 0 0 186 110"/>
+      <path id="leaflet"
+            d="M0,0 C -3,-16 -9,-30 -8,-46 C -7,-62 -5,-80 0,-100 C 5,-80 7,-62 8,-46 C 9,-30 3,-16 0,0 Z M0,-8 L0,-90"
+            vector-effect="non-scaling-stroke"/>
+    </defs>
+    <circle cx="110" cy="110" r="104" fill="none" stroke="currentColor" stroke-width="1.4"/>
+    <circle cx="110" cy="110" r="98"  fill="none" stroke="currentColor" stroke-width="2.6"/>
+    <circle cx="110" cy="110" r="62"  fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.4"/>
+    <g fill="currentColor" style="font-family:'Cinzel',serif;">
+      <text font-size="15" letter-spacing="7" text-anchor="middle"><textPath href="#arcTop" startOffset="50%">CASIMIR</textPath></text>
+      <text font-size="12.5" letter-spacing="4" text-anchor="middle"><textPath href="#arcBot" startOffset="50%">BOTANICALS</textPath></text>
+    </g>
+    <g fill="currentColor" style="font-family:serif;">
+      <text x="15"  y="116" font-size="12" text-anchor="middle">✦</text>
+      <text x="205" y="116" font-size="12" text-anchor="middle">✦</text>
+    </g>
+    <g transform="translate(110,150)" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round">
+      <use href="#leaflet" transform="scale(0.66)"/>
+      <use href="#leaflet" transform="rotate(30) scale(0.55)"/>
+      <use href="#leaflet" transform="rotate(-30) scale(0.55)"/>
+      <use href="#leaflet" transform="rotate(58) scale(0.42)"/>
+      <use href="#leaflet" transform="rotate(-58) scale(0.42)"/>
+      <use href="#leaflet" transform="rotate(82) scale(0.28)"/>
+      <use href="#leaflet" transform="rotate(-82) scale(0.28)"/>
+      <path d="M0,0 L0,16" vector-effect="non-scaling-stroke"/>
+    </g>
+  </svg>`;
+
+  const grade = (round, vert) => `
+    <div class="grade${round?' round':''}${vert?' vert':''}">
+      <span class="g"><span class="mk"></span>Tops</span>
+      <span class="g"><span class="mk"></span>Smalls</span>
+      <span class="g"><span class="mk"></span>Trim</span>
+    </div>`;
+
+  const jarTemplate = `
+    <div class="jar">
+      <div class="jar-head">
+        <div class="jar-head-left">
+          <div class="seal-sm" data-seal></div>
+          <div class="jar-brand"><span class="s">Casimir</span><span class="c">Botanicals</span></div>
+        </div>
+        <div class="gradewrap"><small>Grade</small>${grade(false,true)}</div>
+      </div>
+      <div class="rule"></div>
+      <div class="stack">
+        <div class="field"><small>Plant</small><div class="line" contenteditable></div></div>
+        <div class="field"><small>Cultivar</small><div class="line" contenteditable></div></div>
+        <div class="row2">
+          <div class="field"><small>Harvested</small><div class="line" contenteditable></div></div>
+          <div class="field"><small>Jarred</small><div class="line" contenteditable></div></div>
+        </div>
+        <div class="burp">
+          <small>Cure / burp — day</small>
+          <div class="burp-track">
+            <i>1</i><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i><i>7</i><i>8</i><i>9</i><i>10</i><i>11</i><i>12</i><i>13</i><i>14</i>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  // QR encodes: https://grow.chrisdargis.com/p/A7K2M9  (batch Sunny / Cherry Pie Auto)
+  // One code per harvest. Regenerate: node shares/build.mjs <CODE>
+  // Print >= 1in on MATTE stock -- gloss over mylar defeats scanners.
+  const growQR = `<svg viewBox="0 0 37 37" width="100%" height="100%" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg"><path class="qrline" stroke="#1e3126" d="M4 4.5h7m2 0h3m4 0h4m2 0h7M4 5.5h1m5 0h1m1 0h4m1 0h1m3 0h1m1 0h2m1 0h1m5 0h1M4 6.5h1m1 0h3m1 0h1m7 0h1m1 0h1m2 0h1m2 0h1m1 0h3m1 0h1M4 7.5h1m1 0h3m1 0h1m2 0h1m1 0h3m1 0h1m2 0h2m2 0h1m1 0h3m1 0h1M4 8.5h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h2m4 0h1m2 0h1m1 0h3m1 0h1M4 9.5h1m5 0h1m4 0h2m1 0h1m1 0h1m2 0h1m2 0h1m5 0h1M4 10.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M13 11.5h2m4 0h1m1 0h2M4 12.5h1m1 0h1m1 0h1m1 0h1m3 0h2m4 0h3m5 0h1m2 0h1M8 13.5h2m2 0h1m1 0h2m1 0h1m2 0h1m3 0h4m1 0h1m2 0h1M5 14.5h1m1 0h2m1 0h1m1 0h1m2 0h1m2 0h2m1 0h1m3 0h1m1 0h1m2 0h3M4 15.5h2m1 0h2m4 0h7m1 0h1m1 0h1m1 0h2m4 0h1M5 16.5h1m2 0h4m1 0h3m2 0h4m2 0h4m1 0h1m1 0h2M4 17.5h1m1 0h3m3 0h1m2 0h2m1 0h1m2 0h1m2 0h3m2 0h1m2 0h1M4 18.5h2m4 0h1m1 0h1m1 0h1m2 0h1m3 0h2m1 0h1m1 0h2m1 0h1m1 0h2M5 19.5h5m1 0h1m1 0h1m5 0h1m1 0h4m1 0h1m1 0h2m1 0h1M5 20.5h1m1 0h2m1 0h1m1 0h5m2 0h1m1 0h1m2 0h3m2 0h1m1 0h2M6 21.5h2m1 0h1m2 0h2m3 0h1m1 0h1m4 0h3m2 0h2m1 0h1M4 22.5h1m1 0h2m1 0h5m1 0h1m2 0h2m1 0h1m9 0h2M5 23.5h3m1 0h1m2 0h1m1 0h1m2 0h2m1 0h3m2 0h1m1 0h1m1 0h1m1 0h1M4 24.5h1m1 0h1m3 0h3m5 0h2m1 0h1m2 0h5M12 25.5h3m3 0h1m5 0h1m3 0h1m1 0h3M4 26.5h7m2 0h1m1 0h3m2 0h1m2 0h2m1 0h1m1 0h2m1 0h2M4 27.5h1m5 0h1m2 0h2m1 0h1m2 0h1m1 0h2m1 0h1m3 0h2m1 0h2M4 28.5h1m1 0h3m1 0h1m1 0h1m2 0h1m4 0h3m1 0h5m2 0h1M4 29.5h1m1 0h3m1 0h1m3 0h1m1 0h1m11 0h1m1 0h1M4 30.5h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m3 0h1m1 0h3m2 0h1M4 31.5h1m5 0h1m2 0h4m2 0h1m1 0h5m2 0h1m2 0h1M4 32.5h7m1 0h4m2 0h1m2 0h1m1 0h2m2 0h2m2 0h2"/></svg>`;
+
+  const mylarTemplate = `
+    <div class="mylar">
+      <div class="seal-md" data-seal></div>
+      <div class="my-rule"></div>
+      <div class="field"><small>Plant</small><div class="line" contenteditable></div></div>
+      <div class="field"><small>Strain</small><div class="line big" contenteditable></div></div>
+      <div class="field"><small>Grade</small>${grade(true,false)}</div>
+      <div class="row2">
+        <div class="field"><small>Harvested</small><div class="line" contenteditable></div></div>
+        <div class="field"><small>Net wt</small><div class="line" contenteditable></div></div>
+      </div>
+      <div class="row2">
+        <div class="field"><small>THC %</small><div class="line" contenteditable></div></div>
+        <div class="field"><small>CBD %</small><div class="line" contenteditable></div></div>
+      </div>
+      <div class="my-foot">
+        <div class="qr">${growQR}</div>
+        <div class="my-foot-txt">
+          <div class="place">Cultivated &amp; cured<br>Lisle, Illinois</div>
+          <div class="qr-url">grow.chrisdargis.com<br>/p/A7K2M9</div>
+        </div>
+      </div>
+    </div>`;
+
+  const jarGrid = document.getElementById('jarGrid');
+  const mylarGrid = document.getElementById('mylarGrid');
+  for (let i=0;i<6;i++) jarGrid.insertAdjacentHTML('beforeend', jarTemplate);
+  for (let i=0;i<4;i++) mylarGrid.insertAdjacentHTML('beforeend', mylarTemplate);
+
+  document.querySelectorAll('[data-seal]').forEach(el => { el.innerHTML = seal; });
+
+  document.addEventListener('click', (e) => {
+    const g = e.target.closest('.grade .g');
+    if (g){
+      g.closest('.grade').querySelectorAll('.mk').forEach(m => m.classList.remove('on'));
+      g.querySelector('.mk').classList.add('on');
+      return;
+    }
+    const box = e.target.closest('.burp-track i');
+    if (box){ box.classList.toggle('on'); }
+  });
+</script>
+
+</body>
+</html>
