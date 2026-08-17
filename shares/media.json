@@ -1,0 +1,25 @@
+{
+  "_comment": [
+    "Growing media, keyed by whatever string appears in a transplant log's",
+    "`medium` field. Add an entry when you switch soils.",
+    "",
+    "ga  = guaranteed analysis off the bag, [N, P2O5, K2O] as percentages.",
+    "lb / cuft = the whole bag as sold. Together they give bulk density,",
+    "which is what turns a pot size into a mass.",
+    "",
+    "  mass_g = gallons * 0.13368 * (lb / cuft) * 453.59",
+    "  N = mass_g * N%          (elemental already)",
+    "  P = mass_g * P2O5% * 0.436",
+    "  K = mass_g * K2O%  * 0.83",
+    "",
+    "The 0.436 / 0.83 factors match model.ElementalFromLabel."
+  ],
+
+  "FFOF": {
+    "name": "Fox Farm Ocean Forest",
+    "ga": [0.30, 0.45, 0.05],
+    "lb": 34,
+    "cuft": 1.5,
+    "confirmedWithGrower": "2026-08-17"
+  }
+}

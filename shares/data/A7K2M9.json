@@ -1,0 +1,44 @@
+{
+  "code": "A7K2M9",
+  "plantId": "01KRVTSJHY7W47SNCAZD6DR43Y",
+  "strain": "Cherry Pie",
+  "batch": "Sunny",
+  "harvested": "2026-08-16",
+  "totalDays": 98,
+  "lede": "Ninety-eight days from seed, in living soil, under eighteen hours of light.",
+
+  "phases": [
+    { "label": "Germination", "days": 4 },
+    { "label": "Seedling",    "days": 19 },
+    { "label": "Vegetative",  "days": 7 },
+    { "label": "Flowering",   "days": 68 }
+  ],
+
+  "photos": [
+    { "file": "1.jpg", "stage": "Seedling",       "day": 18 },
+    { "file": "2.jpg", "stage": "Mid flower",     "day": 64 },
+    { "file": "3.jpg", "stage": "Before harvest", "day": 97 }
+  ],
+
+  "record": {
+    "Seed bank": "Zamnesia",
+    "Type": "Autoflower",
+    "Light": "18 on / 6 off",
+    "Flowering time": "68 days",
+    "Tallest": "34.75 in",
+    "Seed to harvest": "98 days"
+  },
+
+  "npk": { "n": 26, "p": 19, "k": 13 },
+  "npkSource": "Total inputs — Ocean Forest base plus 9 hand-mixed feedings",
+
+  "ingredients": "Built on a living-soil base and fed by hand: fish emulsion, worm castings and worm tea, Dr. Earth Bud & Bloom Booster, and langbeinite, a mined potassium-magnesium mineral. Cultivation Nation Bloom and CalMag rounded out the mineral side. No synthetic pesticides at any point.",
+
+  "_derivation": {
+    "day0": "2026-05-10, phase_change into germination",
+    "phaseChanges": "05-10 germination · 05-14 seedling · 06-02 veg · 06-09 flower · 08-16 harvest",
+    "feedNpk": "5.23 / 5.71 / 10.21 g over 9 feedings, summing NutrientEntry.deliveredN/P/K",
+    "soilNpk": "20.6 / 13.5 / 2.9 g — FFOF, 5 gal = 6872 g, see shares/media.json",
+    "photoDays": "chosen by grower: 2026-05-28 = day 18 (seedling), 2026-07-13 = day 64 (flowering), 2026-08-15 = day 97 (day before harvest)"
+  }
+}

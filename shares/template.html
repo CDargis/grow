@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{strain}} · Casimir Botanicals</title>
+<meta name="description" content="How this plant was grown — {{totalDays}} days from seed, harvested {{harvestedLong}}.">
+<meta property="og:title" content="{{strain}} · Casimir Botanicals">
+<meta property="og:description" content="{{totalDays}} days from seed, in living soil. The full grow record.">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:,">
+
+<style>
+@font-face{font-family:'Pinyon Script';font-style:normal;font-weight:400;font-display:swap;src:url(/p/_fonts/Pinyon.woff2) format('woff2');}
+@font-face{font-family:'Cinzel';font-style:normal;font-weight:500;font-display:swap;src:url(/p/_fonts/Cinzel.woff2) format('woff2');}
+@font-face{font-family:'Cormorant Garamond';font-style:normal;font-weight:400;font-display:swap;src:url(/p/_fonts/Cormorant.woff2) format('woff2');}
+@font-face{font-family:'Cormorant Garamond';font-style:italic;font-weight:400;font-display:swap;src:url(/p/_fonts/CormorantI.woff2) format('woff2');}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:400;font-display:swap;src:url(/p/_fonts/PlexMono.woff2) format('woff2');}
+
+/* ── Casimir Botanicals ──────────────────────────────────────────────
+   Single-theme by intent: the label is cream paper, so the page it
+   opens is cream paper. Packaging doesn't theme-switch. Every colour
+   painted explicitly so it holds on any host ground. ---------------- */
+:root{
+  --ink:#1E3126; --paper:#E9E0CA; --oxblood:#8A3324; --brass:#A6802B;
+  --sage:#8B9A7C; --pine:#17281E; --gold:#C9A24B; --cream:#EDE4CC;
+  --muted:#43503F; --hair:#CBBE9F;
+  --script:'Pinyon Script',cursive; --caps:'Cinzel',serif;
+  --serif:'Cormorant Garamond',Georgia,serif;
+  --mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background-color:var(--paper);
+  background-image:
+    radial-gradient(120% 120% at 50% -10%, rgba(255,255,255,.35), transparent 55%),
+    radial-gradient(140% 100% at 100% 110%, rgba(23,40,30,.10), transparent 60%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.05'/></svg>");
+  color:var(--ink); font-family:var(--serif); font-size:1.0625rem;
+  line-height:1.55; -webkit-text-size-adjust:100%; -webkit-font-smoothing:antialiased;
+}
+.page{max-width:31rem;margin:0 auto;padding:2.75rem 1.5rem 3.5rem;display:flex;flex-direction:column;gap:2.25rem;}
+
+.divider{display:flex;align-items:center;gap:1rem;margin:0;}
+.divider::before,.divider::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,transparent,var(--brass),transparent);}
+.divider span{font-family:var(--mono);font-size:.6875rem;letter-spacing:.3em;text-transform:uppercase;color:var(--brass);white-space:nowrap;}
+
+.masthead{text-align:center;display:flex;flex-direction:column;gap:.25rem;}
+.wordmark{font-family:var(--script);font-size:clamp(3.25rem,15vw,4.5rem);line-height:.9;color:var(--ink);text-shadow:0 1px 0 rgba(255,255,255,.4);margin:0;font-weight:400;}
+.subwordmark{font-family:var(--caps);font-weight:500;letter-spacing:.44em;text-transform:uppercase;font-size:.75rem;color:var(--oxblood);padding-left:.44em;margin:.35rem 0 1.25rem;}
+.strain{font-family:var(--caps);font-weight:500;font-size:clamp(1.5rem,6vw,1.9rem);letter-spacing:.06em;color:var(--ink);margin:0;text-wrap:balance;}
+.batch{font-family:var(--mono);font-size:.6875rem;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin:.5rem 0 0;}
+.lede{font-style:italic;font-size:1.125rem;color:var(--muted);margin:.75rem auto 0;max-width:34ch;}
+
+.arc{display:flex;flex-direction:column;gap:.75rem;}
+.arc-bar{display:flex;height:.375rem;overflow:hidden;background:rgba(30,49,38,.10);border-radius:999px;}
+.arc-seg{min-width:3px;}
+.arc-key{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem 1rem;font-family:var(--mono);font-size:.6875rem;letter-spacing:.04em;color:var(--muted);}
+.arc-key span{display:inline-flex;align-items:center;gap:.45rem;}
+.dot{width:.4375rem;height:.4375rem;border-radius:999px;flex:none;}
+
+.stations{display:flex;flex-direction:column;}
+.shot{aspect-ratio:4/5;border:1px solid var(--hair);background:rgba(139,154,124,.18);display:flex;align-items:flex-end;justify-content:center;padding:.875rem;position:relative;overflow:hidden;}
+.shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.stamp{font-family:var(--mono);font-size:.6875rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink);background:var(--cream);border:1px solid var(--brass);padding:.3rem .75rem;position:relative;}
+.gap{display:flex;align-items:center;gap:.75rem;padding:.875rem 0 .875rem 1.5rem;}
+.gap::before{content:"";width:1px;align-self:stretch;background:var(--hair);flex:none;}
+.gap span{font-family:var(--mono);font-size:.6875rem;letter-spacing:.1em;color:var(--muted);}
+
+.block{display:flex;flex-direction:column;gap:1.125rem;}
+.spec{display:grid;grid-template-columns:1fr auto;gap:.6rem 1rem;margin:0;font-family:var(--mono);font-size:.8125rem;font-variant-numeric:tabular-nums;}
+.spec dt{color:var(--muted);letter-spacing:.04em;}
+.spec dd{margin:0;text-align:right;color:var(--ink);}
+
+.npk{display:grid;grid-template-columns:repeat(3,1fr);gap:.625rem;}
+.npk div{border:1px solid var(--hair);background:rgba(237,228,204,.55);padding:.875rem .375rem;text-align:center;}
+.npk b{display:block;font-family:var(--mono);font-size:1.375rem;font-weight:500;font-variant-numeric:tabular-nums;color:var(--oxblood);line-height:1.15;}
+.npk small{display:block;font-family:var(--mono);font-size:.625rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:.25rem;}
+.source{font-family:var(--mono);font-size:.6875rem;letter-spacing:.06em;color:var(--muted);text-align:center;margin:0;}
+.ingredients{margin:0;font-size:1.0625rem;}
+
+.colophon{text-align:center;display:flex;flex-direction:column;gap:.5rem;font-family:var(--mono);font-size:.6875rem;letter-spacing:.1em;color:var(--muted);}
+.colophon .code{color:var(--oxblood);letter-spacing:.14em;}
+.flourish{color:var(--brass);font-size:1rem;letter-spacing:.4em;margin:0;}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="masthead">
+    <p class="wordmark">Casimir Botanicals</p>
+    <p class="subwordmark">Grown in Chicago</p>
+    <h1 class="strain">{{strain}}</h1>
+    <p class="batch">Batch {{batch}} · Harvested {{harvestedLong}}</p>
+    <p class="lede">{{lede}}</p>
+  </header>
+
+  <p class="divider"><span>The Arc</span></p>
+
+  <section class="arc">
+    <div class="arc-bar" role="img" aria-label="{{arcLabel}}">
+      {{#phases}}<div class="arc-seg" style="flex:{{days}};background:{{color}}"></div>{{/phases}}
+    </div>
+    <div class="arc-key">
+      {{#phases}}<span><i class="dot" style="background:{{color}}"></i>{{label}} · {{days}} days</span>{{/phases}}
+    </div>
+  </section>
+
+  <p class="divider"><span>Three Days</span></p>
+
+  <section class="stations">
+    {{#photos}}
+    {{^first}}<div class="gap"><span>&plus; {{gapDays}} days</span></div>{{/first}}
+    <figure class="shot" style="margin:0">
+      <img src="{{file}}" alt="{{stage}}, day {{day}}" loading="lazy" width="1000" height="1250">
+      <figcaption class="stamp">{{stage}} · Day {{day}}</figcaption>
+    </figure>
+    {{/photos}}
+  </section>
+
+  <p class="divider"><span>The Record</span></p>
+
+  <section class="block">
+    <dl class="spec">
+      {{#record}}<dt>{{label}}</dt><dd>{{value}}</dd>{{/record}}
+    </dl>
+  </section>
+
+  <p class="divider"><span>Nutrition</span></p>
+
+  <section class="block">
+    <div class="npk">
+      <div><b>{{npk.n}}</b><small>g N</small></div>
+      <div><b>{{npk.p}}</b><small>g P</small></div>
+      <div><b>{{npk.k}}</b><small>g K</small></div>
+    </div>
+    <p class="source">{{npkSource}}</p>
+    <p class="ingredients">{{ingredients}}</p>
+  </section>
+
+  <footer class="colophon">
+    <p class="flourish">&#10087;</p>
+    <span class="code">{{host}}/p/{{code}}</span>
+    <span>Grown and logged, one day at a time</span>
+  </footer>
+
+</div>
+</body>
+</html>

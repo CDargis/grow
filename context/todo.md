@@ -44,6 +44,13 @@
       a full login; `RefreshTokenValidity` raised to 365 days on both Cognito App Clients.
 - [ ] Cognito Hosted UI branding (logo/colors) — cosmetic, cheap, parked
 
+## Active
+- [ ] QR share page — public, no-login grow summary behind a QR code on printed
+      Casimir Botanicals mylar labels. Frozen `template.html` + one JSON per grow,
+      built into `frontend/public/p/<code>/` so it ships with the normal site deploy.
+      No table, no API, no new bucket. Spec + design mockup:
+      `context/plans/active/qr-share-page.md`
+
 ## Backlog
 - [ ] Height chart per plant
 - [ ] Delivered-NPK trend/timeline view (Phase 2) — `context/plans/backlog/delivered-npk-trend-view.md`

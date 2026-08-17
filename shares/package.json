@@ -1,0 +1,12 @@
+{
+  "name": "casimir-shares",
+  "private": true,
+  "type": "module",
+  "description": "Static grow-record pages behind the QR code on Casimir Botanicals labels.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  }
+}
