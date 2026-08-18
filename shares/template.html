@@ -91,7 +91,7 @@ body{
 
   <header class="masthead">
     <p class="wordmark">Casimir Botanicals</p>
-    <p class="subwordmark">Grown in Chicago</p>
+    <p class="subwordmark">Lisle, Illinois</p>
     <h1 class="strain">{{strain}}</h1>
     <p class="batch">Batch {{batch}} · Harvested {{harvestedLong}}</p>
     <p class="lede">{{lede}}</p>
@@ -114,7 +114,9 @@ body{
     {{#photos}}
     {{^first}}<div class="gap"><span>&plus; {{gapDays}} days</span></div>{{/first}}
     <figure class="shot" style="margin:0">
-      <img src="{{file}}" alt="{{stage}}, day {{day}}" loading="lazy" width="1000" height="1250">
+      <!-- absolute: the page is served at /p/<code> with no trailing slash,
+           so a relative src would resolve against /p/ and 404 -->
+      <img src="/p/{{code}}/{{file}}" alt="{{stage}}, day {{day}}" loading="lazy" width="1000" height="1250">
       <figcaption class="stamp">{{stage}} · Day {{day}}</figcaption>
     </figure>
     {{/photos}}
