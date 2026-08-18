@@ -6,20 +6,41 @@
   "harvested": "2026-08-16",
   "totalDays": 98,
   "lede": "Ninety-eight days from seed, in living soil, under eighteen hours of light.",
-
   "phases": [
-    { "label": "Germination", "days": 4 },
-    { "label": "Seedling",    "days": 19 },
-    { "label": "Vegetative",  "days": 7 },
-    { "label": "Flowering",   "days": 68 }
+    {
+      "label": "Germination",
+      "days": 4
+    },
+    {
+      "label": "Seedling",
+      "days": 19
+    },
+    {
+      "label": "Vegetative",
+      "days": 7
+    },
+    {
+      "label": "Flowering",
+      "days": 68
+    }
   ],
-
   "photos": [
-    { "file": "1.jpg", "stage": "Seedling",       "day": 18 },
-    { "file": "2.jpg", "stage": "Mid flower",     "day": 64 },
-    { "file": "3.jpg", "stage": "Before harvest", "day": 97 }
+    {
+      "file": "1.jpg",
+      "stage": "Seedling",
+      "day": 18
+    },
+    {
+      "file": "2.jpg",
+      "stage": "Mid flower",
+      "day": 64
+    },
+    {
+      "file": "3.jpg",
+      "stage": "Before harvest",
+      "day": 97
+    }
   ],
-
   "record": {
     "Seed bank": "Zamnesia",
     "Type": "Autoflower",
@@ -28,12 +49,18 @@
     "Tallest": "34.75 in",
     "Seed to harvest": "98 days"
   },
-
-  "npk": { "n": 26, "p": 19, "k": 13 },
+  "potency": {
+    "thc": 19,
+    "cbd": null,
+    "note": "Breeder figure for the strain — not a lab test of this harvest"
+  },
+  "npk": {
+    "n": 26,
+    "p": 19,
+    "k": 13
+  },
   "npkSource": "Total inputs — Ocean Forest base plus 9 hand-mixed feedings",
-
   "ingredients": "Built on a living-soil base and fed by hand: fish emulsion, worm castings and worm tea, Dr. Earth Bud & Bloom Booster, and langbeinite, a mined potassium-magnesium mineral. Cultivation Nation Bloom and CalMag rounded out the mineral side. No synthetic pesticides at any point.",
-
   "_derivation": {
     "day0": "2026-05-10, phase_change into germination",
     "phaseChanges": "05-10 germination · 05-14 seedling · 06-02 veg · 06-09 flower · 08-16 harvest",

@@ -78,7 +78,7 @@ be able to restyle the page.
    entry and not the grower's personal voice. Lead on the organic inputs.
    **Claims must survive scrutiny:** name mineral/synthetic products plainly
    rather than claiming "organically grown" outright when they're in the feeds.
-   Never assert anything the logs don't support — pest/spray claims, potency, or
+   Never assert anything the logs don't support — pest/spray claims, unattributed potency, or
    lab results. Ask before writing one.
 
 7. **Dedupe product names by hand.** Free-typed nutrient names arrive as
@@ -100,6 +100,22 @@ be able to restyle the page.
       the actual frames, and he should tell you the real day numbers
     - the build command: `node shares/build.mjs <code>`
 
+## Potency
+
+Optional. Omit the whole `potency` block if there are no figures, and set an
+individual value to `null` to hide just that one -- **never print a 0% or a
+blank tile.** Cherry Pie Auto shows THC and no CBD; the template renders one
+tile or two accordingly.
+
+**Always say where the number came from**, in `potency.note`:
+- a strain's advertised figure -> "Breeder figure for the strain — not a lab
+  test of this harvest"
+- an actual assay -> name the lab and the date
+
+A bare percentage on a public page reads as a measurement of what is in the
+bag. Attributing a breeder figure costs one line and keeps the claim true.
+Never carry a number over from another batch, and never estimate one.
+
 ## Photo selection is not yours
 
 Chris picks the three frames. Do not choose them, and do not auto-suggest by date
@@ -109,8 +125,9 @@ three *stages* are needed and to record the day numbers he gives you.
 
 ## Never on the page
 
-Real name, city, the room, other plants, any link into the app, any potency
-figure without a lab result. The page is a grow journal, not a product listing.
+Real name, the room, other plants, any link into the app. The brand shows its
+town (Lisle, Illinois) on both label and page -- that is deliberate, but the
+street-level detail is not. The page is a grow journal, not a product listing.
 
 ## Reference
 
