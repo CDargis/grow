@@ -1,0 +1,135 @@
+# Oils — Lots, Batches, and the ROBP
+
+## Status
+Backlog. Design worked out in conversation (2026-11-07); nothing built yet.
+
+## What it is
+Track the oils Chris makes at home: Red Mesa isolate/distillate in MCT, THC oil from
+dispensary flower, full-spectrum CBD oil from Rogue Origin flower, and eventually oils
+from his own homegrow plants. **The main point is capturing COAs**, so every oil has a
+record of how it was made and what's in it.
+
+**Simplicity is the requirement.** The ideal workflow is Chris in the kitchen telling
+Claude (claude.ai app) what he's doing, and Claude writing it all into grow via MCP.
+No data-entry forms to start.
+
+## Why it lives in grow
+Considered a separate app (the concern was domain leakage: grow is for *growing*).
+Kept it in grow because:
+- Auth, Cognito, MCP connector, pipeline, and frontend already exist. A separate app
+  would rebuild all of it.
+- Homegrow flower → oil is a real link. A flower input can point at a `plantId`, giving
+  seed → plant → harvest → oil.
+
+Leakage is contained: own tables, own MCP tools, own top-level route. The only link to
+the growing side is the optional `plantId` on a flower input.
+
+---
+
+## Concepts
+- **Lot**: always the *supplier's* lot. One purchased jar of starting material
+  (e.g. a Red Mesa isolate jar), identified by the supplier's lot number, covered by
+  the supplier's COA. Lots in, batches out.
+- **Batch**: something Chris made. Its inputs are lots, earlier batches, flower, and
+  additives (terps etc.).
+- **ROBP (Record of Batch Profile)**: the calculated profile of a batch. Our own
+  "COA", but calculated, not lab-tested. Not a certificate; nothing official.
+
+Out of scope: containers/bottles, grams remaining in a lot, a dose log. Dose math is a
+stateless tool call, not stored.
+
+## Profile (shared by lots and batches)
+One standard storage format for everything a COA reports. Claude extracts the values
+from the COA (layouts vary too much to parse programmatically) and fills the format.
+
+- **Cannabinoids**: fixed known list (CBD, CBDA, Δ9-THC, THCA, Δ8-THC, CBG, CBN, CBC,
+  CBDV, THCV, …), mg/g.
+- **Terpenes**: fixed known list (myrcene, limonene, β-caryophyllene, linalool, …), mg/g.
+- **Other**: name/value pairs for anything the lab reports that isn't on either list,
+  so nothing gets thrown away.
+
+Lots get their profile from the COA. Batches get theirs calculated from inputs.
+
+## Lot
+- Supplier, product (isolate / distillate / …), supplier lot number, grams purchased
+- COA URL + profile extracted from the COA
+- COA archive: when a lot is saved, the Lambda does a plain HTTP GET of the COA URL and
+  stores a copy in S3, so a lab moving or deleting the file doesn't lose the record.
+  If the fetch fails, the lot still saves and is flagged "not archived."
+  (MCP never moves files. Chris gives Claude the PDF to read and the link to store.)
+
+## Batch
+- **ID**: built by the app from its parts, never parsed:
+  `[type]-<subType>-<discriminator>-[YYMMDD]-<batchDiscriminator>`
+  (`[]` required, `<>` optional). Parts are stored as separate fields; the app builds
+  the string and checks it's unique. `-2`-style batch discriminator only when needed.
+  - Types: `DIS`, `ISO`, `FS`, `THC`, `BL`
+  - Unknown date: date field is null, ID uses sentinel `000000`
+  - Examples: `DIS-261024`, `ISO-261024`, `FS-CBD-BB-260717` (CBD plant, Berry Bliss),
+    `THC-TST-000000` (small test, blended flower, date unknown)
+- Date made, total grams made, carrier oil (brand/product) + grams, carrier density
+  (g/mL, per batch, default 0.95 for MCT), notes
+- **Inputs** (array, grams each), each one of:
+  - a lot (raw ISO/DIS straight from the jar)
+  - an earlier batch (e.g. a previously made ISO oil)
+  - flower: strain, THC/CBD % from label/COA, optional `plantId`, **method** (free
+    text) and **confidence** (low / medium / high, set by Chris)
+  - an additive (terps etc.) with grams. The API only takes grams; Claude converts
+    drops (or whatever Chris says) to grams before calling, and the original wording
+    can go in the input's note.
+- Optional batch-level lab COA (expensive, but especially wanted for homegrow flower
+  oils). When present it's shown next to the ROBP, showing how far the estimate was off.
+
+## Calculated numbers
+- **Units**: mg/g is the single stored source of truth (it's what Chris is making).
+  mg/mL is derived as mg/g × density (it's how Chris doses). Density is stored per
+  batch, default 0.95 g/mL for MCT. MCT oils all sit around 0.93–0.96, so the default
+  is off by ~2% at most, which is fine for dosing. It's stored so it can be corrected
+  if it's ever measured (weigh 10 mL). Everything displays both units.
+- **Batch profile** = weighted blend of inputs by grams, per compound.
+- **Estimated vs lab, per compound**: for each cannabinoid (and terpene), the share of
+  that compound's mg that came from flower guesses vs lab-backed inputs, weighted by
+  **contribution, not grams**. Estimated portions are broken down by confidence label.
+  Display: `CBD 24.8 mg/g · 60% medium · 40% lab`.
+  - Per compound because sources differ: an ISO + THC-flower blend is ~0% estimated
+    for CBD but 100% estimated for THC. Chris makes some batches for CBD, some for THC.
+  - Lab-backed includes ISO/DIS batches (COA numbers diluted by carrier, which is just
+    arithmetic).
+  - Estimates and labels carry through into any batch made from an estimated batch.
+- **THC level** is calculated from the profile, never a typed-in "THC-free" flag
+  (distillate often has trace THC). Any "THC-free" display is derived from the number.
+- CBD is listed first everywhere; THC alongside.
+
+Worked example (100 g blend):
+
+| Input | Grams | CBD mg/g | CBD mg |
+|---|---|---|---|
+| FS (medium) | 99 | 15 (estimate) | 1,485 |
+| ISO lot | 1 | 990 (lab) | 990 |
+| **Batch** | 100 | **24.8** | 2,475 |
+
+→ `CBD 24.8 mg/g · 60% medium · 40% lab`
+
+## MCP tools
+The grow MCP server is **read-only today** (list_plants, get_plant,
+list_logs_for_plant, get_logs_by_date_range). This feature adds its first write tools.
+- `create_lot`: supplier details, COA URL, extracted profile
+- `create_batch`: ID parts, inputs, carrier, totals, notes; responds with the
+  calculated ROBP (mg/g + mg/mL + estimated/lab split) for Claude to read back
+- `list_lots`, `list_batches`, `get_batch`
+- `dose`: "how much oil for 100 mg CBD from batch X" (stateless math, mL + g)
+
+## UI
+New top-level route next to plants / environments / overview / inventory. Read-only
+to start (entry happens through MCP).
+- `/oils`: batch list (ID, type, date, CBD/THC mg/g and mg/mL, estimated share);
+  lots as a second tab/section with COA link + archived status. Lots stay out of
+  `/inventory` (that's grow supplies).
+- `/oils/:batchId`: the ROBP. Inputs with grams, full profile with mg/g, mg/mL and
+  estimated/lab split per compound, method + confidence, links to source COAs, source
+  batches, and plants. "Calculated, not lab-tested" note. Batch lab COA alongside if
+  present.
+
+## Open questions
+- DynamoDB table layout (likely `grow-lots` + `grow-batches`, per the
+  one-table-per-entity decision). Not designed yet.
