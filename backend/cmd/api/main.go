@@ -82,6 +82,7 @@ func main() {
 		Plants:           a.plants,
 		Logs:             a.logs,
 		Oils:             a.oils,
+		BuildCommit:      getEnvOrDefault("BUILD_COMMIT", "local"),
 		PublicBaseURL:    os.Getenv("PUBLIC_BASE_URL"),
 		HostedUIBase:     os.Getenv("COGNITO_HOSTED_UI_BASE"),
 		Region:           os.Getenv("AWS_REGION"),

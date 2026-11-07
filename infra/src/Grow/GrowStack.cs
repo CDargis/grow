@@ -240,6 +240,11 @@ public class GrowStack : Stack
 
         // ── Lambda ────────────────────────────────────────────────────────
 
+        // Commit being deployed, so the MCP server_info tool can report which
+        // code a connector is actually talking to. Set by CodeBuild in the
+        // pipeline's synth step; "local" for a synth/deploy from a workstation.
+        string buildCommit = System.Environment.GetEnvironmentVariable("CODEBUILD_RESOLVED_SOURCE_VERSION") ?? "local";
+
         LambdaFunction apiFunction = new LambdaFunction(this, "ApiFunction", new LambdaFunctionProps
         {
             FunctionName  = "grow-api",
@@ -277,7 +282,8 @@ public class GrowStack : Stack
                 ["USER_POOL_CLIENT_ID"]     = userPoolClient.UserPoolClientId,
                 ["MCP_USER_POOL_CLIENT_ID"] = mcpClient.UserPoolClientId,
                 ["PUBLIC_BASE_URL"]         = $"https://{domainName}",
-                ["COGNITO_HOSTED_UI_BASE"]  = $"https://grow-chrisdargis.auth.{this.Region}.amazoncognito.com"
+                ["COGNITO_HOSTED_UI_BASE"]  = $"https://grow-chrisdargis.auth.{this.Region}.amazoncognito.com",
+                ["BUILD_COMMIT"]            = buildCommit
             }
         });
 

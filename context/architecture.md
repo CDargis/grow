@@ -50,6 +50,10 @@
   confidence with Chris, read back numbers) are sent as MCP server instructions; field-level
   guidance is in `jsonschema` struct tags on the request types. Writes needed no OAuth change:
   the token is only checked for issuer/client/`sub`, with no read-only scope.
+- `server_info`: returns the deployed git commit (`BUILD_COMMIT` Lambda env var, set from
+  CodeBuild's `CODEBUILD_RESOLVED_SOURCE_VERSION` at synth) and the server's current tool
+  names, listed via an in-memory client so it matches what real clients get. For telling a
+  stale client tool list (Claude caches it per chat/connection) from a missed deploy.
 - Plant/log tools (read-only): `list_plants`, `get_plant`, `list_logs_for_plant`,
   `get_logs_by_date_range` — thin wrappers over `internal/store`, plus an explicit
   `plant.UserID == callerUserID` ownership check at the tool layer (the REST API doesn't have

@@ -30,6 +30,7 @@ type Deps struct {
 	Plants           *store.PlantStore
 	Logs             *store.LogStore
 	Oils             *oils.Service // nil disables the oils tools
+	BuildCommit      string        // git commit deployed, reported by server_info
 	PublicBaseURL    string        // e.g. https://grow.chrisdargis.com, no trailing slash
 	HostedUIBase     string        // e.g. https://grow-chrisdargis.auth.us-east-1.amazoncognito.com, no trailing slash
 	Region           string
@@ -335,6 +336,7 @@ func (d Deps) newServer(userID string) *mcp.Server {
 	})
 
 	d.addOilTools(s, userID)
+	d.addServerInfoTool(s)
 
 	return s
 }
