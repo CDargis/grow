@@ -99,3 +99,28 @@ func TestBatchValidateFlower(t *testing.T) {
 		t.Errorf("valid batch rejected: %v", err)
 	}
 }
+
+func TestProfileSourceValidation(t *testing.T) {
+	flower := BatchInput{Kind: InputFlower, Grams: 10, Strain: "Berry Bliss",
+		Profile:    &Profile{Cannabinoids: map[string]float64{"cbda": 150}},
+		Efficiency: 0.7, Method: "MCT infusion", Confidence: ConfidenceMedium}
+
+	if err := flower.Validate(); err != nil {
+		t.Errorf("profileSource is optional (older inputs lack it): %v", err)
+	}
+	for _, src := range []ProfileSource{ProfileFromCOA, ProfileFromLabel, ProfileFromBreeder, ProfileFromGuess} {
+		flower.ProfileSource = src
+		if err := flower.Validate(); err != nil {
+			t.Errorf("%s rejected: %v", src, err)
+		}
+	}
+	flower.ProfileSource = "seedbank"
+	if err := flower.Validate(); err == nil || !strings.Contains(err.Error(), "profileSource") {
+		t.Errorf("unknown source: err = %v", err)
+	}
+
+	lot := BatchInput{Kind: InputLot, LotID: "l", Grams: 1, ProfileSource: ProfileFromCOA}
+	if err := lot.Validate(); err == nil {
+		t.Error("profileSource on a lot input should be rejected")
+	}
+}

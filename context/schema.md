@@ -144,6 +144,8 @@ type BatchInput =
       profile: Profile;                        // label/COA numbers, acids as reported
       efficiency: number;                      // (0, 1]; decarb applied separately
       method: string; confidence: Confidence;
+      profileSource?: 'coa' | 'label' | 'breeder' | 'guess';  // where the numbers came from;
+                                               // informational, optional for older inputs
       coaUrl?: string;                         // the flower's own COA, often a JPG
       coaS3Key?: string }                      // archived copy; numbers stay estimates
   | { kind: 'additive'; grams: number; name: string; profile?: Profile; note?: string };

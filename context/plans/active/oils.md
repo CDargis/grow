@@ -189,9 +189,9 @@ keeps it when the same link is re-sent, and removes it when the link changes or 
 deleted. The flower's numbers still count as estimates: that COA documents the flower, not the
 oil.
 
-Open: `confidence` currently has to cover two different things: how much Chris trusts the
+Built (2026-11-07): `confidence` had to cover two different things: how much Chris trusts the
 **method** (extraction) and how good the **starting numbers** are (a COA vs a label vs a
-breeder's "15–20% CBD"). Proposed: add `profileSource: 'coa' | 'label' | 'breeder' | 'guess'`
-to flower inputs, shown on the ROBP, informational only (Chris still sets one confidence,
+breeder's "15–20% CBD"). Added `profileSource: 'coa' | 'label' | 'breeder' | 'guess'`
+to flower inputs (optional, so older inputs still validate), shown on the ROBP, informational only (Chris still sets one confidence,
 weighing both). Homegrow path to better numbers: send a flower sample to a lab, then
 `update_batch` with the new profile + `coaUrl`; blends made from it update automatically.

@@ -50,6 +50,26 @@ func (c Confidence) Valid() bool {
 	return false
 }
 
+// ProfileSource says where a flower input's starting numbers came from.
+// Informational: it's shown on the ROBP but doesn't change the math. Chris
+// weighs it into the single confidence rating himself.
+type ProfileSource string
+
+const (
+	ProfileFromCOA     ProfileSource = "coa"     // the flower's own lab COA
+	ProfileFromLabel   ProfileSource = "label"   // a retail label's %
+	ProfileFromBreeder ProfileSource = "breeder" // seed bank / breeder's stated range
+	ProfileFromGuess   ProfileSource = "guess"
+)
+
+func (p ProfileSource) Valid() bool {
+	switch p {
+	case ProfileFromCOA, ProfileFromLabel, ProfileFromBreeder, ProfileFromGuess:
+		return true
+	}
+	return false
+}
+
 type InputKind string
 
 const (
@@ -165,6 +185,8 @@ type BatchInput struct {
 	Efficiency float64    `dynamodbav:"efficiency,omitempty" json:"efficiency,omitempty" jsonschema:"flower inputs: (0, 1], share of decarbed cannabinoids that ended up in the oil; agree it with Chris, do not assume"`
 	Method     string     `dynamodbav:"method,omitempty"     json:"method,omitempty"     jsonschema:"flower inputs: how the oil was made, free text"`
 	Confidence Confidence `dynamodbav:"confidence,omitempty" json:"confidence,omitempty" jsonschema:"flower inputs: low | medium | high, Chris's trust in this method; ask if unsure"`
+	// Optional so flower inputs recorded before it existed still validate.
+	ProfileSource ProfileSource `dynamodbav:"profileSource,omitempty" json:"profileSource,omitempty" jsonschema:"flower inputs: where the profile numbers came from: coa (the flower's own COA), label (retail label %), breeder (seed bank's stated range), guess"`
 	// COAURL is the flower's own COA (often a JPG for flower bought online).
 	// It documents the flower, not the oil, so the flower's numbers still
 	// count as estimates. COAS3Key is set once the link has been archived.
@@ -366,6 +388,13 @@ func (in BatchInput) Validate() error {
 	}
 	if in.COAURL != "" && in.Kind != InputFlower {
 		errs = append(errs, errors.New("coaUrl only applies to flower inputs (a lot carries its own COA)"))
+	}
+	if in.ProfileSource != "" {
+		if in.Kind != InputFlower {
+			errs = append(errs, errors.New("profileSource only applies to flower inputs"))
+		} else if !in.ProfileSource.Valid() {
+			errs = append(errs, fmt.Errorf("profileSource %q must be coa, label, breeder or guess", in.ProfileSource))
+		}
 	}
 	switch in.Kind {
 	case InputLot:

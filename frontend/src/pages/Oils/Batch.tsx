@@ -153,6 +153,13 @@ function TotalCard({ label, c }: { label: string; c: Compound }) {
   )
 }
 
+const PROFILE_SOURCE_LABEL: Record<NonNullable<BatchInput['profileSource']>, string> = {
+  coa: 'the flower’s COA',
+  label: 'the label',
+  breeder: 'the breeder’s stated range',
+  guess: 'a guess',
+}
+
 interface Lookups {
   lots: Map<string, Lot>
   batches: Map<string, Batch>
@@ -196,6 +203,9 @@ function InputRow({ input, lookups }: { input: BatchInput; lookups: Lookups }) {
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-x-3 text-xs">
                 {conf && <span className={SOURCE_STYLE[conf].text}>{conf} confidence estimate</span>}
+                {input.profileSource && (
+                  <span className="text-dim">numbers from {PROFILE_SOURCE_LABEL[input.profileSource]}</span>
+                )}
                 {input.plantId && (
                   <Link to={`/plants/${input.plantId}`} className="text-fern">
                     {plant ? plant.name : 'plant'}
