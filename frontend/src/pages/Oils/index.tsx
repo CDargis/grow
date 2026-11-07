@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, AlertTriangle } from 'lucide-react'
+import { ChevronRight, AlertTriangle, FileText } from 'lucide-react'
 import { api } from '@/api/client'
 import type { BatchView, Compound, Lot } from '@/types'
 import { batchDateLabel, fmtMg, lotTotal } from '@/lib/oilDisplay'
@@ -84,6 +84,13 @@ function BatchCard({ view, onOpen }: { view: BatchView; onOpen: () => void }) {
           <TotalTile label="THC" c={profile.totalThc} />
         </div>
       )}
+
+      {/* Same look as a lot's COA link. A span, not a link: the whole card
+          is already the button that opens the ROBP. */}
+      <span className="mt-3 flex items-center gap-1 text-xs text-fern">
+        <FileText size={13} />
+        ROBP
+      </span>
     </button>
   )
 }
