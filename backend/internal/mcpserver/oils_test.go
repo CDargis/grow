@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -215,5 +216,49 @@ func TestDeleteBatchTool(t *testing.T) {
 	}
 	if msg := call(t, cs, "delete_lot", map[string]any{"lotId": lot.Lot.LotID}, nil); msg != "" {
 		t.Errorf("delete_lot after its batch is gone: %s", msg)
+	}
+}
+
+// A flower input's profileSource and coaUrl survive create → get_batch →
+// update_batch with the inputs resent unchanged (as Claude does, since
+// inputs replaces the whole list), and the archived copy is kept.
+func TestFlowerInputFieldsRoundTrip(t *testing.T) {
+	cs := connect(t)
+	const coa = "https://rogueorigin.com/cdn/shop/files/2025_Berry_Bliss_-_Sungrown_-_Post_Harvest_Lab_Analysis.jpg?v=1763066892&width=1200"
+
+	var created oils.BatchResult
+	if msg := call(t, cs, "create_batch", map[string]any{
+		"type": "FS", "subType": "CBD", "discriminator": "BB", "date": "2026-07-11", "totalGrams": 120,
+		"inputs": []any{map[string]any{
+			"kind": "flower", "grams": 29.9, "strain": "Berry Bliss",
+			"profile":    map[string]any{"cannabinoids": map[string]any{"cbda": 150, "thca": 5}},
+			"efficiency": 0.7, "method": "MCT infusion", "confidence": "medium",
+			"profileSource": "coa", "coaUrl": coa,
+		}},
+	}, &created); msg != "" {
+		t.Fatalf("create_batch: %s", msg)
+	}
+	in := created.Batch.Inputs[0]
+	if in.ProfileSource != model.ProfileFromCOA || in.COAURL != coa || in.COAS3Key == "" {
+		t.Fatalf("created input = %+v", in)
+	}
+
+	var got oils.BatchView
+	if msg := call(t, cs, "get_batch", map[string]any{"batch": "FS-CBD-BB-260711"}, &got); msg != "" {
+		t.Fatalf("get_batch: %s", msg)
+	}
+	if !reflect.DeepEqual(got.Batch.Inputs[0], in) {
+		t.Fatalf("get_batch input = %+v, want %+v", got.Batch.Inputs[0], in)
+	}
+
+	// Resend exactly what get_batch returned.
+	var upd oils.BatchResult
+	if msg := call(t, cs, "update_batch", map[string]any{
+		"batch": "FS-CBD-BB-260711", "changes": map[string]any{"inputs": got.Batch.Inputs},
+	}, &upd); msg != "" {
+		t.Fatalf("update_batch: %s", msg)
+	}
+	if !reflect.DeepEqual(upd.Batch.Inputs[0], in) {
+		t.Errorf("after update_batch input = %+v, want %+v", upd.Batch.Inputs[0], in)
 	}
 }
