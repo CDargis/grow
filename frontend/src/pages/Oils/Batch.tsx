@@ -193,13 +193,16 @@ function InputRow({ input, lookups }: { input: BatchInput; lookups: Lookups }) {
           sub={`flower · ${input.method ?? ''}${input.efficiency ? ` · ${Math.round(input.efficiency * 100)}% efficiency` : ''}`}
           grams={input.grams}
           extra={
-            <div className="flex flex-wrap items-center gap-x-3 text-xs">
-              {conf && <span className={SOURCE_STYLE[conf].text}>{conf} confidence estimate</span>}
-              {input.plantId && (
-                <Link to={`/plants/${input.plantId}`} className="text-fern">
-                  {plant ? plant.name : 'plant'}
-                </Link>
-              )}
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-x-3 text-xs">
+                {conf && <span className={SOURCE_STYLE[conf].text}>{conf} confidence estimate</span>}
+                {input.plantId && (
+                  <Link to={`/plants/${input.plantId}`} className="text-fern">
+                    {plant ? plant.name : 'plant'}
+                  </Link>
+                )}
+              </div>
+              {(input.coaUrl || input.coaS3Key) && <CoaLinks url={input.coaUrl} s3Key={input.coaS3Key} />}
             </div>
           }
         />

@@ -172,3 +172,26 @@ to start (entry happens through MCP).
   recomputes and stores profiles after each write.
 - `update_batch` rejects input cycles (a batch can't contain itself, directly or
   through other batches) and returns the blends whose numbers changed.
+
+## Flower sources (2026-11-07)
+Full-spectrum and THC oils come from three kinds of flower, and they differ mainly in how
+good the *starting* numbers are:
+
+| Source | Starting numbers | COA? |
+|---|---|---|
+| Bought flower/hemp with a COA (e.g. Rogue Origin Berry Bliss) | the flower's COA | yes, often a JPG |
+| Bought flower with only a label % (dispensary, some online hemp) | label | no |
+| Homegrown (`plantId` set) | breeder/seed bank's stated range, or a guess | rarely; seeds don't come with COAs |
+
+Built: a flower input can carry `coaUrl`; the app archives its own copy (image or PDF,
+content type sniffed when the host sends octet-stream) under `oils/batches/{id}/flower-coa/`,
+keeps it when the same link is re-sent, and removes it when the link changes or the batch is
+deleted. The flower's numbers still count as estimates: that COA documents the flower, not the
+oil.
+
+Open: `confidence` currently has to cover two different things: how much Chris trusts the
+**method** (extraction) and how good the **starting numbers** are (a COA vs a label vs a
+breeder's "15–20% CBD"). Proposed: add `profileSource: 'coa' | 'label' | 'breeder' | 'guess'`
+to flower inputs, shown on the ROBP, informational only (Chris still sets one confidence,
+weighing both). Homegrow path to better numbers: send a flower sample to a lab, then
+`update_batch` with the new profile + `coaUrl`; blends made from it update automatically.

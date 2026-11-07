@@ -29,6 +29,9 @@ in the kitchen. Lots are what he bought (a supplier's jar with its COA). Batches
   Send the parts, not the code. Unknown date → omit it (code gets 000000).
 - Flower inputs need efficiency (0-1) and confidence (low/medium/high). Agree both with Chris
   rather than guessing. Send flower label numbers as reported (THCA/CBDA); the app decarbs.
+- Flower bought with a COA (often a JPG): pass the link as the flower input's coaUrl. It must be
+  a direct link to the file (PDF or image), not a share or preview page. The app keeps a copy.
+  The flower's numbers stay estimates; that COA describes the flower, not the oil.
 - Additives such as terpenes: convert drops to grams before sending; put the original
   wording ("3 drops") in the input's note.
 - After a create or update, read back the result in a sentence or two: the code, total CBD and

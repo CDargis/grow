@@ -143,7 +143,9 @@ type BatchInput =
       strain: string; plantId?: string;
       profile: Profile;                        // label/COA numbers, acids as reported
       efficiency: number;                      // (0, 1]; decarb applied separately
-      method: string; confidence: Confidence }
+      method: string; confidence: Confidence;
+      coaUrl?: string;                         // the flower's own COA, often a JPG
+      coaS3Key?: string }                      // archived copy; numbers stay estimates
   | { kind: 'additive'; grams: number; name: string; profile?: Profile; note?: string };
 
 interface Batch {
@@ -220,4 +222,5 @@ grow-media/
   environments/{environmentId}/photo/{filename}
   oils/lots/{lotId}/coa/{ulid}.{pdf|html|…}       # archived copy of a lot's COA link
   oils/batches/{batchId}/coa/{ulid}.{pdf|html|…}  # archived copy of a batch lab COA
+  oils/batches/{batchId}/flower-coa/{ulid}.{jpg|pdf|…}  # archived copy of a flower input's COA
 ```

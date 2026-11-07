@@ -262,6 +262,8 @@ export interface BatchInput {
   efficiency?: number
   method?: string
   confidence?: Confidence
+  coaUrl?: string    // flower only: the flower's own COA (often an image)
+  coaS3Key?: string  // archived copy; absent = not archived
   name?: string
   note?: string
 }

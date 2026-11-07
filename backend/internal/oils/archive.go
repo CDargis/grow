@@ -36,53 +36,68 @@ func NewS3Archiver(s3Client *s3.Client, bucket string) *S3Archiver {
 }
 
 func (a *S3Archiver) Archive(ctx context.Context, rawURL, keyPrefix string) (string, error) {
-	u, err := url.Parse(rawURL)
-	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-		return "", fmt.Errorf("COA link %q is not an http(s) URL", rawURL)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	body, contentType, err := a.fetch(ctx, rawURL)
 	if err != nil {
-		return "", fmt.Errorf("build COA request: %w", err)
-	}
-	req.Header.Set("User-Agent", "grow-coa-archiver/1.0")
-	resp, err := a.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("fetch COA: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("fetch COA: %s returned %s", u.Host, resp.Status)
-	}
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxCOABytes+1))
-	if err != nil {
-		return "", fmt.Errorf("read COA: %w", err)
-	}
-	if len(body) > maxCOABytes {
-		return "", fmt.Errorf("COA is larger than %d MB", maxCOABytes>>20)
-	}
-	if len(body) == 0 {
-		return "", fmt.Errorf("COA link returned an empty response")
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = http.DetectContentType(body)
+		return "", err
 	}
 	key := keyPrefix + "/" + ulid.Make().String() + extensionFor(contentType)
 
+	sourceURL := rawURL
+	if u, err := url.Parse(rawURL); err == nil {
+		sourceURL = u.String() // percent-escaped, keeping S3's ASCII-only metadata happy
+	}
 	if _, err := a.s3.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(a.bucket),
 		Key:         aws.String(key),
 		Body:        bytes.NewReader(body),
 		ContentType: aws.String(contentType),
-		// u.String() is percent-escaped, keeping S3's ASCII-only metadata happy.
-		Metadata: map[string]string{"source-url": truncate(u.String(), 1024)},
+		Metadata:    map[string]string{"source-url": truncate(sourceURL, 1024)},
 	}); err != nil {
 		return "", fmt.Errorf("store COA: %w", err)
 	}
 	return key, nil
+}
+
+// fetch downloads the COA and works out its content type.
+func (a *S3Archiver) fetch(ctx context.Context, rawURL string) ([]byte, string, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		return nil, "", fmt.Errorf("COA link %q is not an http(s) URL", rawURL)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("build COA request: %w", err)
+	}
+	req.Header.Set("User-Agent", "grow-coa-archiver/1.0")
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("fetch COA: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("fetch COA: %s returned %s", u.Host, resp.Status)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxCOABytes+1))
+	if err != nil {
+		return nil, "", fmt.Errorf("read COA: %w", err)
+	}
+	if len(body) > maxCOABytes {
+		return nil, "", fmt.Errorf("COA is larger than %d MB", maxCOABytes>>20)
+	}
+	if len(body) == 0 {
+		return nil, "", fmt.Errorf("COA link returned an empty response")
+	}
+
+	// Trust a specific Content-Type; sniff the bytes when it's missing or
+	// generic (some image hosts send JPGs as octet-stream), so the stored
+	// copy opens in the browser instead of downloading.
+	contentType := resp.Header.Get("Content-Type")
+	if mt, _, _ := mime.ParseMediaType(contentType); mt == "" || mt == "application/octet-stream" || mt == "binary/octet-stream" {
+		contentType = http.DetectContentType(body)
+	}
+	return body, contentType, nil
 }
 
 func (a *S3Archiver) Remove(ctx context.Context, key string) error {
@@ -109,6 +124,10 @@ func extensionFor(contentType string) string {
 		return ".png"
 	case "image/jpeg":
 		return ".jpg"
+	case "image/webp":
+		return ".webp"
+	case "image/gif":
+		return ".gif"
 	}
 	return ""
 }

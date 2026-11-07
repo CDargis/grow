@@ -374,7 +374,11 @@ func (s *Service) CreateBatch(ctx context.Context, userID string, req CreateBatc
 	if b.LabCOA != nil {
 		b.LabCOA.S3Key = "" // only ever set by archiving
 	}
-	return s.saveBatch(ctx, userID, b, true, false)
+	b.Inputs = slices.Clone(b.Inputs)
+	for i := range b.Inputs {
+		b.Inputs[i].COAS3Key = ""
+	}
+	return s.saveBatch(ctx, userID, b, nil, false)
 }
 
 func (s *Service) UpdateBatch(ctx context.Context, userID, idOrCode string, req UpdateBatchRequest) (*BatchResult, error) {
@@ -395,7 +399,11 @@ func (s *Service) UpdateBatch(ctx context.Context, userID, idOrCode string, req 
 	setString(&b.Date, req.Date)
 	setString(&b.BatchDiscriminator, req.BatchDiscriminator)
 	if req.Inputs != nil {
-		b.Inputs = *req.Inputs
+		// Keep archived copies for flower COA links that didn't change.
+		b.Inputs = slices.Clone(*req.Inputs)
+		for i := range b.Inputs {
+			b.Inputs[i].COAS3Key = keptArchive(existing.Inputs, strings.TrimSpace(b.Inputs[i].COAURL))
+		}
 	}
 	if req.Carrier != nil {
 		b.Carrier = req.Carrier
@@ -425,13 +433,20 @@ func (s *Service) UpdateBatch(ctx context.Context, userID, idOrCode string, req 
 	// Only composition changes alter other batches' mg/g. Density only
 	// changes this batch's mg/mL.
 	compositionChanged := req.Inputs != nil || req.TotalGrams != nil || labChanged
-	return s.saveBatch(ctx, userID, b, false, compositionChanged)
+	return s.saveBatch(ctx, userID, b, &existing, compositionChanged)
 }
 
 // saveBatch validates, checks uniqueness and references, calculates the
-// profile (which also catches cycles and missing inputs), archives a lab COA
-// if needed, then writes.
-func (s *Service) saveBatch(ctx context.Context, userID string, b model.Batch, isNew, reportRipple bool) (*BatchResult, error) {
+// profile (which also catches cycles and missing inputs), archives any COA
+// links not yet archived (lab COA, flower COAs), then writes. old is the
+// batch before this update, nil when creating.
+func (s *Service) saveBatch(ctx context.Context, userID string, b model.Batch, old *model.Batch, reportRipple bool) (*BatchResult, error) {
+	// Own the inputs: archiving writes keys into them, and they may share a
+	// backing array with old.
+	b.Inputs = slices.Clone(b.Inputs)
+	for i := range b.Inputs {
+		b.Inputs[i].COAURL = strings.TrimSpace(b.Inputs[i].COAURL)
+	}
 	code, err := model.BuildBatchCode(b.Type, b.SubType, b.Discriminator, b.Date, b.BatchDiscriminator)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
@@ -476,16 +491,46 @@ func (s *Service) saveBatch(ctx context.Context, userID string, b model.Batch, i
 	}
 
 	res := &BatchResult{}
+	var archiveErrs []string
 	if b.LabCOA != nil && b.LabCOA.URL != "" && b.LabCOA.S3Key == "" {
-		b.LabCOA.S3Key, res.ArchiveError = s.archive(ctx, b.LabCOA.URL, "oils/batches/"+b.BatchID+"/coa")
-		proposed[len(proposed)-1] = b
-		calc = oilcalc.New(lots, proposed)
+		var msg string
+		b.LabCOA.S3Key, msg = s.archive(ctx, b.LabCOA.URL, "oils/batches/"+b.BatchID+"/coa")
+		if msg != "" {
+			archiveErrs = append(archiveErrs, "lab COA: "+msg)
+		}
 	}
+	for i, in := range b.Inputs {
+		if in.COAURL == "" || in.COAS3Key != "" {
+			continue
+		}
+		var msg string
+		b.Inputs[i].COAS3Key, msg = s.archive(ctx, in.COAURL, "oils/batches/"+b.BatchID+"/flower-coa")
+		if msg != "" {
+			archiveErrs = append(archiveErrs, fmt.Sprintf("input %d (%s) COA: %s", i, in.Strain, msg))
+		}
+	}
+	res.ArchiveError = strings.Join(archiveErrs, "; ")
+	proposed[len(proposed)-1] = b
+	calc = oilcalc.New(lots, proposed)
+
 	if err := s.batches.Put(ctx, b); err != nil {
 		return nil, err
 	}
+	// Archived copies the batch no longer references (link changed, input
+	// removed) are cleaned up only after the new version is saved.
+	if old != nil {
+		keep := map[string]bool{}
+		for _, k := range archivedKeys(b) {
+			keep[k] = true
+		}
+		for _, k := range archivedKeys(*old) {
+			if !keep[k] {
+				s.removeArchived(ctx, k)
+			}
+		}
+	}
 	res.BatchView = view(calc, b)
-	if !isNew && reportRipple {
+	if old != nil && reportRipple {
 		res.Affected = refs(proposed, calc.Dependents(b.BatchID))
 	}
 	return res, nil
@@ -519,10 +564,38 @@ func (s *Service) DeleteBatch(ctx context.Context, userID, idOrCode string) (*Ba
 	if err := s.batches.Delete(ctx, b.BatchID); err != nil {
 		return nil, err
 	}
-	if b.LabCOA != nil {
-		s.removeArchived(ctx, b.LabCOA.S3Key)
+	for _, k := range archivedKeys(b) {
+		s.removeArchived(ctx, k)
 	}
 	return &BatchRef{BatchID: b.BatchID, Code: b.Code}, nil
+}
+
+// archivedKeys lists every archived COA copy a batch references.
+func archivedKeys(b model.Batch) []string {
+	var keys []string
+	if b.LabCOA != nil && b.LabCOA.S3Key != "" {
+		keys = append(keys, b.LabCOA.S3Key)
+	}
+	for _, in := range b.Inputs {
+		if in.COAS3Key != "" {
+			keys = append(keys, in.COAS3Key)
+		}
+	}
+	return keys
+}
+
+// keptArchive returns the archived copy of url from an earlier version of
+// the inputs, so re-sending an unchanged link doesn't download it again.
+func keptArchive(prev []model.BatchInput, url string) string {
+	if url == "" {
+		return ""
+	}
+	for _, in := range prev {
+		if in.COAURL == url && in.COAS3Key != "" {
+			return in.COAS3Key
+		}
+	}
+	return ""
 }
 
 // removeArchived best-effort deletes an archived COA copy. The record is

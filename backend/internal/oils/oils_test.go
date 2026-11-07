@@ -3,6 +3,7 @@ package oils
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -77,7 +78,7 @@ func (f *fakeArchiver) Archive(_ context.Context, url, prefix string) (string, e
 	if f.err != nil {
 		return "", f.err
 	}
-	return prefix + "/archived.pdf", nil
+	return fmt.Sprintf("%s/archived-%d.pdf", prefix, f.calls), nil
 }
 
 const user = "u1"
@@ -416,5 +417,84 @@ func TestDeleteOtherUsersIsNotFound(t *testing.T) {
 	}
 	if _, err := svc.DeleteBatch(ctx, "intruder", "ISO-261024"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("batch: err = %v, want ErrNotFound", err)
+	}
+}
+
+// ── Flower COAs ──────────────────────────────────────────────────────────────
+
+func flowerBatchReq(coaURL string) CreateBatchRequest {
+	return CreateBatchRequest{
+		Type: model.BatchFS, SubType: "CBD", Discriminator: "BB", Date: "2026-07-17", TotalGrams: 100,
+		Inputs: []model.BatchInput{{Kind: model.InputFlower, Grams: 14, Strain: "Berry Bliss",
+			Profile:    &model.Profile{Cannabinoids: map[string]float64{"cbda": 150}},
+			Efficiency: 0.7, Method: "MCT infusion", Confidence: model.ConfidenceMedium,
+			COAURL: coaURL, COAS3Key: "client-supplied-should-be-ignored"}},
+	}
+}
+
+func TestFlowerCOALifecycle(t *testing.T) {
+	svc, arch := newSvc()
+	ctx := context.Background()
+
+	res, err := svc.CreateBatch(ctx, user, flowerBatchReq("https://rogue.example/bb.jpg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := res.Batch.Inputs[0].COAS3Key
+	if key == "" || key == "client-supplied-should-be-ignored" || arch.calls != 1 {
+		t.Fatalf("flower COA not archived by us: key=%q calls=%d", key, arch.calls)
+	}
+
+	// Re-sending the same inputs (e.g. to fix grams) keeps the archived copy.
+	inputs := flowerBatchReq("https://rogue.example/bb.jpg").Inputs
+	inputs[0].Grams = 15
+	upd, err := svc.UpdateBatch(ctx, user, "FS-CBD-BB-260717", UpdateBatchRequest{Inputs: &inputs})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if upd.Batch.Inputs[0].COAS3Key != key || arch.calls != 1 || len(arch.removed) != 0 {
+		t.Errorf("unchanged link re-archived or removed: key=%q calls=%d removed=%v",
+			upd.Batch.Inputs[0].COAS3Key, arch.calls, arch.removed)
+	}
+
+	// A new link archives the new file and cleans up the old copy.
+	inputs = flowerBatchReq("https://rogue.example/bb-v2.jpg").Inputs
+	upd, err = svc.UpdateBatch(ctx, user, "FS-CBD-BB-260717", UpdateBatchRequest{Inputs: &inputs})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newKey := upd.Batch.Inputs[0].COAS3Key
+	if newKey == "" || arch.calls != 2 || len(arch.removed) != 1 || arch.removed[0] != key {
+		t.Errorf("link change: newKey=%q calls=%d removed=%v (want old %q removed)", newKey, arch.calls, arch.removed, key)
+	}
+
+	// Deleting the batch removes its archived flower COA.
+	if _, err := svc.DeleteBatch(ctx, user, "FS-CBD-BB-260717"); err != nil {
+		t.Fatal(err)
+	}
+	if arch.removed[len(arch.removed)-1] != newKey {
+		t.Errorf("removed = %v, want %q last", arch.removed, newKey)
+	}
+}
+
+func TestFlowerCOAArchiveFailureStillSaves(t *testing.T) {
+	svc, arch := newSvc()
+	arch.err = errors.New("returned 403 Forbidden")
+	res, err := svc.CreateBatch(context.Background(), user, flowerBatchReq("https://rogue.example/bb.jpg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.ArchiveError, "Berry Bliss") || res.Batch.Inputs[0].COAURL == "" {
+		t.Errorf("archiveError = %q, link = %q", res.ArchiveError, res.Batch.Inputs[0].COAURL)
+	}
+}
+
+func TestCOAURLOnlyOnFlower(t *testing.T) {
+	svc, _ := newSvc()
+	lot := mustLot(t, svc)
+	req := isoBatchReq(lot.LotID)
+	req.Inputs[0].COAURL = "https://lab.example/x.pdf"
+	if _, err := svc.CreateBatch(context.Background(), user, req); !errors.Is(err, ErrInvalid) {
+		t.Errorf("err = %v, want ErrInvalid", err)
 	}
 }

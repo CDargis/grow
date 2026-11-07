@@ -165,6 +165,11 @@ type BatchInput struct {
 	Efficiency float64    `dynamodbav:"efficiency,omitempty" json:"efficiency,omitempty" jsonschema:"flower inputs: (0, 1], share of decarbed cannabinoids that ended up in the oil; agree it with Chris, do not assume"`
 	Method     string     `dynamodbav:"method,omitempty"     json:"method,omitempty"     jsonschema:"flower inputs: how the oil was made, free text"`
 	Confidence Confidence `dynamodbav:"confidence,omitempty" json:"confidence,omitempty" jsonschema:"flower inputs: low | medium | high, Chris's trust in this method; ask if unsure"`
+	// COAURL is the flower's own COA (often a JPG for flower bought online).
+	// It documents the flower, not the oil, so the flower's numbers still
+	// count as estimates. COAS3Key is set once the link has been archived.
+	COAURL   string `dynamodbav:"coaUrl,omitempty"   json:"coaUrl,omitempty"   jsonschema:"flower inputs, optional: direct link to the flower's COA file (PDF or image, not a share page); the app downloads and keeps a copy"`
+	COAS3Key string `dynamodbav:"coaS3Key,omitempty" json:"coaS3Key,omitempty" jsonschema:"ignored on input; set by archiving"`
 
 	Name string `dynamodbav:"name,omitempty" json:"name,omitempty" jsonschema:"additive inputs: what was added, e.g. limonene"`
 	Note string `dynamodbav:"note,omitempty" json:"note,omitempty" jsonschema:"free text, e.g. the original wording like 3 drops"`
@@ -358,6 +363,9 @@ func (in BatchInput) Validate() error {
 	var errs []error
 	if in.Grams <= 0 {
 		errs = append(errs, errors.New("grams must be greater than 0"))
+	}
+	if in.COAURL != "" && in.Kind != InputFlower {
+		errs = append(errs, errors.New("coaUrl only applies to flower inputs (a lot carries its own COA)"))
 	}
 	switch in.Kind {
 	case InputLot:
