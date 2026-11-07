@@ -86,6 +86,8 @@ Lots get their profile from the COA. Batches get theirs calculated from inputs.
   batch, default 0.95 g/mL for MCT. MCT oils all sit around 0.93–0.96, so the default
   is off by ~2% at most, which is fine for dosing. It's stored so it can be corrected
   if it's ever measured (weigh 10 mL). Everything displays both units.
+  Known carriers: LouAna Liquid Coconut Oil ≈ 0.94 (80–85% C8/C10 MCT per LouAna;
+  calculated from composition, not measured). Pure MCT ≈ 0.95.
 - **Batch profile** = weighted blend of inputs by grams, per compound.
 - **Estimated vs lab, per compound**: for each cannabinoid (and terpene), the share of
   that compound's mg that came from flower guesses vs lab-backed inputs, weighted by
