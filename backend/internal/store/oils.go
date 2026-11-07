@@ -91,6 +91,30 @@ func (s *OilBatchStore) Put(ctx context.Context, batch model.Batch) error {
 	return nil
 }
 
+func (s *OilLotStore) Delete(ctx context.Context, lotID string) error {
+	if err := deleteItem(ctx, s.ddb, s.tableName, "lotId", lotID); err != nil {
+		return fmt.Errorf("delete oil lot: %w", err)
+	}
+	return nil
+}
+
+func (s *OilBatchStore) Delete(ctx context.Context, batchID string) error {
+	if err := deleteItem(ctx, s.ddb, s.tableName, "batchId", batchID); err != nil {
+		return fmt.Errorf("delete oil batch: %w", err)
+	}
+	return nil
+}
+
+func deleteItem(ctx context.Context, ddb *dynamodb.Client, table, keyName, keyValue string) error {
+	_, err := ddb.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(table),
+		Key: map[string]types.AttributeValue{
+			keyName: &types.AttributeValueMemberS{Value: keyValue},
+		},
+	})
+	return err
+}
+
 // queryAllByUser pages through a user-index GSI. Profiles are calculated from
 // the full set of a user's lots and batches, so a silently truncated first
 // page would produce wrong numbers -- hence paging rather than one Query.

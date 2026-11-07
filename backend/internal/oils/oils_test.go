@@ -29,7 +29,8 @@ func (f *fakeLots) Get(_ context.Context, id string) (*model.Lot, error) {
 	}
 	return nil, nil
 }
-func (f *fakeLots) Put(_ context.Context, l model.Lot) error { f.m[l.LotID] = l; return nil }
+func (f *fakeLots) Put(_ context.Context, l model.Lot) error  { f.m[l.LotID] = l; return nil }
+func (f *fakeLots) Delete(_ context.Context, id string) error { delete(f.m, id); return nil }
 
 type fakeBatches struct{ m map[string]model.Batch }
 
@@ -49,6 +50,7 @@ func (f *fakeBatches) Get(_ context.Context, id string) (*model.Batch, error) {
 	return nil, nil
 }
 func (f *fakeBatches) Put(_ context.Context, b model.Batch) error { f.m[b.BatchID] = b; return nil }
+func (f *fakeBatches) Delete(_ context.Context, id string) error  { delete(f.m, id); return nil }
 
 type fakePlants struct{ m map[string]model.Plant }
 
@@ -60,8 +62,14 @@ func (f *fakePlants) Get(_ context.Context, id string) (*model.Plant, error) {
 }
 
 type fakeArchiver struct {
-	err   error
-	calls int
+	err     error
+	calls   int
+	removed []string
+}
+
+func (f *fakeArchiver) Remove(_ context.Context, key string) error {
+	f.removed = append(f.removed, key)
+	return nil
 }
 
 func (f *fakeArchiver) Archive(_ context.Context, url, prefix string) (string, error) {
@@ -349,5 +357,64 @@ func TestDose(t *testing.T) {
 	}
 	if _, err := svc.Dose(context.Background(), user, "ISO-261024", "cbg", 10); !errors.Is(err, ErrInvalid) {
 		t.Errorf("missing compound: err = %v, want ErrInvalid", err)
+	}
+}
+
+// ── Deletes ──────────────────────────────────────────────────────────────────
+
+func TestDeleteRefusedWhileInUse(t *testing.T) {
+	svc, arch := newSvc()
+	ctx := context.Background()
+	lot := mustLot(t, svc)
+	iso, err := svc.CreateBatch(ctx, user, isoBatchReq(lot.LotID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.CreateBatch(ctx, user, CreateBatchRequest{
+		Type: model.BatchBL, Date: "2026-11-07", TotalGrams: 10,
+		Inputs: []model.BatchInput{{Kind: model.InputBatch, BatchID: iso.Batch.BatchID, Grams: 10}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Lot is used by ISO-261024; ISO-261024 is used by BL-261107.
+	err = svc.DeleteLot(ctx, user, lot.LotID)
+	if !errors.Is(err, ErrConflict) || !strings.Contains(err.Error(), "ISO-261024") {
+		t.Errorf("delete used lot: err = %v, want ErrConflict naming ISO-261024", err)
+	}
+	_, err = svc.DeleteBatch(ctx, user, "ISO-261024")
+	if !errors.Is(err, ErrConflict) || !strings.Contains(err.Error(), "BL-261107") {
+		t.Errorf("delete used batch: err = %v, want ErrConflict naming BL-261107", err)
+	}
+
+	// Remove from the top down: blend, then ISO, then the lot.
+	for _, code := range []string{"BL-261107", "ISO-261024"} {
+		if _, err := svc.DeleteBatch(ctx, user, code); err != nil {
+			t.Fatalf("delete %s: %v", code, err)
+		}
+	}
+	if err := svc.DeleteLot(ctx, user, lot.LotID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.GetLot(ctx, user, lot.LotID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("lot still there: %v", err)
+	}
+	if len(arch.removed) != 1 || arch.removed[0] != lot.COAS3Key {
+		t.Errorf("archived COA removed = %v, want [%s]", arch.removed, lot.COAS3Key)
+	}
+}
+
+func TestDeleteOtherUsersIsNotFound(t *testing.T) {
+	svc, _ := newSvc()
+	ctx := context.Background()
+	lot := mustLot(t, svc)
+	if _, err := svc.CreateBatch(ctx, user, isoBatchReq(lot.LotID)); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.DeleteLot(ctx, "intruder", lot.LotID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("lot: err = %v, want ErrNotFound", err)
+	}
+	if _, err := svc.DeleteBatch(ctx, "intruder", "ISO-261024"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("batch: err = %v, want ErrNotFound", err)
 	}
 }

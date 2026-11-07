@@ -85,6 +85,16 @@ func (a *S3Archiver) Archive(ctx context.Context, rawURL, keyPrefix string) (str
 	return key, nil
 }
 
+func (a *S3Archiver) Remove(ctx context.Context, key string) error {
+	if _, err := a.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(a.bucket),
+		Key:    aws.String(key),
+	}); err != nil {
+		return fmt.Errorf("delete archived COA: %w", err)
+	}
+	return nil
+}
+
 func extensionFor(contentType string) string {
 	mt, _, err := mime.ParseMediaType(contentType)
 	if err != nil {

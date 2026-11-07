@@ -30,7 +30,8 @@ func (m memLots) Get(_ context.Context, id string) (*model.Lot, error) {
 	}
 	return nil, nil
 }
-func (m memLots) Put(_ context.Context, l model.Lot) error { m[l.LotID] = l; return nil }
+func (m memLots) Put(_ context.Context, l model.Lot) error  { m[l.LotID] = l; return nil }
+func (m memLots) Delete(_ context.Context, id string) error { delete(m, id); return nil }
 
 type memBatches map[string]model.Batch
 
@@ -50,6 +51,7 @@ func (m memBatches) Get(_ context.Context, id string) (*model.Batch, error) {
 	return nil, nil
 }
 func (m memBatches) Put(_ context.Context, b model.Batch) error { m[b.BatchID] = b; return nil }
+func (m memBatches) Delete(_ context.Context, id string) error  { delete(m, id); return nil }
 
 type noPlants struct{}
 
@@ -60,6 +62,8 @@ type okArchiver struct{}
 func (okArchiver) Archive(_ context.Context, _, prefix string) (string, error) {
 	return prefix + "/x.pdf", nil
 }
+
+func (okArchiver) Remove(context.Context, string) error { return nil }
 
 func connect(t *testing.T) *mcp.ClientSession {
 	t.Helper()
@@ -183,5 +187,33 @@ func TestKitchenFlow(t *testing.T) {
 	}
 	if upd.Batch.Notes != "smooth" {
 		t.Errorf("notes = %q", upd.Batch.Notes)
+	}
+}
+
+func TestDeleteBatchTool(t *testing.T) {
+	cs := connect(t)
+	var lot struct {
+		Lot model.Lot `json:"lot"`
+	}
+	call(t, cs, "create_lot", map[string]any{
+		"supplier": "Red Mesa", "product": "CBD isolate", "supplierLotNumber": "2410",
+		"profile": map[string]any{"cannabinoids": map[string]any{"cbd": 992}},
+	}, &lot)
+	call(t, cs, "create_batch", map[string]any{
+		"type": "ISO", "date": "2026-10-24", "totalGrams": 30,
+		"inputs": []any{map[string]any{"kind": "lot", "lotId": lot.Lot.LotID, "grams": 3}},
+	}, nil)
+
+	if msg := call(t, cs, "delete_lot", map[string]any{"lotId": lot.Lot.LotID}, nil); !strings.Contains(msg, "ISO-261024") {
+		t.Errorf("delete_lot in use: %q, want refusal naming ISO-261024", msg)
+	}
+	if msg := call(t, cs, "delete_batch", map[string]any{"batch": "ISO-261024"}, nil); msg != "" {
+		t.Fatalf("delete_batch: %s", msg)
+	}
+	if msg := call(t, cs, "get_batch", map[string]any{"batch": "ISO-261024"}, nil); !strings.Contains(msg, "not found") {
+		t.Errorf("get_batch after delete: %q, want not found", msg)
+	}
+	if msg := call(t, cs, "delete_lot", map[string]any{"lotId": lot.Lot.LotID}, nil); msg != "" {
+		t.Errorf("delete_lot after its batch is gone: %s", msg)
 	}
 }

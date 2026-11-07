@@ -140,10 +140,12 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/oils/lots", a.createOilLot)
 	mux.HandleFunc("GET /api/oils/lots/{lotId}", a.getOilLot)
 	mux.HandleFunc("PATCH /api/oils/lots/{lotId}", a.updateOilLot)
+	mux.HandleFunc("DELETE /api/oils/lots/{lotId}", a.deleteOilLot)
 	mux.HandleFunc("GET /api/oils/batches", a.listOilBatches)
 	mux.HandleFunc("POST /api/oils/batches", a.createOilBatch)
 	mux.HandleFunc("GET /api/oils/batches/{batch}", a.getOilBatch) // batchId or code
 	mux.HandleFunc("PATCH /api/oils/batches/{batch}", a.updateOilBatch)
+	mux.HandleFunc("DELETE /api/oils/batches/{batch}", a.deleteOilBatch)
 
 	mux.HandleFunc("GET /api/auth-config", a.getAuthConfig)
 
@@ -712,6 +714,22 @@ func (a *app) updateOilBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, res)
+}
+
+func (a *app) deleteOilLot(w http.ResponseWriter, r *http.Request) {
+	if err := a.oils.DeleteLot(r.Context(), a.userID(r), r.PathValue("lotId")); err != nil {
+		oilsError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *app) deleteOilBatch(w http.ResponseWriter, r *http.Request) {
+	if _, err := a.oils.DeleteBatch(r.Context(), a.userID(r), r.PathValue("batch")); err != nil {
+		oilsError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // decodeStrict rejects unknown fields, so a misspelled field (e.g. from an

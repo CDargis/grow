@@ -158,6 +158,39 @@ func (d Deps) addOilTools(s *mcp.Server, userID string) {
 		return nil0(d.Oils.UpdateBatch(ctx, userID, args.Batch, args.Changes))
 	})
 
+	destructive := &mcp.ToolAnnotations{DestructiveHint: ptr(true)}
+
+	type deleteLotArgs struct {
+		LotID string `json:"lotId" jsonschema:"the lot's lotId from list_lots"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "delete_lot",
+		Description: "Permanently delete a lot that was recorded by mistake, and its archived COA copy. " +
+			"Refused while any batch uses the lot. Confirm with Chris before calling.",
+		Annotations: destructive,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args deleteLotArgs) (*mcp.CallToolResult, any, error) {
+		if err := d.Oils.DeleteLot(ctx, userID, args.LotID); err != nil {
+			return nil, nil, err
+		}
+		return nil, map[string]any{"deleted": args.LotID}, nil
+	})
+
+	type deleteBatchArgs struct {
+		Batch string `json:"batch" jsonschema:"batch code or batchId"`
+	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "delete_batch",
+		Description: "Permanently delete a batch that was recorded by mistake. Refused while another batch " +
+			"uses it as an input. To fix numbers, use update_batch instead. Confirm with Chris before calling.",
+		Annotations: destructive,
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, args deleteBatchArgs) (*mcp.CallToolResult, any, error) {
+		ref, err := d.Oils.DeleteBatch(ctx, userID, args.Batch)
+		if err != nil {
+			return nil, nil, err
+		}
+		return nil, map[string]any{"deleted": ref}, nil
+	})
+
 	type doseArgs struct {
 		Batch    string  `json:"batch"    jsonschema:"batch code or batchId"`
 		Compound string  `json:"compound" jsonschema:"total_cbd, total_thc, or a profile key such as cbd, d9thc, cbg, cbn"`
@@ -172,6 +205,8 @@ func (d Deps) addOilTools(s *mcp.Server, userID string) {
 		return nil0(d.Oils.Dose(ctx, userID, args.Batch, args.Compound, args.TargetMg))
 	})
 }
+
+func ptr[T any](v T) *T { return &v }
 
 // nil0 adapts a (result, error) service call to a tool handler's return.
 func nil0[T any](v *T, err error) (*mcp.CallToolResult, any, error) {

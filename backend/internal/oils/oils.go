@@ -29,12 +29,14 @@ type LotRepo interface {
 	List(ctx context.Context, userID string) ([]model.Lot, error)
 	Get(ctx context.Context, lotID string) (*model.Lot, error)
 	Put(ctx context.Context, lot model.Lot) error
+	Delete(ctx context.Context, lotID string) error
 }
 
 type BatchRepo interface {
 	List(ctx context.Context, userID string) ([]model.Batch, error)
 	Get(ctx context.Context, batchID string) (*model.Batch, error)
 	Put(ctx context.Context, batch model.Batch) error
+	Delete(ctx context.Context, batchID string) error
 }
 
 type PlantLookup interface {
@@ -42,9 +44,10 @@ type PlantLookup interface {
 }
 
 // Archiver copies the document at url into storage under keyPrefix and
-// returns the stored key.
+// returns the stored key; Remove deletes an archived copy.
 type Archiver interface {
 	Archive(ctx context.Context, url, keyPrefix string) (string, error)
+	Remove(ctx context.Context, key string) error
 }
 
 type Service struct {
@@ -265,6 +268,38 @@ func (s *Service) UpdateLot(ctx context.Context, userID, lotID string, req Updat
 	return res, nil
 }
 
+// DeleteLot removes a lot. Refused while any batch uses it directly, since
+// those batches' profiles would no longer calculate; the error names them.
+func (s *Service) DeleteLot(ctx context.Context, userID, lotID string) error {
+	lot, err := s.GetLot(ctx, userID, lotID)
+	if err != nil {
+		return err
+	}
+	batches, err := s.batches.List(ctx, userID)
+	if err != nil {
+		return err
+	}
+	var users []string
+	for _, b := range batches {
+		for _, in := range b.Inputs {
+			if in.Kind == model.InputLot && in.LotID == lotID {
+				users = append(users, b.Code)
+				break
+			}
+		}
+	}
+	if len(users) > 0 {
+		slices.Sort(users)
+		return fmt.Errorf("%w: lot %s is used by %s; delete or change those batches first",
+			ErrConflict, lot.SupplierLotNumber, strings.Join(users, ", "))
+	}
+	if err := s.lots.Delete(ctx, lotID); err != nil {
+		return err
+	}
+	s.removeArchived(ctx, lot.COAS3Key)
+	return nil
+}
+
 func checkLotUnique(lot model.Lot, existing []model.Lot) error {
 	for _, e := range existing {
 		if e.LotID == lot.LotID {
@@ -454,6 +489,51 @@ func (s *Service) saveBatch(ctx context.Context, userID string, b model.Batch, i
 		res.Affected = refs(proposed, calc.Dependents(b.BatchID))
 	}
 	return res, nil
+}
+
+// DeleteBatch removes a batch. Refused while another batch uses it as an
+// input, since that blend's profile would no longer calculate.
+func (s *Service) DeleteBatch(ctx context.Context, userID, idOrCode string) (*BatchRef, error) {
+	_, batches, err := s.loadAll(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	b, ok := findBatch(batches, idOrCode)
+	if !ok {
+		return nil, fmt.Errorf("batch %s: %w", idOrCode, ErrNotFound)
+	}
+	var users []string
+	for _, other := range batches {
+		for _, in := range other.Inputs {
+			if in.Kind == model.InputBatch && in.BatchID == b.BatchID {
+				users = append(users, other.Code)
+				break
+			}
+		}
+	}
+	if len(users) > 0 {
+		slices.Sort(users)
+		return nil, fmt.Errorf("%w: batch %s is an input to %s; delete or change those batches first",
+			ErrConflict, b.Code, strings.Join(users, ", "))
+	}
+	if err := s.batches.Delete(ctx, b.BatchID); err != nil {
+		return nil, err
+	}
+	if b.LabCOA != nil {
+		s.removeArchived(ctx, b.LabCOA.S3Key)
+	}
+	return &BatchRef{BatchID: b.BatchID, Code: b.Code}, nil
+}
+
+// removeArchived best-effort deletes an archived COA copy. The record is
+// already gone; an orphaned S3 object is preferable to failing the delete.
+func (s *Service) removeArchived(ctx context.Context, key string) {
+	if key == "" || s.archiver == nil {
+		return
+	}
+	if err := s.archiver.Remove(ctx, key); err != nil {
+		log.Printf("warn: remove archived COA %s: %v", key, err)
+	}
 }
 
 func (s *Service) checkPlants(ctx context.Context, userID string, b model.Batch) error {

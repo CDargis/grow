@@ -43,7 +43,8 @@
 - `backend/internal/mcpserver/` — official `modelcontextprotocol/go-sdk`, Streamable HTTP
   transport, stateless.
 - Oils tools (read/write, `mcpserver/oils.go`): `list_lots`, `create_lot`, `update_lot`,
-  `list_batches`, `get_batch`, `create_batch`, `update_batch`, `dose` — thin wrappers over
+  `delete_lot`, `list_batches`, `get_batch`, `create_batch`, `update_batch`, `delete_batch`,
+  `dose` — thin wrappers over
   `internal/oils`; service errors come back as tool errors so Claude can fix and retry.
   Workflow conventions (mg/g only, ND = 0, send code parts not codes, agree efficiency and
   confidence with Chris, read back numbers) are sent as MCP server instructions; field-level
@@ -83,12 +84,15 @@
   validation, uniqueness, code building, reference/plant/cycle checks, COA archiving,
   ripple report) → `internal/oilcalc` (pure profile math). The HTTP handlers and the MCP
   tools both call `internal/oils`, so the rules exist once.
-- REST: `GET|POST /api/oils/lots`, `GET|PATCH /api/oils/lots/{lotId}`,
-  `GET|POST /api/oils/batches`, `GET|PATCH /api/oils/batches/{batch}` (`{batch}` is a
+- REST: `GET|POST /api/oils/lots`, `GET|PATCH|DELETE /api/oils/lots/{lotId}`,
+  `GET|POST /api/oils/batches`, `GET|PATCH|DELETE /api/oils/batches/{batch}` (`{batch}` is a
   batchId or a code like `FS-CBD-BB-260717`). PATCH bodies are patches (absent = unchanged).
   Oils handlers reject unknown JSON fields so a typo can't silently drop data.
 - Profiles are calculated on every read from the user's full set of lots and batches
   (tens of items), never stored, so edits flow into every blend made from them.
+- Deletes are refused while something depends on the record (a lot used by any batch, a
+  batch used as another batch's input), naming the dependents; archived COA copies are
+  removed best-effort.
 - Ownership is checked in the service (`userId` must match) on every get/update,
   including a flower input's `plantId`.
 - COA archiving: on save, the Lambda GETs the COA link (15s timeout, 25 MB cap) and

@@ -240,7 +240,8 @@ func (d Deps) newServer(userID string) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		if plant.UserID != userID {
+		// PlantStore.Get returns (nil, nil) for an unknown id.
+		if plant == nil || plant.UserID != userID {
 			return nil, nil, fmt.Errorf("plant not found")
 		}
 		return nil, plant, nil
@@ -258,7 +259,8 @@ func (d Deps) newServer(userID string) *mcp.Server {
 		if err != nil {
 			return nil, nil, err
 		}
-		if plant.UserID != userID {
+		// PlantStore.Get returns (nil, nil) for an unknown id.
+		if plant == nil || plant.UserID != userID {
 			return nil, nil, fmt.Errorf("plant not found")
 		}
 		logs, err := d.Logs.ListForPlant(ctx, args.PlantID)

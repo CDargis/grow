@@ -143,6 +143,8 @@ list_logs_for_plant, get_logs_by_date_range). This feature adds its first write 
 - `update_lot`, `update_batch`: fix or fill in fields after the fact (COA numbers,
   grams, notes, ID parts, inputs)
 - `list_lots`, `list_batches`, `get_batch`
+- `delete_lot`, `delete_batch`: remove a mistaken record; refused while something depends
+  on it (added after first use)
 - `dose`: "how much oil for 100 mg CBD from batch X" (stateless math, mL + g)
 
 ## UI
