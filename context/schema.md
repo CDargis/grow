@@ -97,6 +97,74 @@ interface Settings {
   sortChipOrder?: LogType[];      // Activity/Sort chip strip order; unset = catalog default order
   plantsLayoutMode?: 'grid' | 'rows' | 'fixed';  // Plants page card layout; unset = 'grid'
 }
+
+// ── Oils (Go: backend/internal/model/oil.go) ───────────────────────────────────
+// Lots in, batches out. All potency values are mg/g (1% = 10 mg/g); mg/mL is
+// always derived (mg/g × densityGPerMl), never stored. Batch profiles (the ROBP)
+// are calculated on read by internal/oilcalc, never stored.
+
+type BatchType = 'DIS' | 'ISO' | 'FS' | 'THC' | 'BL';
+type Confidence = 'low' | 'medium' | 'high';
+
+// Present key with 0 = tested, not detected. Absent key = not reported.
+interface Profile {
+  cannabinoids?: Partial<Record<CannabinoidKey, number>>;  // KnownCannabinoids
+  terpenes?: Partial<Record<TerpeneKey, number>>;          // KnownTerpenes
+  other?: Array<{ name: string; mgPerG: number }>;         // anything off-list
+}
+type CannabinoidKey = 'cbd' | 'cbda' | 'd9thc' | 'thca' | 'd8thc' | 'cbg' | 'cbga'
+  | 'cbn' | 'cbc' | 'cbdv' | 'thcv';
+type TerpeneKey = 'myrcene' | 'limonene' | 'beta_caryophyllene' | 'linalool'
+  | 'alpha_pinene' | 'beta_pinene' | 'humulene' | 'terpinolene' | 'ocimene'
+  | 'bisabolol' | 'nerolidol' | 'caryophyllene_oxide' | 'eucalyptol' | 'geraniol'
+  | 'camphene' | 'terpineol';
+
+// The supplier's lot. Unique per user on (supplier, supplierLotNumber),
+// case-insensitive.
+interface Lot {
+  lotId: string;                  // ULID
+  userId: string;
+  supplier: string;               // "Red Mesa"
+  product: string;                // isolate / distillate / …
+  supplierLotNumber: string;
+  gramsPurchased?: number;
+  coaUrl?: string;
+  coaS3Key?: string;              // archived copy in grow-media; absent = not archived
+  profile: Profile;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+type BatchInput =
+  | { kind: 'lot'; lotId: string; grams: number }
+  | { kind: 'batch'; batchId: string; grams: number }
+  | { kind: 'flower'; grams: number;          // grams of flower, not oil
+      strain: string; plantId?: string;
+      profile: Profile;                        // label/COA numbers, acids as reported
+      efficiency: number;                      // (0, 1]; decarb applied separately
+      method: string; confidence: Confidence }
+  | { kind: 'additive'; grams: number; name: string; profile?: Profile; note?: string };
+
+interface Batch {
+  batchId: string;                // ULID
+  userId: string;
+  code: string;                   // [type]-<subType>-<discriminator>-[YYMMDD]-<batchDiscriminator>
+                                  // built from the parts below; unique per user
+  type: BatchType;
+  subType?: string;               // letters/digits only, uppercased
+  discriminator?: string;
+  date?: string;                  // YYYY-MM-DD; absent → "000000" in code
+  batchDiscriminator?: string;
+  inputs: BatchInput[];
+  carrier?: { name: string; grams: number };
+  densityGPerMl: number;          // per batch; default 0.95, LouAna ≈ 0.94
+  totalGrams: number;             // oil made
+  labCoa?: { url: string; s3Key?: string; profile: Profile };  // replaces calculated profile
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
 ```
 
 ## DynamoDB Tables
@@ -126,6 +194,18 @@ interface Settings {
 | PK: `productId` | STRING | ULID; nutrient products (see `backend/internal/model/product.go`) |
 | GSI `user-index` | PK=userId, SK=productId | list all products for a user |
 
+### grow-oil-lots
+| Key | Type | Notes |
+|-----|------|-------|
+| PK: `lotId` | STRING | ULID |
+| GSI `user-index` | PK=userId, SK=lotId | list all lots for a user; (supplier, lot number) uniqueness checked in Go |
+
+### grow-oil-batches
+| Key | Type | Notes |
+|-----|------|-------|
+| PK: `batchId` | STRING | ULID |
+| GSI `user-index` | PK=userId, SK=batchId | list all batches for a user; code uniqueness and lookup-by-code done in Go |
+
 ### grow-settings
 | Key | Type | Notes |
 |-----|------|-------|
@@ -138,4 +218,6 @@ grow-media/
   plants/{plantId}/avatar/{filename}
   plants/{plantId}/logs/{logId}/{filename}
   environments/{environmentId}/photo/{filename}
+  oils/lots/{lotId}/coa/{ulid}.{pdf|html|…}       # archived copy of a lot's COA link
+  oils/batches/{batchId}/coa/{ulid}.{pdf|html|…}  # archived copy of a batch lab COA
 ```

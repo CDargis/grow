@@ -1,7 +1,7 @@
 # Oils — Lots, Batches, and the ROBP
 
 ## Status
-Active. Design settled 2026-11-07. Step 2 (calculation code) built: `backend/internal/model/oil.go` (types, validation, batch code) and `backend/internal/oilcalc` (profiles, provenance, dose, dependents), with tests.
+Active. Design settled 2026-11-07. Built so far: step 2 (calculation: `internal/model/oil.go`, `internal/oilcalc`) and step 3 (storage + REST: `internal/store/oils.go`, `internal/oils`, CDK tables `grow-oil-lots` / `grow-oil-batches`, `/api/oils/*`). Not deployed yet. Next: step 4 (MCP tools), step 5 (`/oils` UI).
 
 ## What it is
 Track the oils Chris makes at home: Red Mesa isolate/distillate in MCT, THC oil from
@@ -157,63 +157,11 @@ to start (entry happens through MCP).
   present.
 
 ## Storage
-- `grow-lots` (PK `lotId` ULID, GSI `user-index`) and `grow-batches` (PK `batchId`
-  ULID, GSIs `user-index` and `user-code-index`). Interfaces below; they move into
-  `context/schema.md` when built.
-
-```typescript
-type BatchType = 'DIS' | 'ISO' | 'FS' | 'THC' | 'BL';
-type Confidence = 'low' | 'medium' | 'high';
-
-interface Profile {                                       // all mg/g (1% = 10 mg/g)
-  cannabinoids: Partial<Record<CannabinoidKey, number>>;  // fixed known list
-  terpenes: Partial<Record<TerpeneKey, number>>;          // fixed known list
-  other?: Array<{ name: string; mgPerG: number }>;        // anything off-list
-}
-
-interface Lot {
-  lotId: string;                  // ULID
-  userId: string;
-  supplier: string;               // "Red Mesa"; unique on (supplier, supplierLotNumber)
-  product: string;                // isolate / distillate / …
-  supplierLotNumber: string;
-  gramsPurchased?: number;
-  coaUrl?: string;
-  coaS3Key?: string;              // absent = COA not archived
-  profile: Profile;
-  notes?: string;
-  createdAt: string;
-  updatedAt?: string;
-}
-
-type BatchInput =
-  | { kind: 'lot'; lotId: string; grams: number }
-  | { kind: 'batch'; batchId: string; grams: number }
-  | { kind: 'flower'; grams: number; strain: string; plantId?: string;
-      profile: Profile;           // label/COA numbers (THCA/CBDA etc.)
-      efficiency: number;         // 0–1, settled per batch; decarb applied separately
-      method: string; confidence: Confidence }
-  | { kind: 'additive'; grams: number; name: string; profile?: Profile; note?: string };
-
-interface Batch {
-  batchId: string;                // ULID
-  userId: string;
-  code: string;                   // built from the parts below, unique per user
-  type: BatchType;
-  subType?: string;
-  discriminator?: string;
-  date?: string;                  // YYYY-MM-DD; absent → "000000" in code
-  batchDiscriminator?: string;
-  inputs: BatchInput[];
-  carrier?: { name: string; grams: number };
-  densityGPerMl: number;          // per batch; default 0.95, LouAna ≈ 0.94
-  totalGrams: number;
-  labCoa?: { url: string; s3Key?: string; profile: Profile };
-  notes?: string;
-  createdAt: string;
-  updatedAt?: string;
-}
-```
+- `grow-oil-lots` (PK `lotId` ULID, GSI `user-index`) and `grow-oil-batches` (PK
+  `batchId` ULID, GSI `user-index`). Interfaces in `context/schema.md`.
+- No `user-code-index` GSI after all: uniqueness of batch codes and of (supplier, lot
+  number) is checked in Go against the user's full list, which is already loaded to
+  calculate profiles. Lookup by code works the same way.
 - `code` (the human batch ID) is a unique label, not the key, so changing ID parts on
   update doesn't break blends that reference the batch.
 - **Profiles are calculated on read, never stored.** Updates to a batch flow into every

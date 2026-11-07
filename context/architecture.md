@@ -70,9 +70,29 @@
   Claude falls back to manual credentials, validated in `spikes/mcp-auth/`).
 - Confirmed working end-to-end with the real Claude.ai connector (2026-07-26).
 
+### Oils (lots, batches, ROBP)
+- Layers: `internal/store/oils.go` (plain list/get/put) → `internal/oils` (the rules:
+  validation, uniqueness, code building, reference/plant/cycle checks, COA archiving,
+  ripple report) → `internal/oilcalc` (pure profile math). The HTTP handlers and the MCP
+  tools both call `internal/oils`, so the rules exist once.
+- REST: `GET|POST /api/oils/lots`, `GET|PATCH /api/oils/lots/{lotId}`,
+  `GET|POST /api/oils/batches`, `GET|PATCH /api/oils/batches/{batch}` (`{batch}` is a
+  batchId or a code like `FS-CBD-BB-260717`). PATCH bodies are patches (absent = unchanged).
+  Oils handlers reject unknown JSON fields so a typo can't silently drop data.
+- Profiles are calculated on every read from the user's full set of lots and batches
+  (tens of items), never stored, so edits flow into every blend made from them.
+- Ownership is checked in the service (`userId` must match) on every get/update,
+  including a flower input's `plantId`.
+- COA archiving: on save, the Lambda GETs the COA link (15s timeout, 25 MB cap) and
+  stores the response in `grow-media` under `oils/...`. Failure never blocks the save;
+  the link is kept, `archiveError` is returned, and archiving is retried on the next
+  update.
+
 ### Storage
-- DynamoDB: `grow-plants`, `grow-environments`, `grow-logs`, `grow-settings` tables
-- S3 `grow-media` bucket: plant/environment/log photos (private, pre-signed URL access)
+- DynamoDB: `grow-plants`, `grow-environments`, `grow-logs`, `grow-settings`,
+  `grow-products`, `grow-oil-lots`, `grow-oil-batches` tables
+- S3 `grow-media` bucket: plant/environment/log photos and archived COAs (private,
+  pre-signed URL access)
 
 ### Infrastructure
 - CDK (C#) in `infra/`

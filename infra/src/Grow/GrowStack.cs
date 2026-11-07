@@ -108,6 +108,39 @@ public class GrowStack : Stack
             ProjectionType = ProjectionType.ALL
         });
 
+        // Oils: supplier lots (with COAs) and the batches made from them.
+        // Uniqueness of batch codes and supplier lot numbers is enforced in
+        // Go against the user's full list (tens of items), so no extra GSIs.
+        Table oilLotsTable = new Table(this, "OilLotsTable", new TableProps
+        {
+            TableName     = "grow-oil-lots",
+            PartitionKey  = new DynamoAttribute { Name = "lotId", Type = AttributeType.STRING },
+            BillingMode   = BillingMode.PAY_PER_REQUEST,
+            RemovalPolicy = RemovalPolicy.RETAIN
+        });
+        oilLotsTable.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
+        {
+            IndexName      = "user-index",
+            PartitionKey   = new DynamoAttribute { Name = "userId", Type = AttributeType.STRING },
+            SortKey        = new DynamoAttribute { Name = "lotId",  Type = AttributeType.STRING },
+            ProjectionType = ProjectionType.ALL
+        });
+
+        Table oilBatchesTable = new Table(this, "OilBatchesTable", new TableProps
+        {
+            TableName     = "grow-oil-batches",
+            PartitionKey  = new DynamoAttribute { Name = "batchId", Type = AttributeType.STRING },
+            BillingMode   = BillingMode.PAY_PER_REQUEST,
+            RemovalPolicy = RemovalPolicy.RETAIN
+        });
+        oilBatchesTable.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
+        {
+            IndexName      = "user-index",
+            PartitionKey   = new DynamoAttribute { Name = "userId",  Type = AttributeType.STRING },
+            SortKey        = new DynamoAttribute { Name = "batchId", Type = AttributeType.STRING },
+            ProjectionType = ProjectionType.ALL
+        });
+
         // ── Cognito ───────────────────────────────────────────────────────
 
         UserPool userPool = new UserPool(this, "UserPool", new UserPoolProps
@@ -236,6 +269,8 @@ public class GrowStack : Stack
                 ["LOGS_LOGTYPE_DATE_GSI"]   = "user-logtype-date-index",
                 ["SETTINGS_TABLE"]     = settingsTable.TableName,
                 ["PRODUCTS_TABLE"]     = productsTable.TableName,
+                ["OIL_LOTS_TABLE"]     = oilLotsTable.TableName,
+                ["OIL_BATCHES_TABLE"]  = oilBatchesTable.TableName,
                 ["MEDIA_BUCKET"]       = mediaBucket.BucketName,
                 ["USER_ID"]                 = "default",
                 ["USER_POOL_ID"]            = userPool.UserPoolId,
@@ -251,6 +286,8 @@ public class GrowStack : Stack
         logsTable.GrantReadWriteData(apiFunction);
         settingsTable.GrantReadWriteData(apiFunction);
         productsTable.GrantReadWriteData(apiFunction);
+        oilLotsTable.GrantReadWriteData(apiFunction);
+        oilBatchesTable.GrantReadWriteData(apiFunction);
         mediaBucket.GrantReadWrite(apiFunction);
 
         // ── API Gateway ───────────────────────────────────────────────────
@@ -480,6 +517,8 @@ function handler(event) {
         new CfnOutput(this, "LogsTableName",          new CfnOutputProps { Value = logsTable.TableName });
         new CfnOutput(this, "SettingsTableName",      new CfnOutputProps { Value = settingsTable.TableName });
         new CfnOutput(this, "ProductsTableName",      new CfnOutputProps { Value = productsTable.TableName });
+        new CfnOutput(this, "OilLotsTableName",       new CfnOutputProps { Value = oilLotsTable.TableName });
+        new CfnOutput(this, "OilBatchesTableName",    new CfnOutputProps { Value = oilBatchesTable.TableName });
         new CfnOutput(this, "MediaBucketName",        new CfnOutputProps { Value = mediaBucket.BucketName });
         new CfnOutput(this, "UserPoolId",             new CfnOutputProps { Value = userPool.UserPoolId });
         new CfnOutput(this, "UserPoolClientId",        new CfnOutputProps { Value = userPoolClient.UserPoolClientId });

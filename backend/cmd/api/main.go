@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"github.com/cdargis/grow/internal/mcpserver"
 	"github.com/cdargis/grow/internal/model"
+	"github.com/cdargis/grow/internal/oils"
 	"github.com/cdargis/grow/internal/store"
 	"github.com/oklog/ulid/v2"
 )
@@ -27,6 +29,7 @@ type app struct {
 	logs     *store.LogStore
 	settings *store.SettingsStore
 	products *store.ProductStore
+	oils     *oils.Service
 	s3       *s3.Client
 	presign  *s3.PresignClient
 	mediaBkt string
@@ -69,6 +72,12 @@ func main() {
 		mediaBkt:    os.Getenv("MEDIA_BUCKET"),
 		localUserID: getEnvOrDefault("USER_ID", "default"),
 	}
+	a.oils = oils.NewService(
+		store.NewOilLotStore(clients.DDB, os.Getenv("OIL_LOTS_TABLE")),
+		store.NewOilBatchStore(clients.DDB, os.Getenv("OIL_BATCHES_TABLE")),
+		a.plants,
+		oils.NewS3Archiver(clients.S3, a.mediaBkt),
+	)
 	a.mcp = mcpserver.Deps{
 		Plants:           a.plants,
 		Logs:             a.logs,
@@ -125,6 +134,15 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/products/{productId}", a.getProduct)
 	mux.HandleFunc("PATCH /api/products/{productId}", a.updateProduct)
 	mux.HandleFunc("DELETE /api/products/{productId}", a.deleteProduct)
+
+	mux.HandleFunc("GET /api/oils/lots", a.listOilLots)
+	mux.HandleFunc("POST /api/oils/lots", a.createOilLot)
+	mux.HandleFunc("GET /api/oils/lots/{lotId}", a.getOilLot)
+	mux.HandleFunc("PATCH /api/oils/lots/{lotId}", a.updateOilLot)
+	mux.HandleFunc("GET /api/oils/batches", a.listOilBatches)
+	mux.HandleFunc("POST /api/oils/batches", a.createOilBatch)
+	mux.HandleFunc("GET /api/oils/batches/{batch}", a.getOilBatch) // batchId or code
+	mux.HandleFunc("PATCH /api/oils/batches/{batch}", a.updateOilBatch)
 
 	mux.HandleFunc("GET /api/auth-config", a.getAuthConfig)
 
@@ -583,6 +601,124 @@ func (a *app) deleteProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Oils ──────────────────────────────────────────────────────────────────────
+
+// oilsError maps the oils service's error kinds to HTTP statuses.
+func oilsError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, oils.ErrNotFound):
+		httpError(w, err, http.StatusNotFound)
+	case errors.Is(err, oils.ErrConflict):
+		httpError(w, err, http.StatusConflict)
+	case errors.Is(err, oils.ErrInvalid):
+		httpError(w, err, http.StatusBadRequest)
+	default:
+		httpError(w, err, http.StatusInternalServerError)
+	}
+}
+
+func (a *app) listOilLots(w http.ResponseWriter, r *http.Request) {
+	lots, err := a.oils.ListLots(r.Context(), a.userID(r))
+	if err != nil {
+		oilsError(w, err)
+		return
+	}
+	jsonOK(w, lots)
+}
+
+func (a *app) getOilLot(w http.ResponseWriter, r *http.Request) {
+	lot, err := a.oils.GetLot(r.Context(), a.userID(r), r.PathValue("lotId"))
+	if err != nil {
+		oilsError(w, err)
+		return
+	}
+	jsonOK(w, lot)
+}
+
+func (a *app) createOilLot(w http.ResponseWriter, r *http.Request) {
+	var req oils.CreateLotRequest
+	if err := decodeStrict(r, &req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	res, err := a.oils.CreateLot(r.Context(), a.userID(r), req)
+	if err != nil {
+		oilsError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, res)
+}
+
+func (a *app) updateOilLot(w http.ResponseWriter, r *http.Request) {
+	var req oils.UpdateLotRequest
+	if err := decodeStrict(r, &req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	res, err := a.oils.UpdateLot(r.Context(), a.userID(r), r.PathValue("lotId"), req)
+	if err != nil {
+		oilsError(w, err)
+		return
+	}
+	jsonOK(w, res)
+}
+
+func (a *app) listOilBatches(w http.ResponseWriter, r *http.Request) {
+	views, err := a.oils.ListBatches(r.Context(), a.userID(r))
+	if err != nil {
+		oilsError(w, err)
+		return
+	}
+	jsonOK(w, views)
+}
+
+func (a *app) getOilBatch(w http.ResponseWriter, r *http.Request) {
+	v, err := a.oils.GetBatch(r.Context(), a.userID(r), r.PathValue("batch"))
+	if err != nil {
+		oilsError(w, err)
+		return
+	}
+	jsonOK(w, v)
+}
+
+func (a *app) createOilBatch(w http.ResponseWriter, r *http.Request) {
+	var req oils.CreateBatchRequest
+	if err := decodeStrict(r, &req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	res, err := a.oils.CreateBatch(r.Context(), a.userID(r), req)
+	if err != nil {
+		oilsError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	jsonOK(w, res)
+}
+
+func (a *app) updateOilBatch(w http.ResponseWriter, r *http.Request) {
+	var req oils.UpdateBatchRequest
+	if err := decodeStrict(r, &req); err != nil {
+		httpError(w, err, http.StatusBadRequest)
+		return
+	}
+	res, err := a.oils.UpdateBatch(r.Context(), a.userID(r), r.PathValue("batch"), req)
+	if err != nil {
+		oilsError(w, err)
+		return
+	}
+	jsonOK(w, res)
+}
+
+// decodeStrict rejects unknown fields, so a misspelled field (e.g. from an
+// MCP client) fails loudly instead of being silently dropped from a record.
+func decodeStrict(r *http.Request, v any) error {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	return dec.Decode(v)
 }
 
 // ── Media ─────────────────────────────────────────────────────────────────────
