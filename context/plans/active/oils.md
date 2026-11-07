@@ -1,7 +1,7 @@
 # Oils — Lots, Batches, and the ROBP
 
 ## Status
-Backlog. Design worked out in conversation (2026-11-07); nothing built yet.
+Active. Design settled 2026-11-07. Step 2 (calculation code) built: `backend/internal/model/oil.go` (types, validation, batch code) and `backend/internal/oilcalc` (profiles, provenance, dose, dependents), with tests.
 
 ## What it is
 Track the oils Chris makes at home: Red Mesa isolate/distillate in MCT, THC oil from
@@ -52,6 +52,9 @@ Lots get their profile from the COA. Batches get theirs calculated from inputs.
 
 ## Lot
 - Supplier, product (isolate / distillate / …), supplier lot number, grams purchased
+- Red Mesa today, other suppliers later. Supplier lot numbers can collide across
+  suppliers, so uniqueness is on (supplier, supplier lot number). `lotId` is an
+  internal ULID.
 - COA URL + profile extracted from the COA
 - COA archive: when a lot is saved, the Lambda does a plain HTTP GET of the COA URL and
   stores a copy in S3, so a lab moving or deleting the file doesn't lose the record.
@@ -72,8 +75,11 @@ Lots get their profile from the COA. Batches get theirs calculated from inputs.
 - **Inputs** (array, grams each), each one of:
   - a lot (raw ISO/DIS straight from the jar)
   - an earlier batch (e.g. a previously made ISO oil)
-  - flower: strain, THC/CBD % from label/COA, optional `plantId`, **method** (free
-    text) and **confidence** (low / medium / high, set by Chris)
+  - flower: grams of flower, strain, the label/COA profile (as mg/g; 1% = 10 mg/g),
+    optional `plantId`, **method** (free text), **confidence** (low / medium / high,
+    set by Chris), and an **efficiency** factor (0–1) that Chris and Claude settle on
+    per batch and pass in. The app applies decarb (acid × 0.877) and the efficiency to
+    get the flower's contribution to the oil.
   - an additive (terps etc.) with grams. The API only takes grams; Claude converts
     drops (or whatever Chris says) to grams before calling, and the original wording
     can go in the input's note.
@@ -102,6 +108,22 @@ Lots get their profile from the COA. Batches get theirs calculated from inputs.
   (distillate often has trace THC). Any "THC-free" display is derived from the number.
 - CBD is listed first everywhere; THC alongside.
 
+## Calculation rules (as built in oilcalc)
+- **Decarb** (acid × 0.877 → THC/CBD, CBGA × 0.878 → CBG) applies to flower inputs
+  only. Lot and lab COAs are taken as reported: an oil that lists THCA has THCA.
+- Flower terpenes are scaled by the same efficiency factor (a guess either way).
+- **Additives** count as lab-backed (known composition, e.g. pure limonene).
+- **Not detected** is stored as 0 (present key), distinct from "not reported" (absent).
+  A 0-mg compound keeps a provenance split by grams of the inputs that reported it, so
+  "THC 0 · 100% lab" still shows for an isolate oil.
+- **Totals**: Total CBD = CBD + 0.877 × CBDA; Total THC = Δ9-THC + 0.877 × THCA. Δ8-THC
+  is its own line.
+- A batch's lab COA replaces its calculated profile, including downstream (as 100%
+  lab); the calculated profile is still returned for comparison.
+- Profile values are validated 0–1000 mg/g; unknown keys must go in `other`.
+- Batch code parts must be letters and digits (a hyphen inside a part would make the
+  code ambiguous) and are uppercased.
+
 Worked example (100 g blend):
 
 | Input | Grams | CBD mg/g | CBD mg |
@@ -118,6 +140,8 @@ list_logs_for_plant, get_logs_by_date_range). This feature adds its first write 
 - `create_lot`: supplier details, COA URL, extracted profile
 - `create_batch`: ID parts, inputs, carrier, totals, notes; responds with the
   calculated ROBP (mg/g + mg/mL + estimated/lab split) for Claude to read back
+- `update_lot`, `update_batch`: fix or fill in fields after the fact (COA numbers,
+  grams, notes, ID parts, inputs)
 - `list_lots`, `list_batches`, `get_batch`
 - `dose`: "how much oil for 100 mg CBD from batch X" (stateless math, mL + g)
 
@@ -132,6 +156,69 @@ to start (entry happens through MCP).
   batches, and plants. "Calculated, not lab-tested" note. Batch lab COA alongside if
   present.
 
-## Open questions
-- DynamoDB table layout (likely `grow-lots` + `grow-batches`, per the
-  one-table-per-entity decision). Not designed yet.
+## Storage
+- `grow-lots` (PK `lotId` ULID, GSI `user-index`) and `grow-batches` (PK `batchId`
+  ULID, GSIs `user-index` and `user-code-index`). Interfaces below; they move into
+  `context/schema.md` when built.
+
+```typescript
+type BatchType = 'DIS' | 'ISO' | 'FS' | 'THC' | 'BL';
+type Confidence = 'low' | 'medium' | 'high';
+
+interface Profile {                                       // all mg/g (1% = 10 mg/g)
+  cannabinoids: Partial<Record<CannabinoidKey, number>>;  // fixed known list
+  terpenes: Partial<Record<TerpeneKey, number>>;          // fixed known list
+  other?: Array<{ name: string; mgPerG: number }>;        // anything off-list
+}
+
+interface Lot {
+  lotId: string;                  // ULID
+  userId: string;
+  supplier: string;               // "Red Mesa"; unique on (supplier, supplierLotNumber)
+  product: string;                // isolate / distillate / …
+  supplierLotNumber: string;
+  gramsPurchased?: number;
+  coaUrl?: string;
+  coaS3Key?: string;              // absent = COA not archived
+  profile: Profile;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+type BatchInput =
+  | { kind: 'lot'; lotId: string; grams: number }
+  | { kind: 'batch'; batchId: string; grams: number }
+  | { kind: 'flower'; grams: number; strain: string; plantId?: string;
+      profile: Profile;           // label/COA numbers (THCA/CBDA etc.)
+      efficiency: number;         // 0–1, settled per batch; decarb applied separately
+      method: string; confidence: Confidence }
+  | { kind: 'additive'; grams: number; name: string; profile?: Profile; note?: string };
+
+interface Batch {
+  batchId: string;                // ULID
+  userId: string;
+  code: string;                   // built from the parts below, unique per user
+  type: BatchType;
+  subType?: string;
+  discriminator?: string;
+  date?: string;                  // YYYY-MM-DD; absent → "000000" in code
+  batchDiscriminator?: string;
+  inputs: BatchInput[];
+  carrier?: { name: string; grams: number };
+  densityGPerMl: number;          // per batch; default 0.95, LouAna ≈ 0.94
+  totalGrams: number;
+  labCoa?: { url: string; s3Key?: string; profile: Profile };
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+```
+- `code` (the human batch ID) is a unique label, not the key, so changing ID parts on
+  update doesn't break blends that reference the batch.
+- **Profiles are calculated on read, never stored.** Updates to a batch flow into every
+  blend made from it automatically. Volume is tens of items, so list loads everything
+  and computes in memory. If that ever gets slow, move to a background Lambda that
+  recomputes and stores profiles after each write.
+- `update_batch` rejects input cycles (a batch can't contain itself, directly or
+  through other batches) and returns the blends whose numbers changed.

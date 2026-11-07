@@ -55,4 +55,4 @@
 - [ ] Height chart per plant
 - [ ] Delivered-NPK trend/timeline view (Phase 2) — `context/plans/backlog/delivered-npk-trend-view.md`
 - [ ] Environment detail view (plants assigned, light schedule, assigned plants)
-- [ ] Oils: lots, batches, COAs, ROBP (Record of Batch Profile), MCP write tools — `context/plans/backlog/oils.md`
+- [ ] Oils: lots, batches, COAs, ROBP (Record of Batch Profile), MCP write tools — `context/plans/active/oils.md`

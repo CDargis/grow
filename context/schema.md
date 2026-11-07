@@ -120,6 +120,12 @@ interface Settings {
 | SK: `logId` | STRING | ULID — enables range queries for a plant's logs |
 | GSI `user-date-index` | PK=userId, SK=date | powers the date strip (all logs across plants for a day) |
 
+### grow-products
+| Key | Type | Notes |
+|-----|------|-------|
+| PK: `productId` | STRING | ULID; nutrient products (see `backend/internal/model/product.go`) |
+| GSI `user-index` | PK=userId, SK=productId | list all products for a user |
+
 ### grow-settings
 | Key | Type | Notes |
 |-----|------|-------|
