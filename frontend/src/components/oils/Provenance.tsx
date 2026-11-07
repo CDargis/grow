@@ -1,33 +1,43 @@
-import type { Compound } from '@/types'
-import { SOURCE_ORDER, SOURCE_STYLE, sharesText } from '@/lib/oilDisplay'
+import type { Compound, ProvenanceSource } from '@/types'
+import { SOURCE_ORDER, SOURCE_STYLE } from '@/lib/oilDisplay'
 
-// Thin stacked bar: how much of a compound's mg is lab-backed vs estimated,
-// by confidence. Widths are the backend's contribution-weighted shares.
-export function ProvenanceBar({ shares, className = '' }: { shares: Compound['shares']; className?: string }) {
+// Where a compound's number comes from, as small tinted pills: one per
+// source, sized by its share of the compound's mg (lab-backed vs flower
+// estimates by confidence). Deliberately not a bar -- a full-width bar reads
+// as progress, and an all-lab one looks like "100% complete".
+export function ProvenanceChips({ shares, className = '' }: { shares: Compound['shares']; className?: string }) {
+  const parts = SOURCE_ORDER
+    .map(s => ({ s, pct: Math.round((shares[s] ?? 0) * 100) }))
+    .filter(p => p.pct > 0)
+  if (parts.length === 0) return null
+
   return (
-    <div className={`flex h-1.5 w-full overflow-hidden rounded-full bg-raised ${className}`}>
-      {SOURCE_ORDER.map(s => {
-        const share = shares[s] ?? 0
-        if (share <= 0) return null
-        return <div key={s} className={SOURCE_STYLE[s].bar} style={{ width: `${share * 100}%` }} />
-      })}
-    </div>
+    <span className={`inline-flex flex-wrap gap-1 ${className}`}>
+      {parts.map(({ s, pct }) => (
+        <Chip key={s} source={s}>
+          {parts.length === 1 ? SOURCE_STYLE[s].label : `${pct}% ${SOURCE_STYLE[s].label}`}
+        </Chip>
+      ))}
+    </span>
   )
 }
 
-export function ProvenanceText({ shares, className = '' }: { shares: Compound['shares']; className?: string }) {
-  const text = sharesText(shares)
-  if (!text) return null
-  return <span className={`text-xs text-muted ${className}`}>{text}</span>
+function Chip({ source, children }: { source: ProvenanceSource; children: React.ReactNode }) {
+  const { chip } = SOURCE_STYLE[source]
+  return (
+    <span className={`inline-flex items-center rounded-full px-1.5 py-px text-[10px] font-medium leading-4 whitespace-nowrap ${chip}`}>
+      {children}
+    </span>
+  )
 }
 
 export function ProvenanceLegend() {
   return (
-    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted">
       {SOURCE_ORDER.map(s => (
-        <span key={s} className="flex items-center gap-1">
-          <span className={`inline-block h-2 w-2 rounded-full ${SOURCE_STYLE[s].bar}`} />
-          {s === 'lab' ? 'lab (COA)' : `${SOURCE_STYLE[s].label} confidence estimate`}
+        <span key={s} className="flex items-center gap-1.5">
+          <Chip source={s}>{SOURCE_STYLE[s].label}</Chip>
+          {s === 'lab' ? 'from a COA' : 'confidence estimate'}
         </span>
       ))}
     </div>

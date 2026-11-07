@@ -5,7 +5,7 @@ import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { api } from '@/api/client'
 import type { Batch, BatchInput, BatchProfile, Compound, Lot, Plant } from '@/types'
 import { batchDateLabel, fmtMg, SOURCE_STYLE } from '@/lib/oilDisplay'
-import { ProvenanceBar, ProvenanceLegend, ProvenanceText } from '@/components/oils/Provenance'
+import { ProvenanceChips, ProvenanceLegend } from '@/components/oils/Provenance'
 import { CoaLinks } from '@/components/oils/CoaLinks'
 
 // The ROBP (Record of Batch Profile): one batch's inputs and its calculated
@@ -144,8 +144,7 @@ function TotalCard({ label, c }: { label: string; c: Compound }) {
         <>
           <p className="text-xl font-semibold text-primary">{fmtMg(c.mgPerG)}{c.mgPerG > 0 && <span className="text-xs font-normal text-dim"> mg/g</span>}</p>
           {c.mgPerG > 0 && <p className="text-sm text-dim">{fmtMg(c.mgPerMl)} mg/mL</p>}
-          <ProvenanceBar shares={c.shares} className="mt-2" />
-          <ProvenanceText shares={c.shares} />
+          <ProvenanceChips shares={c.shares} className="mt-2" />
         </>
       ) : (
         <p className="text-sm text-muted mt-1">not reported</p>
@@ -270,7 +269,7 @@ function ProfileTable({ profile }: { profile: BatchProfile }) {
                           <span className="w-14 text-right text-muted">{calc ? fmtMg(calc.mgPerG) : '—'}</span>
                         )}
                       </div>
-                      <ProvenanceBar shares={c.shares} className="mt-1.5" />
+                      <ProvenanceChips shares={c.shares} className="mt-1" />
                     </div>
                   )
                 })}

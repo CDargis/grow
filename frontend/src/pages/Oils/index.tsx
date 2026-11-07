@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight, AlertTriangle } from 'lucide-react'
 import { api } from '@/api/client'
 import type { BatchView, Compound, Lot } from '@/types'
-import { batchDateLabel, fmtMg, isEstimated, lotTotal } from '@/lib/oilDisplay'
-import { ProvenanceBar, ProvenanceText } from '@/components/oils/Provenance'
+import { batchDateLabel, fmtMg, lotTotal } from '@/lib/oilDisplay'
+import { ProvenanceChips } from '@/components/oils/Provenance'
 import { CoaLinks } from '@/components/oils/CoaLinks'
 
 type Tab = 'batches' | 'lots'
@@ -99,12 +99,7 @@ function TotalTile({ label, c }: { label: string; c: Compound }) {
             <span className="font-semibold">{fmtMg(c.mgPerG)}</span>
             {c.mgPerG > 0 && <span className="text-dim"> mg/g · {fmtMg(c.mgPerMl)} mg/mL</span>}
           </p>
-          {c.mgPerG > 0 && isEstimated(c.shares) && (
-            <>
-              <ProvenanceBar shares={c.shares} className="mt-1" />
-              <ProvenanceText shares={c.shares} />
-            </>
-          )}
+          <ProvenanceChips shares={c.shares} className="mt-1" />
         </>
       ) : (
         <p className="text-sm text-muted">not reported</p>
