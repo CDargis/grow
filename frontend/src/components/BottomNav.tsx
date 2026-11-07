@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { Leaf, Wind, Activity, FlaskConical } from 'lucide-react'
+import { Leaf, Wind, Activity, FlaskConical, Pipette } from 'lucide-react'
 
 const tabs = [
   { to: '/plants',       label: 'Plants',       Icon: Leaf         },
   { to: '/overview',     label: 'Activity',     Icon: Activity     },
   { to: '/environments', label: 'Environments', Icon: Wind         },
   { to: '/inventory',    label: 'Inventory',    Icon: FlaskConical },
+  { to: '/oils',         label: 'Oils',         Icon: Pipette      },
 ]
 
 export function BottomNav() {

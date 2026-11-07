@@ -2,7 +2,7 @@ import imageCompression from 'browser-image-compression'
 import type {
   Plant, Environment, Log, LastActivity, Settings, Product,
   CreatePlantRequest, UpdatePlantDetailsRequest, CreateEnvironmentRequest, CreateLogRequest, UpdateSettingsRequest,
-  CreateProductRequest,
+  CreateProductRequest, Lot, BatchView,
 } from '@/types'
 import { getUserManager } from '@/auth/userManager'
 
@@ -78,6 +78,14 @@ export const api = {
     update: (id: string, body: CreateProductRequest) =>
       request<Product>(`/products/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
     delete: (id: string)                => request<void>(`/products/${id}`, { method: 'DELETE' }),
+  },
+
+  // Read-only in the UI: oils are entered through the MCP connector.
+  oils: {
+    listLots:    ()             => request<Lot[]>('/oils/lots'),
+    listBatches: ()             => request<BatchView[]>('/oils/batches'),
+    // Accepts a batchId or a batch code such as FS-CBD-BB-260717.
+    getBatch:    (batch: string) => request<BatchView>(`/oils/batches/${encodeURIComponent(batch)}`),
   },
 
   media: {

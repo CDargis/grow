@@ -5,6 +5,8 @@ import { EnvironmentsPage } from '@/pages/Environments'
 import { PlantDetailPage } from '@/pages/PlantDetail'
 import { OverviewPage } from '@/pages/Overview'
 import { InventoryPage } from '@/pages/Inventory'
+import { OilsPage } from '@/pages/Oils'
+import { OilBatchPage } from '@/pages/Oils/Batch'
 import { AuthProvider } from '@/auth/AuthProvider'
 
 export default function App() {
@@ -19,6 +21,8 @@ export default function App() {
             <Route path="/environments"   element={<EnvironmentsPage />} />
             <Route path="/overview"       element={<OverviewPage />} />
             <Route path="/inventory"      element={<InventoryPage />} />
+            <Route path="/oils"           element={<OilsPage />} />
+            <Route path="/oils/:batch"    element={<OilBatchPage />} />
           </Routes>
         </main>
 

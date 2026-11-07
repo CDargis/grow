@@ -222,3 +222,91 @@ export interface CreateEnvironmentRequest {
   targetVpd?: number
   photoKey?: string
 }
+
+// ── Oils (see context/schema.md; Go: backend/internal/model/oil.go) ────────────
+// All potency values are mg/g. mg/mL is calculated by the backend.
+
+export type BatchType = 'DIS' | 'ISO' | 'FS' | 'THC' | 'BL'
+export type Confidence = 'low' | 'medium' | 'high'
+export type ProvenanceSource = 'lab' | Confidence
+
+export interface OilProfile {
+  cannabinoids?: Record<string, number>
+  terpenes?: Record<string, number>
+  other?: Array<{ name: string; mgPerG: number }>
+}
+
+export interface Lot {
+  lotId: string
+  userId: string
+  supplier: string
+  product: string
+  supplierLotNumber: string
+  gramsPurchased?: number
+  coaUrl?: string
+  coaS3Key?: string
+  profile: OilProfile
+  notes?: string
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface BatchInput {
+  kind: 'lot' | 'batch' | 'flower' | 'additive'
+  grams: number
+  lotId?: string
+  batchId?: string
+  strain?: string
+  plantId?: string
+  profile?: OilProfile
+  efficiency?: number
+  method?: string
+  confidence?: Confidence
+  name?: string
+  note?: string
+}
+
+export interface Batch {
+  batchId: string
+  userId: string
+  code: string
+  type: BatchType
+  subType?: string
+  discriminator?: string
+  date?: string
+  batchDiscriminator?: string
+  inputs: BatchInput[]
+  carrier?: { name: string; grams: number }
+  densityGPerMl: number
+  totalGrams: number
+  labCoa?: { url: string; s3Key?: string; profile: OilProfile }
+  notes?: string
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface Compound {
+  group: 'cannabinoid' | 'terpene' | 'other'
+  key: string
+  name: string
+  mgPerG: number
+  mgPerMl: number
+  shares: Partial<Record<ProvenanceSource, number>>  // fractions, sum to 1
+}
+
+export interface BatchProfile {
+  batchId: string
+  code: string
+  densityGPerMl: number
+  fromLabCoa: boolean
+  compounds: Compound[]
+  calculated?: Compound[]
+  totalCbd: Compound
+  totalThc: Compound
+}
+
+export interface BatchView {
+  batch: Batch
+  profile?: BatchProfile
+  profileError?: string
+}

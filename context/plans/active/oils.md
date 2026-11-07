@@ -1,7 +1,7 @@
 # Oils — Lots, Batches, and the ROBP
 
 ## Status
-Active. Design settled 2026-11-07. Built so far: step 2 (calculation: `internal/model/oil.go`, `internal/oilcalc`) and step 3 (storage + REST: `internal/store/oils.go`, `internal/oils`, CDK tables `grow-oil-lots` / `grow-oil-batches`, `/api/oils/*`). Step 4 (MCP tools: `internal/mcpserver/oils.go`) built. Not deployed yet. Next: deploy + try it from the Claude app, then step 5 (`/oils` UI).
+Active. Design settled 2026-11-07. All five steps built and deployed (2026-11-07): `internal/model/oil.go` + `internal/oilcalc` (math), `internal/store/oils.go` + `internal/oils` (rules, REST `/api/oils/*`, CDK tables), `internal/mcpserver/oils.go` (MCP tools), `frontend/src/pages/Oils` (`/oils` list + `/oils/:batch` ROBP, read-only). First real use: 3 batches from 2 lots logged via the Claude app.
 
 ## What it is
 Track the oils Chris makes at home: Red Mesa isolate/distillate in MCT, THC oil from
