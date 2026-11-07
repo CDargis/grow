@@ -1,8 +1,9 @@
-// Package mcpserver exposes a read-only Model Context Protocol server over
-// the existing grow-api data (plants, logs), for use as a Claude custom
-// connector. Registered on its own route, excluded from the API Gateway JWT
-// authorizer that guards the rest of the API -- see the package comment on
-// the auth gate below for why.
+// Package mcpserver exposes a Model Context Protocol server over the
+// grow-api data, for use as a Claude custom connector: read-only tools for
+// plants and logs, and read/write tools for oil lots and batches (oils.go).
+// Registered on its own route, excluded from the API Gateway JWT authorizer
+// that guards the rest of the API -- see the comment on the auth gate below
+// for why.
 package mcpserver
 
 import (
@@ -21,14 +22,16 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/cdargis/grow/internal/model"
+	"github.com/cdargis/grow/internal/oils"
 	"github.com/cdargis/grow/internal/store"
 )
 
 type Deps struct {
 	Plants           *store.PlantStore
 	Logs             *store.LogStore
-	PublicBaseURL    string // e.g. https://grow.chrisdargis.com, no trailing slash
-	HostedUIBase     string // e.g. https://grow-chrisdargis.auth.us-east-1.amazoncognito.com, no trailing slash
+	Oils             *oils.Service // nil disables the oils tools
+	PublicBaseURL    string        // e.g. https://grow.chrisdargis.com, no trailing slash
+	HostedUIBase     string        // e.g. https://grow-chrisdargis.auth.us-east-1.amazoncognito.com, no trailing slash
 	Region           string
 	UserPoolID       string
 	UserPoolClientID string
@@ -211,7 +214,7 @@ func withPlantNames(logs []model.Log, names map[string]string) []logWithPlantNam
 }
 
 func (d Deps) newServer(userID string) *mcp.Server {
-	s := mcp.NewServer(&mcp.Implementation{Name: "grow", Version: "1.0.0"}, nil)
+	s := mcp.NewServer(&mcp.Implementation{Name: "grow", Version: "1.0.0"}, &mcp.ServerOptions{Instructions: oilsInstructions})
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "list_plants",
@@ -328,6 +331,8 @@ func (d Deps) newServer(userID string) *mcp.Server {
 			Logs []logWithPlantName `json:"logs"`
 		}{Logs: withPlantNames(all, names)}, nil
 	})
+
+	d.addOilTools(s, userID)
 
 	return s
 }

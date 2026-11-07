@@ -113,17 +113,17 @@ var KnownTerpenes = []CompoundDef{
 // NamedAmount holds a compound the lab reported that isn't on a known list,
 // so nothing on a COA gets thrown away.
 type NamedAmount struct {
-	Name   string  `dynamodbav:"name"   json:"name"`
-	MgPerG float64 `dynamodbav:"mgPerG" json:"mgPerG"`
+	Name   string  `dynamodbav:"name"   json:"name"   jsonschema:"compound name as the lab wrote it"`
+	MgPerG float64 `dynamodbav:"mgPerG" json:"mgPerG" jsonschema:"mg/g (1% = 10 mg/g); 0 = not detected"`
 }
 
 // Profile is the standard storage format for anything a COA (or a label)
 // reports. All values mg/g; 1% = 10 mg/g. A present key with value 0 means
 // "tested, not detected" -- distinct from an absent key ("not reported").
 type Profile struct {
-	Cannabinoids map[string]float64 `dynamodbav:"cannabinoids,omitempty" json:"cannabinoids,omitempty"`
-	Terpenes     map[string]float64 `dynamodbav:"terpenes,omitempty"     json:"terpenes,omitempty"`
-	Other        []NamedAmount      `dynamodbav:"other,omitempty"        json:"other,omitempty"`
+	Cannabinoids map[string]float64 `dynamodbav:"cannabinoids,omitempty" json:"cannabinoids,omitempty" jsonschema:"mg/g by key (1% = 10 mg/g; 0 = not detected; omit if not reported). Keys: cbd cbda d9thc thca d8thc cbg cbga cbn cbc cbdv thcv"`
+	Terpenes     map[string]float64 `dynamodbav:"terpenes,omitempty"     json:"terpenes,omitempty"     jsonschema:"mg/g by key. Keys: myrcene limonene beta_caryophyllene linalool alpha_pinene beta_pinene humulene terpinolene ocimene bisabolol nerolidol caryophyllene_oxide eucalyptol geraniol camphene terpineol"`
+	Other        []NamedAmount      `dynamodbav:"other,omitempty"        json:"other,omitempty"        jsonschema:"anything the COA reports that has no key above, so nothing is lost"`
 }
 
 type Lot struct {
@@ -151,36 +151,36 @@ type Lot struct {
 //     grams of flower, not oil.
 //   - additive: Name, optional Profile (e.g. pure limonene), Note
 type BatchInput struct {
-	Kind  InputKind `dynamodbav:"kind"  json:"kind"`
-	Grams float64   `dynamodbav:"grams" json:"grams"`
+	Kind  InputKind `dynamodbav:"kind"  json:"kind"  jsonschema:"lot | batch | flower | additive"`
+	Grams float64   `dynamodbav:"grams" json:"grams" jsonschema:"grams used; for flower, grams of flower (not oil); convert drops etc. to grams before sending"`
 
-	LotID   string `dynamodbav:"lotId,omitempty"   json:"lotId,omitempty"`
-	BatchID string `dynamodbav:"batchId,omitempty" json:"batchId,omitempty"`
+	LotID   string `dynamodbav:"lotId,omitempty"   json:"lotId,omitempty"   jsonschema:"lot inputs: the lot's lotId from list_lots"`
+	BatchID string `dynamodbav:"batchId,omitempty" json:"batchId,omitempty" jsonschema:"batch inputs: the source batch's batchId from list_batches"`
 
-	Strain  string   `dynamodbav:"strain,omitempty"  json:"strain,omitempty"`
-	PlantID string   `dynamodbav:"plantId,omitempty" json:"plantId,omitempty"`
-	Profile *Profile `dynamodbav:"profile,omitempty" json:"profile,omitempty"`
+	Strain  string   `dynamodbav:"strain,omitempty"  json:"strain,omitempty"  jsonschema:"flower inputs: strain name"`
+	PlantID string   `dynamodbav:"plantId,omitempty" json:"plantId,omitempty" jsonschema:"flower inputs, optional: the grow plant this flower came from (list_plants)"`
+	Profile *Profile `dynamodbav:"profile,omitempty" json:"profile,omitempty" jsonschema:"flower inputs: label or COA numbers as reported (THCA/CBDA as acids; decarb is applied by the app). additive inputs, optional: its composition, e.g. limonene 1000 for pure limonene"`
 	// Efficiency (0-1] is how much of the decarbed cannabinoid content made it
 	// into the oil. Settled per batch by Chris and Claude, not derived.
-	Efficiency float64    `dynamodbav:"efficiency,omitempty" json:"efficiency,omitempty"`
-	Method     string     `dynamodbav:"method,omitempty"     json:"method,omitempty"`
-	Confidence Confidence `dynamodbav:"confidence,omitempty" json:"confidence,omitempty"`
+	Efficiency float64    `dynamodbav:"efficiency,omitempty" json:"efficiency,omitempty" jsonschema:"flower inputs: (0, 1], share of decarbed cannabinoids that ended up in the oil; agree it with Chris, do not assume"`
+	Method     string     `dynamodbav:"method,omitempty"     json:"method,omitempty"     jsonschema:"flower inputs: how the oil was made, free text"`
+	Confidence Confidence `dynamodbav:"confidence,omitempty" json:"confidence,omitempty" jsonschema:"flower inputs: low | medium | high, Chris's trust in this method; ask if unsure"`
 
-	Name string `dynamodbav:"name,omitempty" json:"name,omitempty"`
-	Note string `dynamodbav:"note,omitempty" json:"note,omitempty"`
+	Name string `dynamodbav:"name,omitempty" json:"name,omitempty" jsonschema:"additive inputs: what was added, e.g. limonene"`
+	Note string `dynamodbav:"note,omitempty" json:"note,omitempty" jsonschema:"free text, e.g. the original wording like 3 drops"`
 }
 
 type Carrier struct {
-	Name  string  `dynamodbav:"name"  json:"name"`
-	Grams float64 `dynamodbav:"grams" json:"grams"`
+	Name  string  `dynamodbav:"name"  json:"name"  jsonschema:"carrier oil, e.g. LouAna liquid coconut oil"`
+	Grams float64 `dynamodbav:"grams" json:"grams" jsonschema:"grams of carrier oil"`
 }
 
 // LabCOA is an optional lab test of the finished batch. When present its
 // profile replaces the calculated one (and counts as 100% lab downstream).
 type LabCOA struct {
-	URL     string  `dynamodbav:"url"             json:"url"`
-	S3Key   string  `dynamodbav:"s3Key,omitempty" json:"s3Key,omitempty"`
-	Profile Profile `dynamodbav:"profile"         json:"profile"`
+	URL     string  `dynamodbav:"url"             json:"url"             jsonschema:"link to the batch's own lab COA"`
+	S3Key   string  `dynamodbav:"s3Key,omitempty" json:"s3Key,omitempty" jsonschema:"ignored on input; set by archiving"`
+	Profile Profile `dynamodbav:"profile"         json:"profile"         jsonschema:"numbers from the batch's lab COA"`
 }
 
 type Batch struct {

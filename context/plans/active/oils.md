@@ -1,7 +1,7 @@
 # Oils — Lots, Batches, and the ROBP
 
 ## Status
-Active. Design settled 2026-11-07. Built so far: step 2 (calculation: `internal/model/oil.go`, `internal/oilcalc`) and step 3 (storage + REST: `internal/store/oils.go`, `internal/oils`, CDK tables `grow-oil-lots` / `grow-oil-batches`, `/api/oils/*`). Not deployed yet. Next: step 4 (MCP tools), step 5 (`/oils` UI).
+Active. Design settled 2026-11-07. Built so far: step 2 (calculation: `internal/model/oil.go`, `internal/oilcalc`) and step 3 (storage + REST: `internal/store/oils.go`, `internal/oils`, CDK tables `grow-oil-lots` / `grow-oil-batches`, `/api/oils/*`). Step 4 (MCP tools: `internal/mcpserver/oils.go`) built. Not deployed yet. Next: deploy + try it from the Claude app, then step 5 (`/oils` UI).
 
 ## What it is
 Track the oils Chris makes at home: Red Mesa isolate/distillate in MCT, THC oil from
@@ -135,7 +135,7 @@ Worked example (100 g blend):
 → `CBD 24.8 mg/g · 60% medium · 40% lab`
 
 ## MCP tools
-The grow MCP server is **read-only today** (list_plants, get_plant,
+Built. The grow MCP server was read-only before this (list_plants, get_plant,
 list_logs_for_plant, get_logs_by_date_range). This feature adds its first write tools.
 - `create_lot`: supplier details, COA URL, extracted profile
 - `create_batch`: ID parts, inputs, carrier, totals, notes; responds with the

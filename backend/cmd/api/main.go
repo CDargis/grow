@@ -81,6 +81,7 @@ func main() {
 	a.mcp = mcpserver.Deps{
 		Plants:           a.plants,
 		Logs:             a.logs,
+		Oils:             a.oils,
 		PublicBaseURL:    os.Getenv("PUBLIC_BASE_URL"),
 		HostedUIBase:     os.Getenv("COGNITO_HOSTED_UI_BASE"),
 		Region:           os.Getenv("AWS_REGION"),

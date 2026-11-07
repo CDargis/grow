@@ -63,12 +63,12 @@ func NewService(lots LotRepo, batches BatchRepo, plants PlantLookup, archiver Ar
 // ── Requests / results ───────────────────────────────────────────────────────
 
 type CreateLotRequest struct {
-	Supplier          string        `json:"supplier"`
-	Product           string        `json:"product"`
-	SupplierLotNumber string        `json:"supplierLotNumber"`
-	GramsPurchased    float64       `json:"gramsPurchased,omitempty"`
-	COAURL            string        `json:"coaUrl,omitempty"`
-	Profile           model.Profile `json:"profile"`
+	Supplier          string        `json:"supplier"                 jsonschema:"who sold it, e.g. Red Mesa"`
+	Product           string        `json:"product"                  jsonschema:"what it is, e.g. CBD isolate or broad spectrum distillate"`
+	SupplierLotNumber string        `json:"supplierLotNumber"        jsonschema:"the supplier's lot or batch number printed on the jar and COA"`
+	GramsPurchased    float64       `json:"gramsPurchased,omitempty" jsonschema:"grams in the jar as bought"`
+	COAURL            string        `json:"coaUrl,omitempty"         jsonschema:"public link to the COA; the app downloads and keeps a copy"`
+	Profile           model.Profile `json:"profile"                  jsonschema:"every number on the COA, converted to mg/g"`
 	Notes             string        `json:"notes,omitempty"`
 }
 
@@ -80,7 +80,7 @@ type UpdateLotRequest struct {
 	SupplierLotNumber *string        `json:"supplierLotNumber,omitempty"`
 	GramsPurchased    *float64       `json:"gramsPurchased,omitempty"`
 	COAURL            *string        `json:"coaUrl,omitempty"`
-	Profile           *model.Profile `json:"profile,omitempty"`
+	Profile           *model.Profile `json:"profile,omitempty" jsonschema:"replaces the whole profile, so send every value, not just the changed one"`
 	Notes             *string        `json:"notes,omitempty"`
 }
 
@@ -95,16 +95,16 @@ type LotResult struct {
 }
 
 type CreateBatchRequest struct {
-	Type               model.BatchType    `json:"type"`
-	SubType            string             `json:"subType,omitempty"`
-	Discriminator      string             `json:"discriminator,omitempty"`
-	Date               string             `json:"date,omitempty"`
-	BatchDiscriminator string             `json:"batchDiscriminator,omitempty"`
-	Inputs             []model.BatchInput `json:"inputs"`
+	Type               model.BatchType    `json:"type"                         jsonschema:"DIS | ISO | FS | THC | BL"`
+	SubType            string             `json:"subType,omitempty"            jsonschema:"optional code part, letters/digits, e.g. CBD or TST"`
+	Discriminator      string             `json:"discriminator,omitempty"      jsonschema:"optional code part, letters/digits, e.g. BB for Berry Bliss"`
+	Date               string             `json:"date,omitempty"               jsonschema:"YYYY-MM-DD the batch was made; omit if unknown (code gets 000000)"`
+	BatchDiscriminator string             `json:"batchDiscriminator,omitempty" jsonschema:"only when the code is already taken, e.g. 2"`
+	Inputs             []model.BatchInput `json:"inputs"                       jsonschema:"everything that went in except the carrier oil"`
 	Carrier            *model.Carrier     `json:"carrier,omitempty"`
-	DensityGPerMl      float64            `json:"densityGPerMl,omitempty"` // 0 → DefaultCarrierDensity
-	TotalGrams         float64            `json:"totalGrams"`
-	LabCOA             *model.LabCOA      `json:"labCoa,omitempty"`
+	DensityGPerMl      float64            `json:"densityGPerMl,omitempty"      jsonschema:"g/mL of the finished oil, used for mg/mL; omit for 0.95 (MCT); LouAna liquid coconut oil is 0.94"`
+	TotalGrams         float64            `json:"totalGrams"                   jsonschema:"grams of finished oil made"`
+	LabCOA             *model.LabCOA      `json:"labCoa,omitempty"             jsonschema:"only if this finished batch was itself lab tested"`
 	Notes              string             `json:"notes,omitempty"`
 }
 
@@ -117,11 +117,11 @@ type UpdateBatchRequest struct {
 	Discriminator      *string             `json:"discriminator,omitempty"`
 	Date               *string             `json:"date,omitempty"`
 	BatchDiscriminator *string             `json:"batchDiscriminator,omitempty"`
-	Inputs             *[]model.BatchInput `json:"inputs,omitempty"`
+	Inputs             *[]model.BatchInput `json:"inputs,omitempty"     jsonschema:"replaces the whole input list, so send every input, not just the changed one"`
 	Carrier            *model.Carrier      `json:"carrier,omitempty"`
 	DensityGPerMl      *float64            `json:"densityGPerMl,omitempty"`
 	TotalGrams         *float64            `json:"totalGrams,omitempty"`
-	LabCOA             *model.LabCOA       `json:"labCoa,omitempty"`
+	LabCOA             *model.LabCOA       `json:"labCoa,omitempty"     jsonschema:"adds or replaces the batch's own lab COA"`
 	Notes              *string             `json:"notes,omitempty"`
 }
 

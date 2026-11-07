@@ -39,9 +39,17 @@
 - API calls attach the access token as `Authorization: Bearer` (`frontend/src/api/client.ts`);
   a 401 response triggers `signinRedirect()` rather than surfacing an error.
 
-### MCP (read-only Claude custom connector)
+### MCP (Claude custom connector)
 - `backend/internal/mcpserver/` — official `modelcontextprotocol/go-sdk`, Streamable HTTP
-  transport, stateless. Tools: `list_plants`, `get_plant`, `list_logs_for_plant`,
+  transport, stateless.
+- Oils tools (read/write, `mcpserver/oils.go`): `list_lots`, `create_lot`, `update_lot`,
+  `list_batches`, `get_batch`, `create_batch`, `update_batch`, `dose` — thin wrappers over
+  `internal/oils`; service errors come back as tool errors so Claude can fix and retry.
+  Workflow conventions (mg/g only, ND = 0, send code parts not codes, agree efficiency and
+  confidence with Chris, read back numbers) are sent as MCP server instructions; field-level
+  guidance is in `jsonschema` struct tags on the request types. Writes needed no OAuth change:
+  the token is only checked for issuer/client/`sub`, with no read-only scope.
+- Plant/log tools (read-only): `list_plants`, `get_plant`, `list_logs_for_plant`,
   `get_logs_by_date_range` — thin wrappers over `internal/store`, plus an explicit
   `plant.UserID == callerUserID` ownership check at the tool layer (the REST API doesn't have
   this check either — pre-existing gap, not fixed everywhere, but cheap to add for this new
@@ -98,9 +106,9 @@
 - CDK (C#) in `infra/`
 - Two stacks: `GrowPipelineStack` → `GrowStack` (via CDK Pipelines)
 - Self-mutating CodePipeline sourced from GitHub (CDargis/grow, main)
-- **Pipeline does not auto-trigger on push** (cause unknown — repo owner/name casing in
-  PipelineStack.cs matches the GitHub remote, which is the usual culprit and was ruled out).
-  Start deploys manually: `aws codepipeline start-pipeline-execution --name GrowPipeline`
+- Pipeline triggers on push to `main` (an older note here said it didn't; per Chris
+  2026-11-07 it does). Manual start if ever needed:
+  `aws codepipeline start-pipeline-execution --name GrowPipeline`
 - Docker bundling for Go Lambda (privileged CodeBuild)
 
 ## Data Flow
