@@ -66,7 +66,13 @@ function BatchCard({ view, onOpen }: { view: BatchView; onOpen: () => void }) {
       <div className="flex items-center gap-2">
         <span className="font-mono text-sm font-semibold text-primary truncate">{batch.code}</span>
         {profile?.fromLabCoa && <span className="text-[10px] px-1.5 py-0.5 rounded bg-forest text-mint">lab tested</span>}
-        <ChevronRight size={16} className="ml-auto text-muted flex-shrink-0" />
+        {/* Same look as a lot's COA link. A span, not a link: the whole card
+            is already the button that opens the ROBP. */}
+        <span className="ml-auto flex items-center gap-1 text-xs text-fern flex-shrink-0">
+          <FileText size={13} />
+          ROBP
+          <ChevronRight size={16} className="text-muted" />
+        </span>
       </div>
       <p className="text-xs text-dim mt-0.5">
         {batchDateLabel(batch.date)} · {batch.totalGrams} g
@@ -84,13 +90,6 @@ function BatchCard({ view, onOpen }: { view: BatchView; onOpen: () => void }) {
           <TotalTile label="THC" c={profile.totalThc} />
         </div>
       )}
-
-      {/* Same look as a lot's COA link. A span, not a link: the whole card
-          is already the button that opens the ROBP. */}
-      <span className="mt-3 flex items-center gap-1 text-xs text-fern">
-        <FileText size={13} />
-        ROBP
-      </span>
     </button>
   )
 }
