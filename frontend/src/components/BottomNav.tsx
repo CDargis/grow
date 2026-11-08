@@ -9,23 +9,24 @@ const tabs = [
   { to: '/oils',         label: 'Oils',         Icon: Pipette      },
 ]
 
-// Equal-width grid columns: with flex-1 the long "Environments" label pushed
-// its column wider and the icons sat unevenly.
+// Tabs size to their labels and the free space is split evenly between them
+// (justify-between). Equal-width columns centered the icons but left short
+// labels ("Plants", "Oils") with big visible gaps next to "Environments".
 export function BottomNav() {
   return (
-    <nav className="grid grid-cols-5 bg-surface border-t border-border pb-safe">
+    <nav className="flex justify-between px-2 bg-surface border-t border-border pb-safe">
       {tabs.map(({ to, label, Icon }) => (
         <NavLink
           key={to}
           to={to}
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center min-w-0 py-3 gap-1 text-[10px] transition-colors ${
+            `flex flex-col items-center justify-center px-2 py-3 gap-1 text-xs transition-colors ${
               isActive ? 'text-fern' : 'text-muted'
             }`
           }
         >
           <Icon size={20} strokeWidth={1.5} />
-          <span className="max-w-full truncate px-0.5">{label}</span>
+          <span className="whitespace-nowrap">{label}</span>
         </NavLink>
       ))}
     </nav>
