@@ -11,19 +11,21 @@ const tabs = [
 
 export function BottomNav() {
   return (
-    <nav className="flex bg-surface border-t border-border pb-safe">
+    {/* Equal-width columns: with flex-1 the long "Environments" label pushed
+        its column wider and the icons sat unevenly. */}
+    <nav className="grid grid-cols-5 bg-surface border-t border-border pb-safe">
       {tabs.map(({ to, label, Icon }) => (
         <NavLink
           key={to}
           to={to}
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center flex-1 py-3 gap-1 text-xs transition-colors ${
+            `flex flex-col items-center justify-center min-w-0 py-3 gap-1 text-[10px] transition-colors ${
               isActive ? 'text-fern' : 'text-muted'
             }`
           }
         >
           <Icon size={20} strokeWidth={1.5} />
-          <span>{label}</span>
+          <span className="max-w-full truncate px-0.5">{label}</span>
         </NavLink>
       ))}
     </nav>
