@@ -9,10 +9,10 @@ const tabs = [
   { to: '/oils',         label: 'Oils',         Icon: Pipette      },
 ]
 
+// Equal-width grid columns: with flex-1 the long "Environments" label pushed
+// its column wider and the icons sat unevenly.
 export function BottomNav() {
   return (
-    {/* Equal-width columns: with flex-1 the long "Environments" label pushed
-        its column wider and the icons sat unevenly. */}
     <nav className="grid grid-cols-5 bg-surface border-t border-border pb-safe">
       {tabs.map(({ to, label, Icon }) => (
         <NavLink
