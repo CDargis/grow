@@ -10,6 +10,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/cdargis/grow/internal/dose"
 	"github.com/cdargis/grow/internal/model"
 	"github.com/cdargis/grow/internal/oils"
 )
@@ -69,7 +70,11 @@ func (okArchiver) Remove(context.Context, string) error { return nil }
 func connect(t *testing.T) *mcp.ClientSession {
 	t.Helper()
 	ctx := context.Background()
-	d := Deps{Oils: oils.NewService(memLots{}, memBatches{}, noPlants{}, okArchiver{})}
+	lots, batches := memLots{}, memBatches{}
+	d := Deps{
+		Oils: oils.NewService(lots, batches, noPlants{}, okArchiver{}),
+		Dose: dose.NewService(memVersions{}, memShelf{}, lots, batches, okArchiver{}),
+	}
 	srv := d.newServer("u1") // panics here if any tool's schema can't be inferred
 
 	st, ct := mcp.NewInMemoryTransports()

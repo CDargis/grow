@@ -17,6 +17,8 @@ run:
 	PRODUCTS_TABLE=grow-products \
 	OIL_LOTS_TABLE=grow-oil-lots \
 	OIL_BATCHES_TABLE=grow-oil-batches \
+	DOSE_VERSIONS_TABLE=grow-dose-versions \
+	SHELF_TABLE=grow-shelf \
 	MEDIA_BUCKET=grow-media \
 	USER_ID=default \
 	go run ./cmd/api

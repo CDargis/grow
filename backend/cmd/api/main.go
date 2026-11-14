@@ -18,6 +18,7 @@ import (
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"github.com/cdargis/grow/internal/mcpserver"
 	"github.com/cdargis/grow/internal/model"
+	"github.com/cdargis/grow/internal/dose"
 	"github.com/cdargis/grow/internal/oils"
 	"github.com/cdargis/grow/internal/store"
 	"github.com/oklog/ulid/v2"
@@ -30,6 +31,7 @@ type app struct {
 	settings *store.SettingsStore
 	products *store.ProductStore
 	oils     *oils.Service
+	dose     *dose.Service
 	s3       *s3.Client
 	presign  *s3.PresignClient
 	mediaBkt string
@@ -78,10 +80,20 @@ func main() {
 		a.plants,
 		oils.NewS3Archiver(clients.S3, a.mediaBkt),
 	)
+	// Dose reads the same lot/batch tables for strengths, so it gets its own
+	// stores over them rather than going through the oils service.
+	a.dose = dose.NewService(
+		store.NewDoseVersionStore(clients.DDB, os.Getenv("DOSE_VERSIONS_TABLE")),
+		store.NewShelfStore(clients.DDB, os.Getenv("SHELF_TABLE")),
+		store.NewOilLotStore(clients.DDB, os.Getenv("OIL_LOTS_TABLE")),
+		store.NewOilBatchStore(clients.DDB, os.Getenv("OIL_BATCHES_TABLE")),
+		oils.NewS3Archiver(clients.S3, a.mediaBkt),
+	)
 	a.mcp = mcpserver.Deps{
 		Plants:           a.plants,
 		Logs:             a.logs,
 		Oils:             a.oils,
+		Dose:             a.dose,
 		BuildCommit:      getEnvOrDefault("BUILD_COMMIT", "local"),
 		PublicBaseURL:    os.Getenv("PUBLIC_BASE_URL"),
 		HostedUIBase:     os.Getenv("COGNITO_HOSTED_UI_BASE"),
@@ -147,6 +159,7 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/oils/batches/{batch}", a.getOilBatch) // batchId or code
 	mux.HandleFunc("PATCH /api/oils/batches/{batch}", a.updateOilBatch)
 	mux.HandleFunc("DELETE /api/oils/batches/{batch}", a.deleteOilBatch)
+	mux.HandleFunc("GET /api/dose", a.getDose) // read-only; written via MCP
 
 	mux.HandleFunc("GET /api/auth-config", a.getAuthConfig)
 
@@ -829,4 +842,17 @@ func getEnvOrDefault(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// ── Dose ──────────────────────────────────────────────────────────────────────
+
+// getDose returns the dose card: current version, draft, history and shelf.
+// The dose service uses the oils error kinds, so oilsError maps them.
+func (a *app) getDose(w http.ResponseWriter, r *http.Request) {
+	v, err := a.dose.Get(r.Context(), a.userID(r))
+	if err != nil {
+		oilsError(w, err)
+		return
+	}
+	jsonOK(w, v)
 }

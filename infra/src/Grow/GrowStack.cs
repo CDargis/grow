@@ -141,6 +141,38 @@ public class GrowStack : Stack
             ProjectionType = ProjectionType.ALL
         });
 
+        // Dose: plan versions and the shelf (named role → current bottle).
+        // A handful of items per user; current/draft are worked out in Go.
+        Table doseVersionsTable = new Table(this, "DoseVersionsTable", new TableProps
+        {
+            TableName     = "grow-dose-versions",
+            PartitionKey  = new DynamoAttribute { Name = "versionId", Type = AttributeType.STRING },
+            BillingMode   = BillingMode.PAY_PER_REQUEST,
+            RemovalPolicy = RemovalPolicy.RETAIN
+        });
+        doseVersionsTable.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
+        {
+            IndexName      = "user-index",
+            PartitionKey   = new DynamoAttribute { Name = "userId",    Type = AttributeType.STRING },
+            SortKey        = new DynamoAttribute { Name = "versionId", Type = AttributeType.STRING },
+            ProjectionType = ProjectionType.ALL
+        });
+
+        Table shelfTable = new Table(this, "ShelfTable", new TableProps
+        {
+            TableName     = "grow-shelf",
+            PartitionKey  = new DynamoAttribute { Name = "shelfItemId", Type = AttributeType.STRING },
+            BillingMode   = BillingMode.PAY_PER_REQUEST,
+            RemovalPolicy = RemovalPolicy.RETAIN
+        });
+        shelfTable.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
+        {
+            IndexName      = "user-index",
+            PartitionKey   = new DynamoAttribute { Name = "userId",      Type = AttributeType.STRING },
+            SortKey        = new DynamoAttribute { Name = "shelfItemId", Type = AttributeType.STRING },
+            ProjectionType = ProjectionType.ALL
+        });
+
         // ── Cognito ───────────────────────────────────────────────────────
 
         UserPool userPool = new UserPool(this, "UserPool", new UserPoolProps
@@ -276,6 +308,8 @@ public class GrowStack : Stack
                 ["PRODUCTS_TABLE"]     = productsTable.TableName,
                 ["OIL_LOTS_TABLE"]     = oilLotsTable.TableName,
                 ["OIL_BATCHES_TABLE"]  = oilBatchesTable.TableName,
+                ["DOSE_VERSIONS_TABLE"] = doseVersionsTable.TableName,
+                ["SHELF_TABLE"]        = shelfTable.TableName,
                 ["MEDIA_BUCKET"]       = mediaBucket.BucketName,
                 ["USER_ID"]                 = "default",
                 ["USER_POOL_ID"]            = userPool.UserPoolId,
@@ -294,6 +328,8 @@ public class GrowStack : Stack
         productsTable.GrantReadWriteData(apiFunction);
         oilLotsTable.GrantReadWriteData(apiFunction);
         oilBatchesTable.GrantReadWriteData(apiFunction);
+        doseVersionsTable.GrantReadWriteData(apiFunction);
+        shelfTable.GrantReadWriteData(apiFunction);
         mediaBucket.GrantReadWrite(apiFunction);
 
         // ── API Gateway ───────────────────────────────────────────────────
@@ -525,6 +561,8 @@ function handler(event) {
         new CfnOutput(this, "ProductsTableName",      new CfnOutputProps { Value = productsTable.TableName });
         new CfnOutput(this, "OilLotsTableName",       new CfnOutputProps { Value = oilLotsTable.TableName });
         new CfnOutput(this, "OilBatchesTableName",    new CfnOutputProps { Value = oilBatchesTable.TableName });
+        new CfnOutput(this, "DoseVersionsTableName",  new CfnOutputProps { Value = doseVersionsTable.TableName });
+        new CfnOutput(this, "ShelfTableName",         new CfnOutputProps { Value = shelfTable.TableName });
         new CfnOutput(this, "MediaBucketName",        new CfnOutputProps { Value = mediaBucket.BucketName });
         new CfnOutput(this, "UserPoolId",             new CfnOutputProps { Value = userPool.UserPoolId });
         new CfnOutput(this, "UserPoolClientId",        new CfnOutputProps { Value = userPoolClient.UserPoolClientId });

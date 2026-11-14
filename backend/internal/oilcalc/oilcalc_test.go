@@ -303,3 +303,34 @@ func TestDose(t *testing.T) {
 		t.Error("expected error for a batch with none of the compound")
 	}
 }
+
+// LotGrams traces raw lot grams through a batch of batches; flower inputs
+// aren't lots and don't appear.
+func TestLotGramsThroughBatches(t *testing.T) {
+	iso := model.Batch{
+		BatchID: "b-iso", Code: "ISO-261024", Type: model.BatchISO,
+		Inputs:        []model.BatchInput{{Kind: model.InputLot, LotID: "lot-iso", Grams: 3}},
+		DensityGPerMl: 0.94, TotalGrams: 30, // 0.1 g isolate per g
+	}
+	blend := model.Batch{
+		BatchID: "b-bl", Code: "BL-261107", Type: model.BatchBL,
+		Inputs: []model.BatchInput{
+			{Kind: model.InputBatch, BatchID: "b-iso", Grams: 10},
+			{Kind: model.InputBatch, BatchID: "b-fs", Grams: 10},
+		},
+		DensityGPerMl: 0.94, TotalGrams: 20,
+	}
+	c := New([]model.Lot{isoLot}, []model.Batch{iso, fsOil, blend})
+	got, err := c.LotGrams("b-bl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("lots = %v, want only lot-iso", got)
+	}
+	approx(t, "isolate g per g of blend", got["lot-iso"], 0.05)
+
+	if _, err := c.LotGrams("nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("missing batch err = %v, want ErrNotFound", err)
+	}
+}

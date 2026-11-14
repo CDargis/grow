@@ -506,3 +506,43 @@ func Dose(mgPerG, densityGPerMl, targetMg float64) (DoseResult, error) {
 	g := targetMg / mgPerG
 	return DoseResult{Grams: g, Ml: g / densityGPerMl}, nil
 }
+
+// LotGrams returns, for one gram of the batch, how many grams of each lot
+// went into it, traced through batch inputs. It follows the physical
+// ingredients, so a batch's own lab COA doesn't change it. Flower and
+// additive inputs aren't lots and aren't counted.
+func (c *Calculator) LotGrams(batchID string) (map[string]float64, error) {
+	return c.lotGrams(batchID, map[string]bool{})
+}
+
+func (c *Calculator) lotGrams(batchID string, visiting map[string]bool) (map[string]float64, error) {
+	b, ok := c.batches[batchID]
+	if !ok {
+		return nil, fmt.Errorf("batch %s: %w", batchID, ErrNotFound)
+	}
+	if visiting[batchID] {
+		return nil, fmt.Errorf("%w at batch %s (%s)", ErrCycle, b.Code, b.BatchID)
+	}
+	if b.TotalGrams <= 0 {
+		return nil, fmt.Errorf("batch %s: totalGrams must be greater than 0", b.Code)
+	}
+	visiting[batchID] = true
+	defer delete(visiting, batchID)
+
+	out := map[string]float64{}
+	for i, in := range b.Inputs {
+		switch in.Kind {
+		case model.InputLot:
+			out[in.LotID] += in.Grams / b.TotalGrams
+		case model.InputBatch:
+			sub, err := c.lotGrams(in.BatchID, visiting)
+			if err != nil {
+				return nil, fmt.Errorf("batch %s input %d: %w", b.Code, i, err)
+			}
+			for lot, g := range sub {
+				out[lot] += g * in.Grams / b.TotalGrams
+			}
+		}
+	}
+	return out, nil
+}
