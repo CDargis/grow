@@ -56,3 +56,4 @@
 - [ ] Delivered-NPK trend/timeline view (Phase 2) — `context/plans/backlog/delivered-npk-trend-view.md`
 - [ ] Environment detail view (plants assigned, light schedule, assigned plants)
 - [ ] Oils: lots, batches, COAs, ROBP (Record of Batch Profile), MCP write tools — `context/plans/active/oils.md`
+- [ ] Dose: versioned dose plans + shelf, Oils → Dose segment — `context/plans/active/dose.md`

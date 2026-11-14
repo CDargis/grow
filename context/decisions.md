@@ -166,3 +166,6 @@ Real-world feeds are waterings with nutrients mixed in, and dry top-dresses get 
 
 ## Oils tracking lives in grow, not a separate app (2026-11-07)
 Tracking homemade oils (Red Mesa isolate/distillate, flower oils, blends) and their COAs is arguably outside a *grow* app's domain. Kept it in grow anyway: auth, Cognito, the MCP connector, the pipeline and the frontend already exist, and homegrow flower → oil is a real link (a flower input can reference a `plantId`). Leakage is contained by giving oils their own tables, MCP tools and top-level `/oils` route. The only link to the growing side is that optional `plantId`. Plan: `context/plans/active/oils.md`.
+
+## Dose plans live in grow, under Oils (2026-11-14)
+Dosing is one more step from growing, but its strengths come straight from batch ROBPs; anywhere else they'd have to be copied and would go stale. It's a third segment on the Oils page (Batches · Lots · Dose), not a new bottom-nav tab. Plan = mg per time-of-day slot; a separate "shelf" maps named slots to the bottle currently filling them, so switching to a new batch doesn't touch the dose. Versions are explicit (`bump` vs `amend`, Chris's call), and a draft is just a pending version. Plan, not a log: no daily intake logging. Plan: `context/plans/active/dose.md`.
