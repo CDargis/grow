@@ -169,6 +169,44 @@ interface Batch {
   createdAt: string;
   updatedAt?: string;
 }
+
+// ── Dose (Go: backend/internal/model/dose.go) ──────────────────────────────────
+// Plan = how much (mg); shelf = which bottle. mL/pieces and totals are derived
+// on read, never stored.
+
+type DoseCompound = 'cbd' | 'thc';   // totals: CBD + 0.877×CBDA, Δ9-THC + 0.877×THCA
+
+type ShelfSource =
+  | { kind: 'batch'; batchId: string }                     // strength from its ROBP
+  | { kind: 'product'; productName: string;                // strength from its label
+      unit: 'mL' | 'piece'; unitName?: string;             // unitName required for piece ("gummy")
+      mgPerUnit: Partial<Record<CannabinoidKey, number>>;
+      coaUrl?: string; coaS3Key?: string };
+
+interface ShelfItem {
+  shelfItemId: string;            // ULID
+  userId: string;
+  name: string;                   // role, unique per user (case-insensitive): "Distillate oil", "Night"
+  source: ShelfSource;            // current
+  since: string;                  // YYYY-MM-DD current source started
+  history?: Array<{ source: ShelfSource; from: string; to: string }>;  // [from, to)
+  notes?: string;
+  createdAt: string; updatedAt?: string;
+}
+
+interface DoseVersion {
+  versionId: string;              // ULID
+  userId: string;
+  name?: string;                  // "Distillate-led"
+  startDate?: string;             // absent or future = draft (at most one)
+  endDate?: string;               // active over [startDate, endDate); absent = open
+  times: Array<{                  // Morning / Midday / Night
+    name: string;
+    lines: Array<{ shelfItemId: string; mg: number; compound: DoseCompound; note?: string }>;
+  }>;
+  notes?: string;
+  createdAt: string; updatedAt?: string;
+}
 ```
 
 ## DynamoDB Tables
@@ -210,6 +248,18 @@ interface Batch {
 | PK: `batchId` | STRING | ULID |
 | GSI `user-index` | PK=userId, SK=batchId | list all batches for a user; code uniqueness and lookup-by-code done in Go |
 
+### grow-dose-versions
+| Key | Type | Notes |
+|-----|------|-------|
+| PK: `versionId` | STRING | ULID |
+| GSI `user-index` | PK=userId, SK=versionId | all versions for a user; current/draft worked out in Go from dates |
+
+### grow-shelf
+| Key | Type | Notes |
+|-----|------|-------|
+| PK: `shelfItemId` | STRING | ULID |
+| GSI `user-index` | PK=userId, SK=shelfItemId | all shelf items for a user; name uniqueness checked in Go |
+
 ### grow-settings
 | Key | Type | Notes |
 |-----|------|-------|
@@ -225,4 +275,5 @@ grow-media/
   oils/lots/{lotId}/coa/{ulid}.{pdf|html|…}       # archived copy of a lot's COA link
   oils/batches/{batchId}/coa/{ulid}.{pdf|html|…}  # archived copy of a batch lab COA
   oils/batches/{batchId}/flower-coa/{ulid}.{jpg|pdf|…}  # archived copy of a flower input's COA
+  dose/shelf/{shelfItemId}/coa/{ulid}.{pdf|jpg|…}       # archived copy of a premade product's COA
 ```

@@ -7,10 +7,11 @@ import type { BatchView, Compound, Lot } from '@/types'
 import { batchDateLabel, fmtMg, lotTotal } from '@/lib/oilDisplay'
 import { ProvenanceChips } from '@/components/oils/Provenance'
 import { CoaLinks } from '@/components/oils/CoaLinks'
+import { DoseTab } from './Dose'
 
-type Tab = 'batches' | 'lots'
+type Tab = 'batches' | 'lots' | 'dose'
 
-// Read-only: lots and batches are entered by talking to Claude through the
+// Read-only: lots, batches and the dose plan are entered by talking to Claude through the
 // MCP connector, so there are no add/edit buttons here.
 export function OilsPage() {
   const [tab, setTab] = useState<Tab>('batches')
@@ -20,7 +21,7 @@ export function OilsPage() {
       <h1 className="text-lg font-semibold mb-3">Oils</h1>
 
       <div className="flex gap-1 p-1 mb-4 bg-surface border border-border rounded-xl">
-        {(['batches', 'lots'] as const).map(t => (
+        {(['batches', 'lots', 'dose'] as const).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -33,7 +34,9 @@ export function OilsPage() {
         ))}
       </div>
 
-      {tab === 'batches' ? <BatchList /> : <LotList />}
+      {tab === 'batches' && <BatchList />}
+      {tab === 'lots' && <LotList />}
+      {tab === 'dose' && <DoseTab />}
     </div>
   )
 }

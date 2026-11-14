@@ -2,7 +2,7 @@ import imageCompression from 'browser-image-compression'
 import type {
   Plant, Environment, Log, LastActivity, Settings, Product,
   CreatePlantRequest, UpdatePlantDetailsRequest, CreateEnvironmentRequest, CreateLogRequest, UpdateSettingsRequest,
-  CreateProductRequest, Lot, BatchView,
+  CreateProductRequest, Lot, BatchView, DoseView,
 } from '@/types'
 import { getUserManager } from '@/auth/userManager'
 
@@ -86,6 +86,7 @@ export const api = {
     listBatches: ()             => request<BatchView[]>('/oils/batches'),
     // Accepts a batchId or a batch code such as FS-CBD-BB-260717.
     getBatch:    (batch: string) => request<BatchView>(`/oils/batches/${encodeURIComponent(batch)}`),
+    getDose:     ()             => request<DoseView>('/dose'),
   },
 
   media: {

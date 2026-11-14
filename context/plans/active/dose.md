@@ -1,7 +1,12 @@
 # Dose — Plans, Versions, and the Shelf
 
 ## Status
-Design settled 2026-11-14. Not built yet. Builds on oils (`context/plans/active/oils.md`).
+Design settled and built 2026-11-14: `internal/model/dose.go`, `internal/dose` (rules +
+`Derive`), `internal/store/dose.go`, `mcpserver/dose.go`, `GET /api/dose`, tables
+`grow-dose-versions` / `grow-shelf`, and the Oils → Dose segment (`pages/Oils/Dose.tsx`).
+Builds on oils (`context/plans/active/oils.md`). Next: Chris enters the current plan via
+the Claude app. Canonical schema is in `context/schema.md`; the draft schema below used
+earlier names (slots → times, ShelfSlot → ShelfItem).
 
 ## What it is
 Chris's daily dose regimen: mostly his own oils, sometimes a gummy or a premade oil.

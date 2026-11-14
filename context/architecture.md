@@ -50,6 +50,10 @@
   confidence with Chris, read back numbers) are sent as MCP server instructions; field-level
   guidance is in `jsonschema` struct tags on the request types. Writes needed no OAuth change:
   the token is only checked for issuer/client/`sub`, with no read-only scope.
+- Dose tools (`mcpserver/dose.go`): `get_dose_plan`, `list_shelf`, `set_shelf_item`,
+  `delete_shelf_item`, `create_dose_version`, `update_dose_version` (`mode: bump | amend`,
+  required), `start_dose_version`, `delete_dose_version`. Their workflow rules are appended to
+  the oils server instructions.
 - `server_info`: returns the deployed git commit (`BUILD_COMMIT` Lambda env var, set from
   CodeBuild's `CODEBUILD_RESOLVED_SOURCE_VERSION` at synth) and the server's current tool
   names, listed via an in-memory client so it matches what real clients get. For telling a
@@ -104,9 +108,25 @@
   the link is kept, `archiveError` is returned, and archiving is retried on the next
   update.
 
+### Dose (plan versions + shelf)
+- `internal/dose` holds the rules; `internal/store/dose.go` is plain persistence. Plan
+  lines name a shelf item; the shelf item points at a batch or a premade product. mL or
+  pieces, day totals, minors, use per 30 days and raw lot grams per 30 days are derived on
+  read (`dose.Derive`) from batch ROBPs (`oilcalc`, plus `Calculator.LotGrams` for the raw
+  trace) or product labels. A line that cannot be worked out carries an `error` instead of
+  failing the plan.
+- Version status comes from dates, not a stored field: active over `[startDate, endDate)`;
+  no start date or a future one is the draft (at most one). Scheduling a draft sets the
+  current version end date; deleting it clears that again.
+- "Today" is America/Chicago (`time/tzdata` embedded; Lambda has no zoneinfo).
+- REST: `GET /api/dose` only (read-only UI); writes go through MCP.
+- UI: third segment of the Oils page (`pages/Oils/Dose.tsx`), Current | Draft toggle when
+  a draft exists, with the draft day totals compared against current.
+
 ### Storage
 - DynamoDB: `grow-plants`, `grow-environments`, `grow-logs`, `grow-settings`,
-  `grow-products`, `grow-oil-lots`, `grow-oil-batches` tables
+  `grow-products`, `grow-oil-lots`, `grow-oil-batches`, `grow-dose-versions`, `grow-shelf`
+  tables
 - S3 `grow-media` bucket: plant/environment/log photos and archived COAs (private,
   pre-signed URL access)
 

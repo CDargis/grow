@@ -313,3 +313,90 @@ export interface BatchView {
   profile?: BatchProfile
   profileError?: string
 }
+
+// ── Dose (Go: backend/internal/model/dose.go, internal/dose) ─────────────────
+// Read-only in the UI; written through MCP. Amounts are derived server-side.
+
+export type DoseCompound = 'cbd' | 'thc'
+export type DoseStatus = 'current' | 'draft' | 'past'
+export type ShelfUnit = 'mL' | 'piece'
+
+export interface ShelfSource {
+  kind: 'batch' | 'product'
+  batchId?: string
+  productName?: string
+  unit?: ShelfUnit
+  unitName?: string
+  mgPerUnit?: Record<string, number>
+  coaUrl?: string
+  coaS3Key?: string
+}
+
+export interface ShelfItem {
+  shelfItemId: string
+  name: string
+  source: ShelfSource
+  since: string
+  history?: Array<{ source: ShelfSource; from: string; to: string }>
+  notes?: string
+}
+
+export interface ShelfStrength {
+  unit: ShelfUnit
+  unitName?: string
+  label: string
+  batchId?: string
+  cannabinoids: DoseAmount[]
+  totalCbd: number
+  totalThc: number
+  sharesCbd?: Compound['shares']
+  sharesThc?: Compound['shares']
+}
+
+export interface DoseAmount { key: string; name: string; mg: number }
+
+export interface DoseLineView {
+  shelfItemId: string
+  shelfName: string
+  compound: DoseCompound
+  mg: number
+  note?: string
+  amount: number
+  unit?: ShelfUnit
+  unitName?: string
+  source?: string
+  batchId?: string
+  shares?: Compound['shares']
+  error?: string
+}
+
+export interface DoseLine { shelfItemId: string; mg: number; compound: DoseCompound; note?: string }
+
+export interface DoseVersion {
+  versionId: string
+  name?: string
+  startDate?: string
+  endDate?: string
+  times: Array<{ name: string; lines: DoseLine[] }>
+  notes?: string
+}
+
+export interface DoseVersionView {
+  version: DoseVersion
+  status: DoseStatus
+  times: Array<{ name: string; lines: DoseLineView[]; totalCbd: number; totalThc: number }>
+  cannabinoids: DoseAmount[]
+  totalCbd: number
+  totalThc: number
+  minors: number
+  shelf: Array<{ shelfItemId: string; name: string; unit: ShelfUnit; unitName?: string; perDay: number; per30Days: number }>
+  rawLots: Array<{ lotId: string; label: string; gramsPer30Days: number }>
+}
+
+export interface DoseView {
+  today: string
+  current?: DoseVersionView
+  draft?: DoseVersionView
+  history: Array<{ version: DoseVersion; shelfNames: Record<string, string> }>
+  shelf: Array<{ item: ShelfItem; strength?: ShelfStrength; strengthError?: string }>
+}
