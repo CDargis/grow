@@ -209,17 +209,38 @@ function Shelf({ shelf }: { shelf: DoseView['shelf'] }) {
   )
 }
 
+// Newest few first; older ones load in steps so a long history doesn't
+// become one huge scroll.
+const HISTORY_FIRST = 3
+const HISTORY_STEP = 5
+
 function History({ history }: { history: DoseView['history'] }) {
   const [open, setOpen] = useState(false)
+  const [shown, setShown] = useState(HISTORY_FIRST)
+  const remaining = history.length - shown
   return (
     <div className="bg-surface rounded-xl border border-border">
       <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between p-4 text-left">
-        <span className="font-semibold text-primary">Past plans</span>
+        <span className="font-semibold text-primary">
+          Past plans <span className="text-xs font-normal text-muted">{history.length}</span>
+        </span>
         <ChevronDown size={18} className={`text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="px-4 pb-4 divide-y divide-border">
-          {history.map(({ version, shelfNames }) => <PastVersion key={version.versionId} v={version} names={shelfNames} />)}
+        <div className="px-4 pb-4">
+          <div className="divide-y divide-border">
+            {history.slice(0, shown).map(({ version, shelfNames }) => (
+              <PastVersion key={version.versionId} v={version} names={shelfNames} />
+            ))}
+          </div>
+          {remaining > 0 && (
+            <button
+              onClick={() => setShown(n => n + HISTORY_STEP)}
+              className="w-full mt-2 py-2 text-sm text-fern border-t border-border active:opacity-70"
+            >
+              Show older ({remaining} more)
+            </button>
+          )}
         </div>
       )}
     </div>
