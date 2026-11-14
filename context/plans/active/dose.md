@@ -101,6 +101,9 @@ interface DosePlanVersion {
 `delete_dose_version` (drafts only), `list_shelf`, `set_shelf_slot` (create or repoint;
 appends history), `delete_shelf_slot` (refused while a plan line uses it).
 
-## Open questions
-- Is "Night: 15 mg dose" a shelf slot (which product?) or a free-text line?
-- History view: just a list of past versions, or a diff between versions?
+## Settled details
+- Night is currently half a Sunset Lake Vibe gummy (30 mg CBD each, discontinued): a
+  shelf slot holding a product. The plan line is 15 mg CBD and the app shows "½ gummy". When the
+  gummies run out, the slot is repointed to an oil and the plan line is unchanged.
+- History: a list of full past versions first. A diff between versions ("Midday 350 → 310")
+  can be added later with no data changes, since versions are stored in full.
