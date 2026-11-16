@@ -111,7 +111,7 @@
 ### Dose (plan versions + shelf)
 - `internal/dose` holds the rules; `internal/store/dose.go` is plain persistence. Plan
   lines name a shelf item; the shelf item points at a batch or a premade product. mL or
-  pieces, day totals, minors, use per 30 days and raw lot grams per 30 days are derived on
+  pieces, day totals (cannabinoids, minors, terpenes), use per 30 days and raw lot grams per 30 days are derived on
   read (`dose.Derive`) from batch ROBPs (`oilcalc`, plus `Calculator.LotGrams` for the raw
   trace) or product labels. A line that cannot be worked out carries an `error` instead of
   failing the plan.

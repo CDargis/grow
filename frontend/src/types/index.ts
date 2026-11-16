@@ -327,9 +327,8 @@ export interface ShelfSource {
   productName?: string
   unit?: ShelfUnit
   unitName?: string
-  mgPerUnit?: Record<string, number>
-  coaUrl?: string
-  coaS3Key?: string
+  mgPerUnit?: Record<string, number>   // cannabinoid and terpene keys
+  coas?: Array<{ url: string; label?: string; s3Key?: string }>
 }
 
 export interface ShelfItem {
@@ -347,6 +346,7 @@ export interface ShelfStrength {
   label: string
   batchId?: string
   cannabinoids: DoseAmount[]
+  terpenes: DoseAmount[]
   totalCbd: number
   totalThc: number
   sharesCbd?: Compound['shares']
@@ -389,6 +389,8 @@ export interface DoseVersionView {
   totalCbd: number
   totalThc: number
   minors: number
+  terpenes: DoseAmount[]
+  totalTerpenes: number
   shelf: Array<{ shelfItemId: string; name: string; unit: ShelfUnit; unitName?: string; perDay: number; per30Days: number }>
   rawLots: Array<{ lotId: string; label: string; gramsPer30Days: number }>
 }

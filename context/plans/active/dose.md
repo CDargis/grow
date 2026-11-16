@@ -44,8 +44,8 @@ Peach Power     →  product: gummy, 40 mg CBD each
 - Opening a new batch with the same dose: repoint the slot. The plan doesn't change,
   and the mL recalculates.
 - Shuffling around what's available: repoint a slot or tweak a plan line.
-- **Products** (premade oils, gummies): label strength (mg/mL or mg/unit), optional
-  COA link (archived like lot COAs). No ROBP behind them.
+- **Products** (premade oils, gummies): label strength (mg/mL or mg/unit; cannabinoids and terpenes), any number of
+  labeled COAs (e.g. cannabinoids + terpenes), each archived like lot COAs. No ROBP behind them.
 - Each slot keeps a dated source history, so "what was I taking in March" is answerable.
 
 ### Versions
@@ -85,8 +85,8 @@ interface ShelfSlot {
 type ShelfSource =
   | { kind: 'batch'; batchId: string }
   | { kind: 'product'; name: string; unit: 'mL' | 'unit';
-      mgPerUnit: Partial<Record<CannabinoidKey, number>>;   // per mL or per piece
-      coaUrl?: string; coaS3Key?: string };
+      mgPerUnit: Partial<Record<CannabinoidKey | TerpeneKey, number>>;   // per mL or per piece
+      coas?: Array<{ url: string; label?: string; s3Key?: string }> };
 
 interface DosePlanVersion {
   versionId: string; userId: string;

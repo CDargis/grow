@@ -57,6 +57,9 @@ func (s *ShelfStore) List(ctx context.Context, userID string) ([]model.ShelfItem
 	if err := queryAllByUser(ctx, s.ddb, s.tableName, s.indexName, userID, &out); err != nil {
 		return nil, fmt.Errorf("list shelf: %w", err)
 	}
+	for i := range out {
+		out[i].UpgradeCOAs()
+	}
 	return out, nil
 }
 

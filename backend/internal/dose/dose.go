@@ -528,8 +528,8 @@ func (s *Service) SetShelfItem(ctx context.Context, userID string, req SetShelfI
 		return nil, err
 	}
 	src := req.Source
-	src.COAURL = strings.TrimSpace(src.COAURL)
-	src.COAS3Key = ""
+	src.LegacyCOAURL, src.LegacyCOAS3Key = "", ""
+	src.COAs = cleanCOAs(src.COAs)
 	if src.Kind == model.ShelfFromBatch {
 		// Accept a batch code as well as an ID.
 		batches, err := s.batches.List(ctx, userID)
@@ -553,6 +553,13 @@ func (s *Service) SetShelfItem(ctx context.Context, userID string, req SetShelfI
 	}
 
 	item, exists := snap.findItem(req.Name)
+	// COA links already archived keep their copy, whatever else changed.
+	archived := map[string]string{}
+	for _, c := range item.Source.COAs {
+		if c.S3Key != "" {
+			archived[c.URL] = c.S3Key
+		}
+	}
 	if !exists {
 		item = model.ShelfItem{
 			ShelfItemID: ulid.Make().String(), UserID: userID,
@@ -561,8 +568,7 @@ func (s *Service) SetShelfItem(ctx context.Context, userID string, req SetShelfI
 		}
 	} else {
 		old := item.Source
-		oldKey := old.COAS3Key
-		old.COAS3Key = ""
+		old.COAs = cleanCOAs(old.COAs)
 		if !reflect.DeepEqual(old, src) {
 			switch {
 			case since < item.Since:
@@ -570,10 +576,9 @@ func (s *Service) SetShelfItem(ctx context.Context, userID string, req SetShelfI
 			case since > item.Since:
 				item.History = append(item.History, model.ShelfHistoryEntry{Source: item.Source, From: item.Since, To: since})
 			}
-			item.Source, item.Since = src, since
-		} else {
-			item.Source.COAS3Key = oldKey // unchanged source keeps its archive
+			item.Since = since
 		}
+		item.Source = src
 		item.UpdatedAt = s.stamp()
 	}
 	if req.NewName != "" {
@@ -592,16 +597,26 @@ func (s *Service) SetShelfItem(ctx context.Context, userID string, req SetShelfI
 	}
 
 	view := ShelfItemView{}
-	if item.Source.COAURL != "" && item.Source.COAS3Key == "" {
-		if s.archiver == nil {
-			view.ArchiveError = "COA archiving is not configured"
-		} else if key, err := s.archiver.Archive(ctx, item.Source.COAURL, "dose/shelf/"+item.ShelfItemID+"/coa"); err != nil {
-			log.Printf("warn: archive COA %s: %v", item.Source.COAURL, err)
-			view.ArchiveError = err.Error()
-		} else {
-			item.Source.COAS3Key = key
+	var archiveErrs []string
+	for i := range item.Source.COAs {
+		c := &item.Source.COAs[i]
+		if key := archived[c.URL]; key != "" {
+			c.S3Key = key
+			continue
 		}
+		if s.archiver == nil {
+			archiveErrs = append(archiveErrs, "COA archiving is not configured")
+			break
+		}
+		key, err := s.archiver.Archive(ctx, c.URL, "dose/shelf/"+item.ShelfItemID+"/coa")
+		if err != nil {
+			log.Printf("warn: archive COA %s: %v", c.URL, err)
+			archiveErrs = append(archiveErrs, fmt.Sprintf("%s: %v", c.URL, err))
+			continue
+		}
+		c.S3Key = key
 	}
+	view.ArchiveError = strings.Join(archiveErrs, "; ")
 	if err := s.shelf.Put(ctx, item); err != nil {
 		return nil, err
 	}
@@ -623,6 +638,19 @@ func (s *Service) SetShelfItem(ctx context.Context, userID string, req SetShelfI
 		view.Strength = &st
 	}
 	return &view, nil
+}
+
+// cleanCOAs trims links and drops archive keys, so a source from input
+// compares equal to the stored one when only the archive differs.
+func cleanCOAs(in []model.ShelfCOA) []model.ShelfCOA {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]model.ShelfCOA, len(in))
+	for i, c := range in {
+		out[i] = model.ShelfCOA{URL: strings.TrimSpace(c.URL), Label: strings.TrimSpace(c.Label)}
+	}
+	return out
 }
 
 // DeleteShelfItem is refused while any version (past ones included, which

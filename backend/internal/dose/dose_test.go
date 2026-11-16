@@ -3,7 +3,9 @@ package dose
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -85,8 +87,11 @@ func (m memBatches) Delete(_ context.Context, id string) error  { delete(m, id);
 
 type okArchiver struct{}
 
+// Unique keys, so a test can tell a kept archive from a fresh one.
+var archiveSeq atomic.Int64
+
 func (okArchiver) Archive(_ context.Context, _, prefix string) (string, error) {
-	return prefix + "/archived.pdf", nil
+	return fmt.Sprintf("%s/%d.pdf", prefix, archiveSeq.Add(1)), nil
 }
 func (okArchiver) Remove(context.Context, string) error { return nil }
 
@@ -373,12 +378,90 @@ func TestShelfRules(t *testing.T) {
 	}
 	res, err := f.svc.SetShelfItem(ctx, user, SetShelfItemRequest{Name: "Peach",
 		Source: model.ShelfSource{Kind: model.ShelfFromProduct, ProductName: "Peach Power", Unit: model.ProductPerPiece,
-			UnitName: "gummy", MgPerUnit: map[string]float64{"cbd": 40}, COAURL: "https://example.com/coa.pdf"}})
+			UnitName: "gummy", MgPerUnit: map[string]float64{"cbd": 40}, COAs: []model.ShelfCOA{
+				{URL: "https://example.com/cannabinoids.pdf", Label: "Cannabinoids"},
+				{URL: "https://example.com/terpenes.pdf", Label: "Terpenes"}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Item.Source.COAS3Key == "" {
-		t.Errorf("product COA not archived")
+	coas := res.Item.Source.COAs
+	if len(coas) != 2 || coas[0].S3Key == "" || coas[1].S3Key == "" {
+		t.Fatalf("product COAs not all archived: %+v", coas)
+	}
+	if coas[1].Label != "Terpenes" {
+		t.Errorf("COA label = %q", coas[1].Label)
+	}
+}
+
+// Re-sending a product with its COAs (as Claude does when adding terpenes)
+// keeps the archived copies and, same day, adds no history entry.
+func TestShelfCOAsKeepArchives(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	src := model.ShelfSource{Kind: model.ShelfFromProduct, ProductName: "Vibe", Unit: model.ProductPerPiece,
+		UnitName: "gummy", MgPerUnit: map[string]float64{"cbd": 30},
+		COAs: []model.ShelfCOA{{URL: "https://example.com/c.pdf", Label: "Cannabinoids"}}}
+	first, err := f.svc.SetShelfItem(ctx, user, SetShelfItemRequest{Name: "Night", Source: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := first.Item.Source.COAs[0].S3Key
+
+	src.MgPerUnit = map[string]float64{"cbd": 30, "myrcene": 0.5}
+	src.COAs = append(src.COAs, model.ShelfCOA{URL: "https://example.com/t.pdf", Label: "Terpenes"})
+	res, err := f.svc.SetShelfItem(ctx, user, SetShelfItemRequest{Name: "Night", Source: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := res.Item.Source.COAs[0].S3Key; got != key {
+		t.Errorf("existing COA re-archived: key %q, want %q", got, key)
+	}
+	if res.Item.Source.COAs[1].S3Key == "" {
+		t.Errorf("new COA not archived")
+	}
+	if len(res.Item.History) != 0 {
+		t.Errorf("same-day correction added history: %+v", res.Item.History)
+	}
+	if res.Strength == nil || len(res.Strength.Terpenes) != 1 || res.Strength.Terpenes[0].Key != "myrcene" {
+		t.Errorf("strength terpenes = %+v", res.Strength)
+	}
+
+	if _, err := f.svc.SetShelfItem(ctx, user, SetShelfItemRequest{Name: "Night", Source: model.ShelfSource{
+		Kind: model.ShelfFromProduct, ProductName: "Vibe", Unit: model.ProductPerPiece, UnitName: "gummy",
+		MgPerUnit: map[string]float64{"cbd": 30, "pinene": 1}}}); !errors.Is(err, oils.ErrInvalid) {
+		t.Errorf("unknown terpene key err = %v, want invalid", err)
+	}
+}
+
+func TestUpgradeLegacyCOA(t *testing.T) {
+	it := model.ShelfItem{
+		Source:  model.ShelfSource{LegacyCOAURL: "https://a", LegacyCOAS3Key: "k"},
+		History: []model.ShelfHistoryEntry{{Source: model.ShelfSource{LegacyCOAURL: "https://b"}}},
+	}
+	it.UpgradeCOAs()
+	if len(it.Source.COAs) != 1 || it.Source.COAs[0].S3Key != "k" || it.Source.LegacyCOAURL != "" {
+		t.Errorf("source = %+v", it.Source)
+	}
+	if len(it.History[0].Source.COAs) != 1 || it.History[0].Source.COAs[0].URL != "https://b" {
+		t.Errorf("history = %+v", it.History[0].Source)
+	}
+}
+
+// Terpenes from a product's label add up per day like cannabinoids.
+func TestDayTerpenes(t *testing.T) {
+	src := model.ShelfSource{Kind: model.ShelfFromProduct, ProductName: "Vibe", Unit: model.ProductPerPiece,
+		UnitName: "gummy", MgPerUnit: map[string]float64{"cbd": 30, "myrcene": 0.6, "limonene": 0.2}}
+	items := map[string]model.ShelfItem{"g": {ShelfItemID: "g", Name: "Night", Source: src}}
+	v := model.DoseVersion{StartDate: "2026-11-01", Times: []model.DoseTime{
+		{Name: "Night", Lines: []model.DoseLine{{ShelfItemID: "g", Mg: 15, Compound: model.DoseCBD}}}}}
+	out := Derive(v, "2026-11-16", items, map[string]Strength{"g": ProductStrength(src)}, nil, nil)
+	if len(out.Terpenes) != 2 || out.Terpenes[0].Key != "myrcene" {
+		t.Fatalf("terpenes = %+v", out.Terpenes)
+	}
+	approx(t, "myrcene", out.Terpenes[0].Mg, 0.3)
+	approx(t, "total terpenes", out.TotalTerpenes, 0.4)
+	if out.Minors != 0 {
+		t.Errorf("terpenes counted as minor cannabinoids: %v", out.Minors)
 	}
 }
 

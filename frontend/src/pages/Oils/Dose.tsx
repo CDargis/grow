@@ -6,6 +6,7 @@ import { api } from '@/api/client'
 import type { DoseLineView, DoseVersion, DoseVersionView, DoseView, ShelfUnit } from '@/types'
 import { batchDateLabel } from '@/lib/oilDisplay'
 import { ProvenanceChips } from '@/components/oils/Provenance'
+import { CoaLinks } from '@/components/oils/CoaLinks'
 
 // The dose card. Read-only: the plan and shelf are set by talking to Claude.
 // Every mL/piece amount is worked out server-side from the shelf's current
@@ -113,6 +114,7 @@ function Line({ l }: { l: DoseLineView }) {
 function DayTotal({ v, was }: { v: DoseVersionView; was?: DoseVersionView }) {
   const wasShelf = new Map(was?.shelf.map(s => [s.shelfItemId, s]))
   const wasLots = new Map(was?.rawLots.map(r => [r.lotId, r]))
+  const wasTerps = new Map(was?.terpenes.map(t => [t.key, t]))
   return (
     <div className="p-4 bg-surface rounded-xl border border-border">
       <p className="text-xs uppercase tracking-wide text-muted mb-2">Day total</p>
@@ -121,6 +123,20 @@ function DayTotal({ v, was }: { v: DoseVersionView; was?: DoseVersionView }) {
         <Row label="THC" value={`${round(v.totalThc, 1)} mg`} was={was && `${round(was.totalThc, 1)} mg`} strong />
       )}
       {v.minors > 0 && <Row label="Minor cannabinoids" value={`${round(v.minors, 1)} mg`} was={was && `${round(was.minors, 1)} mg`} />}
+
+      {(v.terpenes.length > 0 || (was?.terpenes.length ?? 0) > 0) && (
+        <>
+          <Divider label="Terpenes per day" />
+          <Row label="Total" value={`${round(v.totalTerpenes, 1)} mg`} was={was && `${round(was.totalTerpenes, 1)} mg`} />
+          {v.terpenes.map(t => {
+            const w = wasTerps.get(t.key)
+            return (
+              <Row key={t.key} label={t.name} value={`${round(t.mg, 2)} mg`}
+                was={was && (w ? `${round(w.mg, 2)} mg` : 'none')} />
+            )
+          })}
+        </>
+      )}
 
       {v.shelf.length > 0 && <Divider label="Per day · per 30 days" />}
       {v.shelf.map(s => {
@@ -193,6 +209,11 @@ function Shelf({ shelf }: { shelf: DoseView['shelf'] }) {
                   : (strength?.label ?? item.source.productName ?? item.source.batchId)}
                 {' '}· since {batchDateLabel(item.since)}
               </p>
+              {item.source.coas && item.source.coas.length > 0 && (
+                <div className="mt-1 space-y-1">
+                  {item.source.coas.map(c => <CoaLinks key={c.url} url={c.url} s3Key={c.s3Key} label={c.label} />)}
+                </div>
+              )}
               {strengthError && (
                 <p className="flex items-center gap-1 text-xs text-red-400 mt-1"><AlertTriangle size={12} /> {strengthError}</p>
               )}

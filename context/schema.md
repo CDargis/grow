@@ -180,8 +180,11 @@ type ShelfSource =
   | { kind: 'batch'; batchId: string }                     // strength from its ROBP
   | { kind: 'product'; productName: string;                // strength from its label
       unit: 'mL' | 'piece'; unitName?: string;             // unitName required for piece ("gummy")
-      mgPerUnit: Partial<Record<CannabinoidKey, number>>;
-      coaUrl?: string; coaS3Key?: string };
+      mgPerUnit: Partial<Record<CannabinoidKey | TerpeneKey, number>>;  // terpenes → day terpene totals
+      coas?: Array<{ url: string; label?: string;          // "Cannabinoids", "Terpenes"
+                     s3Key?: string }> };                  // archived copy; kept across updates by url
+// Items written before 2026-11-16 may carry a single coaUrl/coaS3Key; the
+// store folds it into coas on read (model.ShelfItem.UpgradeCOAs).
 
 interface ShelfItem {
   shelfItemId: string;            // ULID

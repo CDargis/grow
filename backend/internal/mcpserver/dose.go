@@ -27,7 +27,13 @@ plan, not a log: never record what he took on a given day.
 - mg in a plan line is total CBD or total THC (acid ×0.877 included). The app works out mL or
   pieces from the shelf item's current strength. Never send mL.
 - Premade products and gummies: set_shelf_item with a product source and the label strength
-  (mgPerUnit per mL or per piece).
+  (mgPerUnit per mL or per piece). mgPerUnit takes terpene keys too, so the day total shows
+  terpenes. Terpene COAs usually report % or mg/g: convert to mg per unit with the unit's weight
+  (a gummy's weight from the COA or label; for an oil, mg/g × density, about 0.92-0.95 g/mL).
+  If the weight isn't given anywhere, ask Chris. Don't guess.
+- A product can have several COAs (e.g. one for cannabinoids, one for terpenes): send them all in
+  coas, each with a label. Updating a product means sending its whole source again, including
+  every COA, because what you send replaces what's there. Read it first with list_shelf.
 - After a change, read back each time of day with the mg and the resulting mL/pieces, plus the
   day's total CBD and THC. Mention any line error.`
 
@@ -41,7 +47,7 @@ func (d Deps) addDoseTools(s *mcp.Server, userID string) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "get_dose_plan",
 		Description: "The dose card: the current version and the draft (if any), each with every time of day's " +
-			"lines worked out to mL or pieces from the shelf's current strengths, day totals (CBD, THC, minors), " +
+			"lines worked out to mL or pieces from the shelf's current strengths, day totals (CBD, THC, minors, terpenes), " +
 			"use per 30 days per shelf item, and raw lot grams per 30 days. Plus past versions and the shelf.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {

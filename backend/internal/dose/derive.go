@@ -15,8 +15,10 @@ type Strength struct {
 	UnitName string            `json:"unitName,omitempty"` // "gummy" for pieces
 	Label    string            `json:"label"`              // batch code or product name
 	BatchID  string            `json:"batchId,omitempty"`
-	// Cannabinoids per unit, in display order. Totals use the ROBP convention.
+	// Cannabinoids and terpenes per unit, in display order. Totals use the
+	// ROBP convention.
 	Cannabinoids []Amount `json:"cannabinoids"`
+	Terpenes     []Amount `json:"terpenes"`
 	TotalCBD     float64  `json:"totalCbd"`
 	TotalTHC     float64  `json:"totalThc"`
 	// Provenance of the totals; only batches have it (products are a label).
@@ -91,12 +93,15 @@ type VersionView struct {
 	Times   []TimeView        `json:"times"`
 	// Day totals: every cannabinoid delivered, plus the two totals and the
 	// sum of minors (everything but CBD/CBDA/Δ9-THC/THCA).
-	Cannabinoids []Amount     `json:"cannabinoids"`
-	TotalCBD     float64      `json:"totalCbd"`
-	TotalTHC     float64      `json:"totalThc"`
-	Minors       float64      `json:"minors"`
-	Shelf        []ShelfUsage `json:"shelf"`
-	RawLots      []LotUsage   `json:"rawLots"`
+	Cannabinoids []Amount `json:"cannabinoids"`
+	TotalCBD     float64  `json:"totalCbd"`
+	TotalTHC     float64  `json:"totalThc"`
+	Minors       float64  `json:"minors"`
+	// Terpenes delivered per day, and their sum.
+	Terpenes      []Amount     `json:"terpenes"`
+	TotalTerpenes float64      `json:"totalTerpenes"`
+	Shelf         []ShelfUsage `json:"shelf"`
+	RawLots       []LotUsage   `json:"rawLots"`
 }
 
 const daysPerMonth = 30
@@ -149,6 +154,9 @@ func Derive(v model.DoseVersion, today string, items map[string]model.ShelfItem,
 			for _, a := range s.Cannabinoids {
 				dayMg[a.Key] += lv.Amount * a.Mg
 			}
+			for _, a := range s.Terpenes {
+				dayMg[a.Key] += lv.Amount * a.Mg
+			}
 			perDay[l.ShelfItemID] += lv.Amount
 			for lot, g := range s.LotGrams {
 				lotPerDay[lot] += lv.Amount * g
@@ -168,6 +176,13 @@ func Derive(v model.DoseVersion, today string, items map[string]model.ShelfItem,
 		out.Cannabinoids = append(out.Cannabinoids, Amount{Key: d.Key, Name: d.Name, Mg: mg})
 		if !majorKeys[d.Key] {
 			out.Minors += mg
+		}
+	}
+
+	for _, d := range model.KnownTerpenes {
+		if mg, ok := dayMg[d.Key]; ok {
+			out.Terpenes = append(out.Terpenes, Amount{Key: d.Key, Name: d.Name, Mg: mg})
+			out.TotalTerpenes += mg
 		}
 	}
 
@@ -203,6 +218,9 @@ func Derive(v model.DoseVersion, today string, items map[string]model.ShelfItem,
 	if out.Cannabinoids == nil {
 		out.Cannabinoids = []Amount{}
 	}
+	if out.Terpenes == nil {
+		out.Terpenes = []Amount{}
+	}
 	if out.Shelf == nil {
 		out.Shelf = []ShelfUsage{}
 	}
@@ -229,8 +247,11 @@ func BatchStrength(p oilcalc.Profile, lotGramsPerG map[string]float64) Strength 
 		LotGrams: make(map[string]float64, len(lotGramsPerG)),
 	}
 	for _, c := range p.Compounds {
-		if c.Group == "cannabinoid" {
+		switch c.Group {
+		case "cannabinoid":
 			s.Cannabinoids = append(s.Cannabinoids, Amount{Key: c.Key, Name: c.Name, Mg: c.MgPerMl})
+		case "terpene":
+			s.Terpenes = append(s.Terpenes, Amount{Key: c.Key, Name: c.Name, Mg: c.MgPerMl})
 		}
 	}
 	for lot, g := range lotGramsPerG {
@@ -245,6 +266,11 @@ func ProductStrength(src model.ShelfSource) Strength {
 	for _, d := range model.KnownCannabinoids {
 		if mg, ok := src.MgPerUnit[d.Key]; ok {
 			s.Cannabinoids = append(s.Cannabinoids, Amount{Key: d.Key, Name: d.Name, Mg: mg})
+		}
+	}
+	for _, d := range model.KnownTerpenes {
+		if mg, ok := src.MgPerUnit[d.Key]; ok {
+			s.Terpenes = append(s.Terpenes, Amount{Key: d.Key, Name: d.Name, Mg: mg})
 		}
 	}
 	m := src.MgPerUnit

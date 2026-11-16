@@ -51,11 +51,40 @@ type ShelfSource struct {
 	ProductName string      `dynamodbav:"productName,omitempty" json:"productName,omitempty" jsonschema:"product sources: brand and product, e.g. Sunset Lake Vibe gummy"`
 	Unit        ProductUnit `dynamodbav:"unit,omitempty"        json:"unit,omitempty"        jsonschema:"product sources: mL (an oil, strength per mL) or piece (gummy, capsule; strength per piece)"`
 	UnitName    string      `dynamodbav:"unitName,omitempty"    json:"unitName,omitempty"    jsonschema:"product sources with unit piece: what one piece is called, e.g. gummy"`
-	// MgPerUnit is per mL or per piece. Keys are the known cannabinoid keys,
-	// so totals use the same CBD + 0.877×CBDA convention as batches.
-	MgPerUnit map[string]float64 `dynamodbav:"mgPerUnit,omitempty" json:"mgPerUnit,omitempty" jsonschema:"product sources: label strength in mg per unit by cannabinoid key (cbd cbda d9thc thca d8thc cbg cbga cbn cbc cbdv thcv), e.g. {cbd: 30} for a 30 mg CBD gummy"`
-	COAURL    string             `dynamodbav:"coaUrl,omitempty"    json:"coaUrl,omitempty"    jsonschema:"product sources, optional: link to the product's COA; the app keeps a copy"`
-	COAS3Key  string             `dynamodbav:"coaS3Key,omitempty"  json:"coaS3Key,omitempty"  jsonschema:"ignored on input; set by archiving"`
+	// MgPerUnit is per mL or per piece. Keys are the known cannabinoid and
+	// terpene keys, so totals use the same CBD + 0.877×CBDA convention as
+	// batches and terpenes add up alongside.
+	MgPerUnit map[string]float64 `dynamodbav:"mgPerUnit,omitempty" json:"mgPerUnit,omitempty" jsonschema:"product sources: mg per unit by cannabinoid key (cbd cbda d9thc thca d8thc cbg cbga cbn cbc cbdv thcv) or terpene key (myrcene limonene beta_caryophyllene linalool alpha_pinene beta_pinene humulene terpinolene ocimene bisabolol nerolidol caryophyllene_oxide eucalyptol geraniol camphene terpineol), e.g. {cbd: 30, myrcene: 0.4}"`
+	// A product can have several COAs, e.g. one for cannabinoids and one for
+	// terpenes.
+	COAs []ShelfCOA `dynamodbav:"coas,omitempty" json:"coas,omitempty" jsonschema:"product sources, optional: the product's COAs, each labeled with what it covers; the app keeps a copy of each"`
+
+	// Single COA from before 2026-11-16. Read only: UpgradeCOAs folds it into COAs.
+	LegacyCOAURL   string `dynamodbav:"coaUrl,omitempty"   json:"-"`
+	LegacyCOAS3Key string `dynamodbav:"coaS3Key,omitempty" json:"-"`
+}
+
+type ShelfCOA struct {
+	URL   string `dynamodbav:"url"             json:"url"             jsonschema:"link to the COA"`
+	Label string `dynamodbav:"label,omitempty" json:"label,omitempty" jsonschema:"what it covers, e.g. Cannabinoids or Terpenes"`
+	S3Key string `dynamodbav:"s3Key,omitempty" json:"s3Key,omitempty" jsonschema:"ignored on input; set by archiving"`
+}
+
+// UpgradeCOAs moves a legacy single COA into COAs.
+func (s *ShelfSource) UpgradeCOAs() {
+	if s.LegacyCOAURL == "" && s.LegacyCOAS3Key == "" {
+		return
+	}
+	s.COAs = append([]ShelfCOA{{URL: s.LegacyCOAURL, S3Key: s.LegacyCOAS3Key}}, s.COAs...)
+	s.LegacyCOAURL, s.LegacyCOAS3Key = "", ""
+}
+
+// UpgradeCOAs upgrades the current source and every history entry.
+func (s *ShelfItem) UpgradeCOAs() {
+	s.Source.UpgradeCOAs()
+	for i := range s.History {
+		s.History[i].Source.UpgradeCOAs()
+	}
 }
 
 // ShelfHistoryEntry is a source a shelf item used to point at, [From, To).
@@ -188,7 +217,7 @@ func (s ShelfSource) Validate() error {
 		if s.BatchID == "" {
 			errs = append(errs, errors.New("batchId is required"))
 		}
-		if s.ProductName != "" || s.Unit != "" || len(s.MgPerUnit) > 0 || s.COAURL != "" {
+		if s.ProductName != "" || s.Unit != "" || len(s.MgPerUnit) > 0 || len(s.COAs) > 0 {
 			errs = append(errs, errors.New("product fields don't apply to a batch source (its strength comes from the ROBP)"))
 		}
 	case ShelfFromProduct:
@@ -211,11 +240,16 @@ func (s ShelfSource) Validate() error {
 			errs = append(errs, errors.New("mgPerUnit is required (the label strength)"))
 		}
 		for k, v := range s.MgPerUnit {
-			if !knownCannabinoidKeys[k] {
-				errs = append(errs, fmt.Errorf("unknown cannabinoid %q in mgPerUnit", k))
+			if !knownCannabinoidKeys[k] && !knownTerpeneKeys[k] {
+				errs = append(errs, fmt.Errorf("unknown cannabinoid or terpene %q in mgPerUnit", k))
 			}
 			if v < 0 {
 				errs = append(errs, fmt.Errorf("mgPerUnit %q must not be negative", k))
+			}
+		}
+		for i, c := range s.COAs {
+			if strings.TrimSpace(c.URL) == "" {
+				errs = append(errs, fmt.Errorf("coas[%d]: url is required", i))
 			}
 		}
 	default:

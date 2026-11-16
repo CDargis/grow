@@ -5,7 +5,8 @@ import { api } from '@/api/client'
 // Links to a COA: the archived copy (presigned S3 URL, fetched on tap so it
 // never expires on screen) and the original link. "Not archived" flags a COA
 // whose download failed, so the record depends on the lab keeping the file up.
-export function CoaLinks({ url, s3Key }: { url?: string; s3Key?: string }) {
+// label names what a COA covers when there's more than one ("Terpenes COA").
+export function CoaLinks({ url, s3Key, label }: { url?: string; s3Key?: string; label?: string }) {
   const [opening, setOpening] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,7 +41,7 @@ export function CoaLinks({ url, s3Key }: { url?: string; s3Key?: string }) {
       {s3Key && (
         <button onClick={openArchived} disabled={opening} className="flex items-center gap-1 text-fern active:opacity-70 disabled:opacity-50">
           <FileText size={13} />
-          {opening ? 'Opening…' : 'COA'}
+          {opening ? 'Opening…' : label ? `${label} COA` : 'COA'}
         </button>
       )}
       {url && (
